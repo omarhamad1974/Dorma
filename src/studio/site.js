@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, pn, LANGS, siteLangs, setLang, localize, ui } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, pn, LANGS, siteLangs, setLang, localize, ui } from './core';
 import { Store } from './store';
 import { A } from './data';
 
@@ -76,7 +76,7 @@ const SECTIONS={
     const stage=h("div",{class:"stage"}), wipe=h("div",{class:"wipe"});
     root.append(stage,wipe,h("div",{class:"shade-hero"}));
     if (cfg.theme.grain) root.append(h("div",{class:"grain"}));
-    const S=slides.map((s,i)=>{ const el=h("div",{class:"slide","aria-hidden":"true"}), par=h("div",{class:"par"}); const node=mediaNode(cfg,s.media,{w:1920,hh:1080}); if (node) par.append(node); el.append(par); stage.append(el); return {el,par,node}; });
+    const S=slides.map((s,i)=>{ const el=h("div",{class:"slide","aria-hidden":"true"}), par=h("div",{class:"par"}); const node=mediaNode(cfg,s.media,{w:1920,hh:1080}); if (node) par.append(node); el.append(par); if (node){ const ov=overlayEl(cfg,s.media); if (ov) el.append(ov); } stage.append(el); return {el,par,node}; });
     const eyeIdx=h("span",{text:"01",style:"color:var(--accent)"}), eyeTxt=h("span",{class:"txt"}), rule=h("span",{style:"width:56px;height:1px;background:var(--faint);transform-origin:left;display:inline-block"});
     const eyebrow=h("p",{class:"eyebrow",style:"--x:0"},eyeIdx,rule,eyeTxt); eyebrow.classList.add("no-after"); eyebrow.style.setProperty("gap","14px");
     const title=h("h1",{class:"title"}), lede=h("p",{class:"lede"});

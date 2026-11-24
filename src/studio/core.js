@@ -115,11 +115,38 @@ function mediaNode(cfg,id,{w=1280,hh=800}={}){
   c.getContext("2d").drawImage(src,(src.width-sw)*(+(m.fx??.5)),(src.height-sh)*(+(m.fy??.5)),sw,sh,0,0,w,hh);
   return c;
 }
+/* ---------- colour overlays ----------
+   theme.imageOverlay is the site-wide default; a library item's own overlay replaces it.
+   Shape: {mode:"default"|"none"|"solid"|"linear"|"radial", c1,a1, c2,a2, angle, blend}.
+   "default" (or no overlay on the item) follows the site default. */
+const OV_MODES=new Set(["solid","linear","radial"]);
+const OV_BLENDS=new Set(["normal","multiply","screen","overlay","soft-light","hard-light","color","luminosity","color-burn","color-dodge","darken","lighten","hue","saturation"]);
+const clamp01=v=>{ const n=+v; return isNaN(n)?1:Math.max(0,Math.min(1,n)); };
+/** The overlay that applies to a library item, or null when there is none. */
+function overlayFor(cfg,id){
+  const m=mediaItem(cfg,id); if (!m || m.kind==="article") return null;
+  const own=m.overlay&&typeof m.overlay==="object"&&m.overlay.mode&&m.overlay.mode!=="default"?m.overlay:null;
+  const o=own||(cfg.theme&&cfg.theme.imageOverlay);
+  return o&&OV_MODES.has(o.mode)?o:null;
+}
+/** CSS for an overlay: {background, blend}. Horizontal gradients mirror on Arabic (RTL) pages so the strong side follows the text. */
+function overlayCss(o,{rtl=LANG.cur==="ar"}={}){
+  if (!o || !OV_MODES.has(o.mode)) return null;
+  const c1=rgba(o.c1,clamp01(o.a1??1)), c2=rgba(o.c2||o.c1,clamp01(o.a2??0));
+  let ang=((+o.angle||0)%360+360)%360; if (rtl) ang=(360-ang)%360;
+  const background=o.mode==="solid"?`linear-gradient(${c1},${c1})`:o.mode==="radial"?`radial-gradient(circle at 50% 50%,${c1} 0%,${c2} 100%)`:`linear-gradient(${ang}deg,${c1} 0%,${c2} 100%)`;
+  return {background, blend:OV_BLENDS.has(o.blend)?o.blend:"normal"};
+}
+/** The overlay layer for a library item (placed over the image), or null. */
+function overlayEl(cfg,id,o=overlayFor(cfg,id)){
+  const css=overlayCss(o); if (!css) return null;
+  const el=h("span",{class:"img-ov","aria-hidden":"true"}); el.style.background=css.background; el.style.mixBlendMode=css.blend; return el;
+}
 const isMoving=(cfg,id)=>{ const m=mediaItem(cfg,id); return !!m && (m.kind==="video"||m.animate); };
 /* a framed image box; ratio sets canvas resolution */
 function mediaBox(cfg,id,{ratio=1.6,badge="",cls="",bleed=false,res=1280}={}){
   const box=h("div",{class:"ph"+(bleed?" bleed":"")+(cls?" "+cls:"")});
-  const node=mediaNode(cfg,id,{w:res,hh:Math.round(res/ratio)}); if (node) box.append(node);
+  const node=mediaNode(cfg,id,{w:res,hh:Math.round(res/ratio)}); if (node){ box.append(node); const ov=overlayEl(cfg,id); if (ov) box.append(ov); }
   if (badge && NUM.on) box.append(h("span",{class:"badge",html:`<b>${isMoving(cfg,id)?"VID":"IMG"}</b> ${esc(badge)}`}));
   return box;
 }
@@ -278,4 +305,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

@@ -23,7 +23,9 @@ const STARTER = {
     ink: "#040915", panel: "#0b1630", fg: "#eef2fa", accent: "#ffc93c",
     mutedOpacity: 0.66, lineOpacity: 0.14,
     display: "Sora", body: "Sora", mono: "JetBrains Mono",
-    radius: 4, grain: true, overlay: 1, imageBrightness: 0.8
+    radius: 4, grain: true, overlay: 1, imageBrightness: 0.8,
+    /* Colour or gradient laid over every image. Each library item can follow this, turn it off, or use its own. */
+    imageOverlay: { mode: "none", c1: "#0072bc", a1: 0.55, c2: "#ffcb08", a2: 0.35, angle: 135, blend: "normal" }
   },
   motion: {
     speed: 1, ease: "expo",
@@ -236,7 +238,20 @@ const STARTER = {
 
 /* ================= FIELD SCHEMAS =================
    One generic form engine edits everything below. Field: [key, kind, label, opts] */
+/* Brand overlay presets: Dorma blue #0072bc, yellow #ffcb08, magenta #ed0677 (from the logo), ink #040915. */
+const OV_PRESETS = [
+  ["Blue tint",       { mode:"solid",  c1:"#0072bc", a1:.5,  c2:"#0072bc", a2:.5, angle:180, blend:"multiply" }],
+  ["Blue mono",       { mode:"solid",  c1:"#0072bc", a1:1,   c2:"#0072bc", a2:1,  angle:180, blend:"color" }],
+  ["Yellow glow",     { mode:"solid",  c1:"#ffcb08", a1:.4,  c2:"#ffcb08", a2:.4, angle:180, blend:"soft-light" }],
+  ["Blue to yellow",  { mode:"linear", c1:"#0072bc", a1:.7,  c2:"#ffcb08", a2:.45, angle:135, blend:"multiply" }],
+  ["Blue fade",       { mode:"linear", c1:"#0072bc", a1:.85, c2:"#0072bc", a2:0,  angle:0,   blend:"normal" }],
+  ["Night fade",      { mode:"linear", c1:"#040915", a1:.9,  c2:"#040915", a2:0,  angle:0,   blend:"normal" }],
+  ["Spotlight",       { mode:"radial", c1:"#040915", a1:0,   c2:"#040915", a2:.8, angle:0,   blend:"normal" }],
+  ["Magenta to blue", { mode:"linear", c1:"#ed0677", a1:.55, c2:"#0072bc", a2:.6, angle:120, blend:"screen" }]
+];
 const OPT = {
+  overlayModes: [["none","No overlay"],["solid","Solid colour"],["linear","Linear gradient"],["radial","Radial gradient (centre to edges)"]],
+  blends: [["normal","Normal"],["multiply","Multiply (darken, keep detail)"],["screen","Screen (lighten)"],["overlay","Overlay (contrast)"],["soft-light","Soft light"],["hard-light","Hard light"],["color","Colour (recolour the image)"],["luminosity","Luminosity"],["color-burn","Colour burn"],["color-dodge","Colour dodge"],["darken","Darken"],["lighten","Lighten"],["hue","Hue"],["saturation","Saturation"]],
   fonts: ["Sora","Space Grotesk","Manrope","Unbounded","Inter"],
   monos: ["JetBrains Mono","IBM Plex Mono"],
   ease: [["expo","Expo (sharp, cinematic)"],["power3","Power (smooth)"],["sine","Sine (gentle)"],["back","Back (overshoot)"],["elastic","Elastic (springy)"]],
@@ -306,4 +321,4 @@ function normalize(c){
   return out;
 }
 
-export { normalize, A, STARTER, OPT, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+export { normalize, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };

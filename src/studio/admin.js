@@ -1,9 +1,9 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
-import { A, OPT, SECTION_BLANK, SECTION_TYPES, STARTER } from './data';
+import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
 
@@ -316,8 +316,51 @@ function panelTheme(body){
   body.append(card("Preset palettes",sw),card("Preview",prev),
     card("Colours",fieldsFor(T,[["accent","color","Accent"],["ink","color","Background"],["panel","color","Panels"],["fg","color","Text"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
     card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
-    card("Image treatment",fieldsFor(T,[["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["overlay","range","Dark overlay on heroes",{min:0,max:1.4,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])));
+    card("Image treatment",fieldsFor(T,[["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["overlay","range","Dark overlay on heroes",{min:0,max:1.4,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),
+    card("Colour overlay on images",h("p",{class:"adm-intro",text:"A colour or gradient laid over every image and video on the site: hero slides, sections, cards, modals and the blog. Any item in the Library can turn it off or use its own overlay instead."}),
+      overlayEditor(T,"imageOverlay",{preview:true})));
 }
+/* ---------- colour overlay editor ----------
+   Edits holder[key] = {mode, c1,a1, c2,a2, angle, blend}. With allowDefault, "default" follows the site-wide overlay. */
+const OV_CUSTOM=["solid","linear","radial"];
+function overlayEditor(holder,key,{allowDefault=false,preview=false,onChange=()=>{}}={}){
+  const D=Store.draft, wrap=h("div",{class:"ov-edit"});
+  const pv=preview?h("div",{class:"ph ov-prev"}):null;
+  const sampleId=()=>{ const ids=[]; D.pages.forEach(p=>(p.sections||[]).forEach(sec=>{ (sec.slides||[]).forEach(x=>ids.push(x.media)); ids.push(sec.media); })); ids.push(...D.media.map(m=>m.id));
+    return ids.find(id=>{ const m=id&&D.media.find(x=>x.id===id); return m&&m.kind!=="article"&&!m.hidden; }); };
+  const drawPrev=()=>{ if (!pv) return; pv.textContent=""; const id=sampleId(); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) pv.append(n); const ov=id?overlayEl(D,id,holder[key]):null; if (ov) pv.append(ov); pv.append(h("span",{class:"lbl-a",text:"Preview"})); };
+  const swatch=(label,o,onclick,on)=>{ const css=overlayCss(o,{rtl:false});
+    return h("button",{type:"button",class:on?"on":"",onclick},h("i",{style:`background:${css?css.background+",":""}linear-gradient(135deg,#3a4a66,#c9b48a)`}),label); };
+  const same=(a,b)=>!!a&&!!b&&["mode","c1","a1","c2","a2","angle","blend"].every(k=>a.mode==="solid"&&(k==="c2"||k==="a2"||k==="angle")?true:String(a[k])===String(b[k]));
+  const draw=()=>{ wrap.textContent="";
+    if (!holder[key]||typeof holder[key]!=="object"||!holder[key].mode) holder[key]={mode:allowDefault?"default":"none"};
+    const o=holder[key], set=v=>{ holder[key]=v; touch(); onChange(); draw(); };
+    const sw=h("div",{class:"swatches ov-presets"});
+    if (allowDefault) sw.append(swatch("Site default",overlayOn(D.theme.imageOverlay),()=>set({mode:"default"}),o.mode==="default"));
+    sw.append(swatch("None",null,()=>set({...o,mode:"none"}),o.mode==="none"));
+    OV_PRESETS.forEach(([n,p])=>sw.append(swatch(n,p,()=>set(clone(p)),same(o,p))));
+    const modes=(allowDefault?[["default","Use the site default"]]:[]).concat(OPT.overlayModes);
+    wrap.append(h("p",{class:"hint",text:"Dorma presets"}),sw,fieldsFor(o,[["mode","select","Overlay",{options:modes}]],()=>{
+      if (OV_CUSTOM.includes(o.mode)){ const b=D.theme.imageOverlay||{}; [["c1","#0072bc"],["a1",.55],["c2","#ffcb08"],["a2",.35],["angle",135],["blend","normal"]].forEach(([k,d])=>{ if (o[k]==null) o[k]=b[k]??d; }); }
+      onChange(); draw(); }));
+    if (OV_CUSTOM.includes(o.mode)){
+      const grad=o.mode!=="solid", schema=[["c1","color",grad?"Start colour":"Colour"],["a1","range",grad?"Start strength":"Strength",{min:0,max:1,step:.01}]];
+      if (grad) schema.push(["c2","color","End colour"],["a2","range","End strength",{min:0,max:1,step:.01}]);
+      if (o.mode==="linear") schema.push(["angle","range","Direction in degrees (0 = start at the bottom, 90 = start at the left)",{min:0,max:360,step:5}]);
+      schema.push(["blend","select","Blend mode",{options:OPT.blends}]);
+      wrap.append(fieldsFor(o,schema,()=>{ onChange(); drawPrev(); }));
+      if (o.mode==="linear") wrap.append(h("p",{class:"hint",text:"On Arabic pages the direction flips left to right, so a fade behind the text stays behind the text."}));
+    } else if (o.mode==="default"){
+      const site=overlayOn(D.theme.imageOverlay);
+      wrap.append(h("p",{class:"hint",text:site?"Follows the site overlay set under Colours and type.":"The site overlay is off, so this item shows no overlay. Set one under Colours and type, or pick a preset here."}));
+    }
+    if (pv) wrap.append(pv);
+    drawPrev();
+  };
+  draw();
+  return wrap;
+}
+const overlayOn=o=>o&&OV_CUSTOM.includes(o.mode)?o:null;
 function panelMotion(body){
   const M=Store.draft.motion;
   const prev=h("div",{class:"preview-box",style:"flex-direction:column;align-items:flex-start;gap:18px"});
@@ -507,11 +550,11 @@ function panelMedia(body){
     countEl.textContent=list.length+" of "+D.media.length+" items";
     if (!list.length) grid.append(h("p",{class:"adm-intro",text:"Nothing matches. Add files on GitHub (below), or change the filters."}));
     list.forEach(m=>grid.append(h("button",{class:"lib-card"+(m.id===Admin.sel.media?" on":"")+(m.hidden?" is-hidden":""),type:"button",onclick:()=>{ Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
-      h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id)),
+      h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id),m.kind==="article"?null:overlayEl(D,m.id)),
       h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.url?"Supabase":""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")})))));
   };
   const drawDetail=()=>{ det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
-    const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); };
+    const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); };
     const common=[["label","text",m.kind==="article"?"Title":"Name"],["category","category","Category"],["tags","strings","Tags (one per line)"]];
     let schema=common;
     if (m.kind==="scene") schema=common.concat([["scene","select","Scene",{options:OPT.scenes}],["fx","range","Focus left–right",{min:0,max:1,step:.01}],["fy","range","Focus top–bottom",{min:0,max:1,step:.01}],["zoom","range","Crop zoom",{min:1,max:3,step:.05}],["animate","toggle","Plays as a video (slow motion loop)"]]);
@@ -526,6 +569,8 @@ function panelMedia(body){
       fieldsFor(m,schema,()=>{ redraw(); drawGrid(); }),
       h("p",{class:"hint",text:"Use it in a blog post by writing [["+m.id+"|caption]] on its own line."}),
       h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},del)));
+    if (m.kind!=="article") det.append(card("Colour overlay",h("p",{class:"adm-intro",text:"Lay a colour or gradient over this "+(m.kind==="video"?"video":"image")+" wherever it appears. The preview above updates as you change it."}),
+      overlayEditor(m,"overlay",{allowDefault:true,onChange:()=>{ redraw(); drawGrid(); }})));
     redraw();
   };
   const draw=()=>{ drawFilters(); drawGrid(); drawDetail(); };
@@ -588,4 +633,4 @@ function proseField(obj,key,id,set){
   return h("div",{class:"prose-wrap"},t,h("div",{class:"prose-tools"},pick,h("span",{class:"hint",text:"Empty line = new paragraph · ## Heading · - list item · > quote · **bold** · *italic* · [text](https://…)"})));
 }
 
-export { LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+export { overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
