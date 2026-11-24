@@ -86,7 +86,8 @@ function applyTheme(cfg){
   r.setProperty("--ink",t.ink); r.setProperty("--panel",t.panel); r.setProperty("--fg",t.fg); r.setProperty("--accent",t.accent);
   r.setProperty("--muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--glass",rgba(t.fg,.05));
   r.setProperty("--accent-soft",rgba(t.accent,.12)); r.setProperty("--accent-line",rgba(t.accent,.55)); r.setProperty("--accent-glow",rgba(t.accent,.5));
-  r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--mono",`"${t.mono}","IBM Plex Sans Arabic",ui-monospace,Menlo,monospace`);
+  r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--btn-glow",rgba(t.accent,Math.max(0,Math.min(1,cfg.motion.buttonGlow??.45))*.75)); r.setProperty("--btn-glow-on",(+(cfg.motion.buttonGlow??.45))>0?"1":"0");
+  r.setProperty("--mono",`"${t.mono}","IBM Plex Sans Arabic",ui-monospace,Menlo,monospace`);
   r.setProperty("--radius",(+t.radius||0)+"px"); r.setProperty("--ov",t.overlay); r.setProperty("--img-bright",t.imageBrightness);
   document.body.style.background=t.ink;
 }
@@ -162,7 +163,7 @@ function flowItemEl(cfg,flow,it,i){
     if (iconMarkup){ b.classList.add("has-ic"); b.append(h("span",{class:"ic",html:iconMarkup})); }
     b.append(document.createTextNode(it.label||""));
   }
-  b.append(h("span",{class:"bar-fill"}));
+  b.style.setProperty("--gi",String(i));
   return b;
 }
 /* returns a controller; opts.onItem(i,item) replaces the default click action */

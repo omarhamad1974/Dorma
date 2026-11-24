@@ -90,6 +90,10 @@ When Arabic is on, every text box in the studio shows **English and Arabic side 
 
 The same card has **Show numbering**, which is off by default. It controls the 01/02 counters, step labels, badges and numbered lists.
 
+## Hero carousel slides
+
+Each slide has its own **flow**: the buttons under its text, which open modals, pages or links. A slide without one uses the section's default flow. Flows never move the slides. Visitors change slides with the arrows, the dots, swiping or the keyboard, and slides also advance on their own after their seconds on screen. Buttons have a soft pulsing glow instead of a progress line. Set its strength, or turn it off, under Animation → Button glow.
+
 ## Timing (storytelling)
 
 Every hero, hero carousel, timeline, flow strip and modal has a **Timing** row in the studio. It gives the second each piece starts (eyebrow, title, text, image, flow, flow detail, button), counted from when the section scrolls into view, the modal opens, or the slide's text starts. Leave a box empty for the default shown, and use lower numbers to bring a piece forward. Hero carousel slides can also set their own **seconds on screen** and override the section timing. The flow's item-by-item animation still comes from the Flows panel.
