@@ -26,14 +26,14 @@ const STARTER = {
   },
   /* Generated placeholder scenes. Replace them with real project photos in the studio (Images). */
   media: [
-    { id:"m-nebula", label:"Placeholder · Nebula", kind:"scene", scene:"nebula", fx:.5, fy:.5, zoom:1 },
-    { id:"m-ridges", label:"Placeholder · Ridges", kind:"scene", scene:"ridges", fx:.5, fy:.5, zoom:1 },
-    { id:"m-city", label:"Placeholder · City", kind:"scene", scene:"city", fx:.5, fy:.5, zoom:1 },
-    { id:"m-ocean", label:"Placeholder · Ocean", kind:"scene", scene:"ocean", fx:.55, fy:.5, zoom:1 },
-    { id:"m-nebula-2", label:"Placeholder · Nebula detail", kind:"scene", scene:"nebula", fx:.72, fy:.42, zoom:1.6 },
-    { id:"m-ridges-2", label:"Placeholder · Ridges detail", kind:"scene", scene:"ridges", fx:.7, fy:.56, zoom:1.6 },
-    { id:"m-city-2", label:"Placeholder · City detail", kind:"scene", scene:"city", fx:.75, fy:.6, zoom:1.6 },
-    { id:"m-ocean-2", label:"Placeholder · Ocean motion", kind:"scene", scene:"ocean", fx:.55, fy:.62, zoom:1.7, animate:true }
+    { id:"m-nebula", label:"Placeholder · Nebula", kind:"scene", category:"backgrounds", scene:"nebula", fx:.5, fy:.5, zoom:1 },
+    { id:"m-ridges", label:"Placeholder · Ridges", kind:"scene", category:"backgrounds", scene:"ridges", fx:.5, fy:.5, zoom:1 },
+    { id:"m-city", label:"Placeholder · City", kind:"scene", category:"backgrounds", scene:"city", fx:.5, fy:.5, zoom:1 },
+    { id:"m-ocean", label:"Placeholder · Ocean", kind:"scene", category:"backgrounds", scene:"ocean", fx:.55, fy:.5, zoom:1 },
+    { id:"m-nebula-2", label:"Placeholder · Nebula detail", kind:"scene", category:"backgrounds", scene:"nebula", fx:.72, fy:.42, zoom:1.6 },
+    { id:"m-ridges-2", label:"Placeholder · Ridges detail", kind:"scene", category:"backgrounds", scene:"ridges", fx:.7, fy:.56, zoom:1.6 },
+    { id:"m-city-2", label:"Placeholder · City detail", kind:"scene", category:"backgrounds", scene:"city", fx:.75, fy:.6, zoom:1.6 },
+    { id:"m-ocean-2", label:"Placeholder · Ocean motion", kind:"scene", category:"backgrounds", scene:"ocean", fx:.55, fy:.62, zoom:1.7, animate:true }
   ],
   icons: [
     { id:"i-idea", label:"Idea", svg:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>' },
@@ -126,6 +126,27 @@ const STARTER = {
       text:"A thoughtful promotional product starts with the person receiving it. We help you choose gifts, merchandise, and display products suited to your audience, occasion, and budget. Ask for our dedicated catalogues to explore available options.",
       media:["m-ridges-2"], caption:["10","Give your brand","a useful place"], flowId:"", more:{ label:"Ask for the catalogues", action:A("modal","md-contact") } }
   ],
+  /* Library and blog categories. Each one matches a folder in public/library/ on GitHub. */
+  categories: [
+    { id:"brand", label:"Brand & Identity" },
+    { id:"content", label:"Photo & Video" },
+    { id:"events", label:"Events & Activations" },
+    { id:"exhibitions", label:"Exhibitions & Booths" },
+    { id:"digital", label:"Digital & Social" },
+    { id:"print", label:"Print & Packaging" },
+    { id:"signage", label:"Signage & Fabrication" },
+    { id:"gifts", label:"Gifts & Displays" },
+    { id:"backgrounds", label:"Backgrounds & Textures" },
+    { id:"articles", label:"Articles & Guides" }
+  ],
+  posts: [
+    { id:"p-exhibition", slug:"make-your-exhibition-space-count", title:"From an allocated space to a considered presence", date:"2026-11-24", category:"exhibitions", tags:["Exhibitions","Booths"], author:"Dorma Advertising", cover:"m-city", published:true,
+      excerpt:"Your booth should help visitors understand who you are, what you offer, and why they should stop and speak with you.",
+      body:"You have a space at an exhibition. How do you make it count?\n\nYour booth should help visitors understand who you are, what you offer, and why they should stop and speak with you. That only happens when the concept, construction, graphics, displays, and presentation materials are planned around the same objectives.\n\n## What a complete booth brings together\n\n- Booth concepts and graphic design\n- Booth construction and custom fabrication\n- Counters, desks, and product displays\n- Signage and lighting elements\n- Presentation films and digital content\n- Brochures, promotional materials, and giveaways\n- Team preparation\n\n[[m-city-2|Placeholder image: replace with a completed booth from the library]]\n\n## Start with the objective\n\nBefore choosing materials or layouts, agree on what the space needs to achieve: who you want to reach, what they should remember, and what the team on the stand needs to do their job well.\n\n> From an allocated space to a considered presence.\n\nTell us about your next exhibition and we'll help shape the way forward." },
+    { id:"p-process", slug:"understand-shape-deliver", title:"Understand, shape, deliver: how we bring a brief together", date:"2026-11-20", category:"brand", tags:["Process"], author:"Dorma Advertising", cover:"m-ridges", published:true,
+      excerpt:"Every brief has its own audience, priorities, and practical considerations. We start by understanding those differences.",
+      body:"Different businesses have individual requirements. Every brief has its own audience, priorities, and practical considerations, so we start by understanding those differences.\n\n## Understand\n\nClarify your objectives, audience, requirements, and budget.\n\n## Shape\n\nDevelop the approach and agree on the scope, materials, and schedule.\n\n## Deliver\n\nCoordinate the creative work, production, and delivery required by the brief.\n\n> Clear communication connects every stage.\n\nWhether you need a single item produced well or a coordinated project across both of our divisions, the same three stages keep everyone working toward **what you want to achieve**." }
+  ],
   pages: [
     { id:"home", title:"Home", nav:false, layout:"cinematic", sections:[
       { id:"s-hc", type:"heroCarousel", flowId:"f-hero", flowDrivesSlides:true, hud:true, slides:[
@@ -182,6 +203,10 @@ const STARTER = {
       ] },
       { id:"w4", type:"timeline", num:"03", eyebrow:"How we bring it together", text:"Every brief has its own audience, priorities, and practical considerations. We start by understanding those differences.", flowId:"f-process" }
     ] },
+    { id:"blog", title:"Blog", nav:true, layout:"cinematic", sections:[
+      { id:"b1", type:"hero", num:"05", eyebrow:"Blog", title:"Ideas, guides and work in progress", lede:"Notes from the Agency and the production floor.", media:"m-nebula", height:"compact", flowId:"" },
+      { id:"b2", type:"blog", title:"Latest posts", category:"", limit:12, filters:true, style:"grid" }
+    ] },
     { id:"about", title:"About", nav:true, layout:"console", sections:[
       { id:"c1", type:"hero", num:"04", eyebrow:"About Dorma", title:"Your objectives give our work direction.", lede:"", media:"m-ridges", height:"tall", flowId:"" },
       { id:"c2", type:"about", num:"01", eyebrow:"Mission", text:"To understand each client's needs and bring together *creative thinking and practical execution* to deliver purposeful brand solutions.", media:"", link:{ label:"", action:A() } },
@@ -214,9 +239,10 @@ const OPT = {
   scrollReveal: [["rise","Rise"],["fade","Fade"],["none","None"]],
   presets: [["rise","Rise"],["fade","Fade"],["scale","Scale"],["blur","Blur"],["slideLeft","Slide from left"],["slideRight","Slide from right"],["flip","Flip"],["pop","Pop"],["none","None"]],
   separators: [["dots3","Three dots"],["dot","Single dot"],["line","Line"],["chevron","Chevron"],["none","None"]],
+  libKinds: [["","All"],["image","Images"],["video","Videos"],["article","Articles"],["scene","Scenes"]],
   kinds: [["button","Button"],["text","Plain text"],["icon","Icon"],["svg","Custom SVG"]],
   sizes: [["s","Small"],["m","Medium"],["l","Large"]],
-  actions: [["none","Nothing"],["modal","Open modal"],["page","Go to page"],["slide","Go to slide"],["url","Open link"]],
+  actions: [["none","Nothing"],["modal","Open modal"],["page","Go to page"],["post","Open blog post"],["doc","Open library article"],["slide","Go to slide"],["url","Open link"]],
   layouts: [["cinematic","Cinematic"],["index","Index"],["console","Console (side menu)"]],
   heights: [["full","Full screen"],["tall","Tall"],["compact","Compact"]],
   statStyles: [["band","Band"],["hud","HUD tiles"],["meters","Meters"]],
@@ -242,7 +268,9 @@ const SECTION_TYPES = {
   timeline: { label:"Timeline", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement",{wide:true}],["flowId","flow","Timeline flow (each item's detail text shows on click)"]] },
   flowStrip: { label:"Flow strip", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["flowId","flow","Flow"]] },
   banner: { label:"Wide banner", fields:[["caption","strings","Caption items (one per line)",{wide:true}],["media","media","Image",{wide:true}]] },
-  cta: { label:"Call to action", fields:[["title","text","Heading",{wide:true}],["button","button","Button"]] }
+  cta: { label:"Call to action", fields:[["title","text","Heading",{wide:true}],["button","button","Button"]] },
+  blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
+  article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
 const SECTION_BLANK = {
   heroCarousel:()=>({flowId:"",flowDrivesSlides:false,hud:true,slides:[{eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}]}),
@@ -252,12 +280,15 @@ const SECTION_BLANK = {
   clients:()=>({num:"",eyebrow:"Clients",style:"grid",items:[]}), grid:()=>({title:"Cards",filters:true,items:[]}),
   accordion:()=>({num:"",eyebrow:"",items:[]}), timeline:()=>({num:"",eyebrow:"Story",text:"",flowId:""}),
   flowStrip:()=>({num:"",eyebrow:"",title:"",flowId:""}), banner:()=>({caption:[],media:"m-ocean"}),
-  cta:()=>({title:"Have a project in mind?",button:{label:"Get in touch",action:A()}})
+  cta:()=>({title:"Have a project in mind?",button:{label:"Get in touch",action:A()}}),
+  blog:()=>({title:"Latest posts",category:"",limit:12,filters:true,style:"grid"}),
+  article:()=>({num:"",eyebrow:"",title:"",body:"Write here. Leave an empty line between paragraphs."})
 };
 
 /* Fills in anything missing from a saved config with the starter template, so older saves keep working. */
 function normalize(c){
   const out=JSON.parse(JSON.stringify(STARTER)); if (!c || typeof c!=="object") return out;
+  c=JSON.parse(JSON.stringify(c)); // never share objects with the caller (live and draft must stay separate)
   for (const k of Object.keys(out)){
     if (c[k]==null) continue;
     if (Array.isArray(out[k])) out[k]=Array.isArray(c[k])?c[k]:out[k];

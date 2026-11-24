@@ -15,3 +15,15 @@ export const online = (): boolean => Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 /** Storage bucket for uploaded images and videos (created in 0001_site_config.sql). */
 export const MEDIA_BUCKET = 'media';
+
+/**
+ * Where library files live. For now they are committed to public/library/ in the GitHub repo and
+ * served with the site. To move them (for example to a CDN or Supabase Storage), copy the files with
+ * the same folder layout and set VITE_LIBRARY_BASE to the new address; saved settings keep working
+ * because they store paths relative to this base.
+ */
+export const LIBRARY_BASE: string = (env.VITE_LIBRARY_BASE || `${env.BASE_URL}library/`).replace(/\/?$/, '/');
+
+/** The GitHub repository that holds the library folder, for the studio's "Add files on GitHub" links. */
+export const REPO_URL = 'https://github.com/omarhamad1974/Dorma';
+export const REPO_BRANCH = 'main';

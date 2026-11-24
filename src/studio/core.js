@@ -2,6 +2,7 @@ import { scenes } from './scenes';
 import { gsap } from 'gsap';
 import { openModal } from './site';
 import { isMediaUrl } from './store';
+import { LIBRARY_BASE } from '../config';
 
 /* ================= CORE HELPERS ================= */
 const $ = (s,el=document)=>el.querySelector(s);
@@ -72,7 +73,10 @@ const ioEase=cfg=>{ const e=EASES[cfg.motion.ease]||"expo"; return (e==="back"||
 const sceneCache={};
 const sceneCanvas=name=>sceneCache[name]||(sceneCache[name]=(scenes[name]||scenes.nebula)());
 function mediaItem(cfg,id){ return (cfg.media||[]).find(m=>m.id===id); }
-function mediaUrl(m){ return isMediaUrl(m.url)?m.url:""; }
+/* A safe relative path inside the library folder, e.g. "exhibitions/booth-01.jpg". */
+const libPathOk=p=>typeof p==="string" && /^[\w\-. ()&+,]+(\/[\w\-. ()&+,]+)*$/.test(p) && !p.split("/").some(x=>x===".."||x===".");
+const libraryUrl=p=>libPathOk(p)?LIBRARY_BASE+p.split("/").map(encodeURIComponent).join("/"):"";
+function mediaUrl(m){ if (m.path) return libraryUrl(m.path); return isMediaUrl(m.url)?m.url:""; }
 function mediaNode(cfg,id,{w=1280,hh=800}={}){
   const m=mediaItem(cfg,id); if (!m) return null;
   if (m.kind==="image"){ const u=mediaUrl(m); if(!u) return null; return h("img",{src:u,alt:m.alt||"",loading:"lazy",decoding:"async"}); }
@@ -174,6 +178,8 @@ function runAction(cfg,action,ctx={}){
   if (action.type==="modal") openModal(cfg,action.target,ctx);
   else if (action.type==="page"){ if ((cfg.pages||[]).some(p=>p.id===action.target)) location.hash=action.target; }
   else if (action.type==="slide"){ ctx.goSlide && ctx.goSlide((parseInt(action.target,10)||1)-1); }
+  else if (action.type==="post"){ const p=(cfg.posts||[]).find(x=>x.id===action.target); if (p) location.hash="post/"+encodeURIComponent(p.slug||p.id); }
+  else if (action.type==="doc"){ const m=mediaItem(cfg,action.target); const u=m?(/^https:\/\//i.test(m.link||"")?m.link:mediaUrl(m)):""; if (u){ const a=h("a",{href:u,target:"_blank",rel:"noopener"}); document.body.append(a); a.click(); a.remove(); } }
   else if (action.type==="url"){ const u=String(action.target||""); if (/^https:\/\//i.test(u)){ const a=h("a",{href:u,target:"_blank",rel:"noopener"}); document.body.append(a); a.click(); a.remove(); } }
 }
 function buttonEl(cfg,btn,cls="more"){
@@ -205,4 +211,32 @@ function revealTitle(cfg,el,text,delay=0){
   return gsap.timeline({delay}).fromTo(parts,{yPercent:115,rotate:mode==="chars"?6:3},{yPercent:0,rotate:0,duration:1.1,ease:ease(cfg),stagger:mode==="chars"?.022:.07});
 }
 
-export { $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+/* ---------- prose (blog posts and text articles) ----------
+   A small, safe subset of Markdown. Everything is escaped first; only these patterns become markup:
+   blank line = new paragraph, "## " / "### " headings, "- " lists, "> " quotes,
+   **bold**, *italic*, [text](https://link), and [[media-id|caption]] to place a library image or video. */
+function inlineMd(t){
+  return esc(t)
+    .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g,"<em>$1</em>")
+    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g,(m,a,u)=>`<a href="${u}" target="_blank" rel="noopener">${a}</a>`);
+}
+function renderProse(cfg,text){
+  const out=h("div",{class:"prose"});
+  String(text||"").replace(/\r/g,"").split(/\n{2,}/).forEach(block=>{
+    const b=block.trim(); if (!b) return;
+    const media=/^\[\[([\w-]+)(?:\|([^\]]*))?\]\]$/.exec(b);
+    if (media){ const fig=h("figure",{},mediaBox(cfg,media[1],{ratio:16/9,res:1280})); if (media[2]) fig.append(h("figcaption",{class:"mono",text:media[2]})); out.append(fig); return; }
+    const head=/^(#{2,3}) (.+)$/.exec(b);
+    if (head){ out.append(h(head[1].length===2?"h2":"h3",{html:inlineMd(head[2])})); return; }
+    const lines=b.split("\n");
+    if (lines.every(l=>/^- /.test(l))){ const ul=h("ul"); lines.forEach(l=>ul.append(h("li",{html:inlineMd(l.slice(2))}))); out.append(ul); return; }
+    if (lines.every(l=>/^> ?/.test(l))){ out.append(h("blockquote",{html:inlineMd(lines.map(l=>l.replace(/^> ?/,"")).join(" "))})); return; }
+    out.append(h("p",{html:lines.map(inlineMd).join("<br>")}));
+  });
+  return out;
+}
+const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); };
+const categoryLabel=(cfg,id)=>((cfg.categories||[]).find(c=>c.id===id)||{}).label||"";
+
+export { libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

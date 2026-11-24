@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, ease, emphasize, esc, eyebrowEl, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, revealTitle, runAction } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction } from './core';
 import { Store } from './store';
 import { A } from './data';
 
@@ -16,7 +16,7 @@ function onWin(type,fn,opts){ addEventListener(type,fn,opts); Site.disposers.pus
 function renderSite(cfg,pageId){
   disposePage(); closeModal(true);
   Site.cfg=cfg; applyTheme(cfg); gsap.globalTimeline.timeScale(+cfg.motion.speed||1);
-  const pages=cfg.pages||[], page=pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
+  const pages=cfg.pages||[], page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
   const app=$("#app"); app.textContent=""; scrollTo(0,0);
   if (!page){ app.append(h("div",{class:"denied"},h("div",{},h("p",{class:"lede",text:"This site has no pages yet."})))); return; }
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
@@ -42,7 +42,7 @@ function renderSite(cfg,pageId){
 }
 function siteHeader(cfg,page){
   const nav=h("nav",{class:"site-nav","aria-label":"Main"});
-  (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
+  (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id || (page.isPost && p.id===blogHome(cfg))) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
   const home=h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"");
   const menu=h("button",{class:"menu-btn",type:"button","aria-label":"Menu",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>',onclick:()=>nav.classList.toggle("open")});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
@@ -181,6 +181,44 @@ const SECTIONS={
     });
     w.append(grid); return h("section",{class:"sec"},w);
   },
+  blog(cfg,sec){
+    const all=visiblePosts(cfg).filter(p=>!sec.category||p.category===sec.category).slice(0,Math.max(1,+sec.limit||12));
+    const w=h("div",{class:"wrap"}), head=h("div",{class:"head-row","data-rv":""},h("h2",{class:"h2",text:sec.title||""}));
+    const count=h("span",{class:"mono"}); head.append(count); w.append(head);
+    if (!all.length){ w.append(h("p",{class:"lede",text:"New posts are on the way."})); return h("section",{class:"sec"},w); }
+    const list=h("div",{class:sec.style==="list"?"post-list":"grid-cards post-grid"});
+    const cards=all.map(p=>{ const a=h("a",{class:"card post-card",href:"#post/"+encodeURIComponent(p.slug||p.id),"data-cat":p.category||"","data-rv":""},
+        sec.style==="list"?null:mediaBox(cfg,p.cover,{ratio:16/10,res:800}),
+        captionEl([fmtDate(p.date),categoryLabel(cfg,p.category)].filter(Boolean)),
+        h("h3",{class:"h3",text:p.title||""}),h("p",{text:p.excerpt||""}));
+      list.append(a); return a; });
+    const setCount=n=>count.innerHTML=`<b>${pad(n)}</b> posts`; setCount(all.length);
+    if (sec.filters && !sec.category){
+      const cats=[...new Set(all.map(p=>p.category).filter(Boolean))];
+      if (cats.length>1){
+        const labels=["All",...cats.map(c=>categoryLabel(cfg,c)||c)];
+        const fake={id:"_bf",name:"Filter",separator:"dots3",size:"s",anim:{mode:"items",preset:"rise",duration:.6,stagger:.05,delay:0},items:labels.map((t,i)=>({id:"c"+i,kind:i?"text":"button",label:t,showIndex:false,action:A()}))};
+        const fc=renderFlow({...cfg,flows:[fake]},"_bf",{onItem:(i)=>{ fc.setActive(i,{fill:true}); const show=cards.filter(c=>i===0||c.dataset.cat===cats[i-1]); setCount(show.length);
+          gsap.to(cards,{autoAlpha:0,y:10,duration:.25,ease:"power2.in",onComplete(){ cards.forEach(c=>c.hidden=!show.includes(c)); gsap.fromTo(show,{autoAlpha:0,y:20},{autoAlpha:1,y:0,duration:.6,ease:"power3.out",stagger:.06}); }}); }});
+        fc.setActive(0,{fill:true}); fc.el.style.marginTop="24px"; w.append(fc.el);
+      }
+    }
+    w.append(list); return h("section",{class:"sec"},w);
+  },
+  article(cfg,sec){
+    const w=h("div",{class:"wrap article"}); const eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.rv=""; w.append(eb); }
+    if (sec.title) w.append(h("h2",{class:"h2","data-rv":"",text:sec.title}));
+    const body=renderProse(cfg,sec.body); body.dataset.rv=""; w.append(body);
+    if (sec.post){ const p=sec.post, nav=h("div",{class:"post-nav","data-rv":""});
+      const back=blogHome(cfg); nav.append(h("a",{class:"more",href:"#"+back,html:"All posts"+ARROW_SVG}));
+      if (p.tags&&p.tags.length) nav.append(captionEl(p.tags));
+      w.append(nav);
+      const more=visiblePosts(cfg).filter(x=>x!==p).slice(0,3);
+      if (more.length){ const g=h("div",{class:"grid-cards post-grid"}); more.forEach(x=>g.append(h("a",{class:"card post-card",href:"#post/"+encodeURIComponent(x.slug||x.id),"data-rv":""},mediaBox(cfg,x.cover,{ratio:16/10,res:800}),captionEl([fmtDate(x.date),categoryLabel(cfg,x.category)].filter(Boolean)),h("h3",{class:"h3",text:x.title||""}))));
+        w.append(h("h3",{class:"eyebrow more-posts","data-rv":"",text:"More posts"}),g); }
+    }
+    return h("section",{class:"sec"},w);
+  },
   about(cfg,sec){
     const left=h("div",{class:"txt","data-rv":""}); const eb=eyebrowEl(sec.num,sec.eyebrow); if (eb) left.append(eb);
     left.append(h("p",{class:"big",html:emphasize(sec.text||"")}));
@@ -286,6 +324,20 @@ function afterRender(cfg,page){
 }
 
 /* ================= MODALS ================= */
+/* ---------- blog routes: #post/<slug> ---------- */
+function visiblePosts(cfg){ return (cfg.posts||[]).filter(p=>p.published||Site.preview).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
+function blogHome(cfg){ const pg=(cfg.pages||[]).find(p=>p.sections.some(s=>s.type==="blog")); return pg?pg.id:(cfg.site.homePage||"home"); }
+function postPage(cfg,pageId){
+  const m=/^post\/(.+)$/.exec(pageId||""); if (!m) return null;
+  let slug=m[1]; try { slug=decodeURIComponent(slug); } catch(e){}
+  const p=visiblePosts(cfg).find(x=>(x.slug||x.id)===slug);
+  if (!p) return { id:"post-missing", title:"Post not found", nav:false, layout:"cinematic", sections:[
+    { id:"pm", type:"hero", num:"", eyebrow:"Blog", title:"This post isn't available", lede:"It may have been moved or unpublished.", media:"", height:"compact", flowId:"" },
+    { id:"pm2", type:"cta", title:"Browse the other posts", button:{ label:"All posts", action:A("page",blogHome(cfg)) } } ] };
+  return { id:"post/"+slug, title:p.title, nav:false, layout:"cinematic", isPost:true, sections:[
+    { id:"ph", type:"hero", num:fmtDate(p.date), eyebrow:[categoryLabel(cfg,p.category),p.author].filter(Boolean).join(" · "), title:p.title||"", lede:p.excerpt||"", media:p.cover||"", height:"tall", flowId:"" },
+    { id:"pb", type:"article", num:"", eyebrow:"", title:"", body:p.body||"", post:p } ] };
+}
 const MS={ open:false, tl:null, tweens:[], seq:[], idx:0, opener:null, cfg:null };
 const modalIsOpen=()=>MS.open;
 function openModal(cfg,id,ctx={}){
@@ -404,4 +456,4 @@ addEventListener("keydown",e=>{
     if (e.shiftKey && document.activeElement===a){ e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement===z){ e.preventDefault(); a.focus(); } }
 });
 
-export { Site, disposePage, onWin, renderSite, siteHeader, studioPill, buildSection, SECTIONS, fmtNum, afterRender, MS, modalIsOpen, openModal, fillModal, modalFigure, animateModalIn, stepModal, closeModal };
+export { visiblePosts, blogHome, postPage, Site, disposePage, onWin, renderSite, siteHeader, studioPill, buildSection, SECTIONS, fmtNum, afterRender, MS, modalIsOpen, openModal, fillModal, modalFigure, animateModalIn, stepModal, closeModal };

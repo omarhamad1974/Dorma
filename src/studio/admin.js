@@ -1,4 +1,5 @@
-import { $, $$, ARROW_SVG, applyTheme, clone, esc, h, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
+import { $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -15,6 +16,7 @@ const IC={
   flows:'<svg viewBox="0 0 24 24"><rect x="2" y="9" width="6" height="6" rx="3"/><rect x="16" y="9" width="6" height="6" rx="3"/><path d="M10 12h.01M12 12h.01M14 12h.01"/></svg>',
   modals:'<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 9h16M15 7h2"/></svg>',
   pages:'<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/></svg>',
+  blog:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
   plus:'<svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg>',
   eye:'<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   up:'<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
@@ -22,7 +24,7 @@ const IC={
   grip:'<svg viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.3"/><circle cx="11" cy="4" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="11" cy="12" r="1.3"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"]];
+const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["blog","Blog"]];
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 
@@ -47,7 +49,7 @@ async function renderAdmin(){
     mnav.append(h("button",{type:"button","data-p":k,class:Admin.panel===k?"on":"",text:l,onclick:()=>openPanel(k)}));
   });
   side.append(h("div",{class:"grow"}),h("p",{class:"mono",style:"padding:0 10px;line-height:1.6;overflow-wrap:anywhere",html:Store.mode==="db"?"Signed in as<br>"+esc(signedInEmail()):"Saved in this<br>browser only"}),
-    Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):null);
+    Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):"");
   const top=h("div",{class:"adm-top",id:"admTop"});
   const body=h("div",{class:"adm-body",id:"admBody"});
   app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},top,mnav,body)));
@@ -74,7 +76,7 @@ function openPanel(k){
   Admin.panel=k; Admin.refresh=null;
   $$(".adm-side button[data-p],.adm-mobile-nav button[data-p]").forEach(b=>b.classList.toggle("on",b.dataset.p===k));
   const body=$("#admBody"); if (!body) return; body.textContent=""; disposePage();
-  ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages})[k](body);
+  ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,blog:panelBlog})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -111,6 +113,9 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       const list=kind==="flow"?D.flows:kind==="modal"?D.modals:D.pages;
       const s=h("select",{id},h("option",{value:"",text:"None"})); list.forEach(x=>{ const op=h("option",{value:x.id,text:x.name||x.title||x.id}); if (obj[key]===x.id) op.selected=true; s.append(op); });
       s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
+    case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category"}); s.id=id; wrap.append(s); break; }
+    case "date": { const i=h("input",{id,type:"date",value:obj[key]||""}); i.addEventListener("change",()=>set(i.value)); wrap.append(i); break; }
+    case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v))); break;
     case "media": wrap.append(mediaPicker(obj,key,opts,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "icon": wrap.append(iconPicker(obj,key,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "action": { obj[key]=obj[key]||A(); wrap.append(actionEditor(obj[key],()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break; }
@@ -128,7 +133,7 @@ function actionEditor(a,onChange){
   const type=h("select",{"aria-label":"Action"}); OPT.actions.forEach(([v,l])=>{ const o=h("option",{value:v,text:l}); if (a.type===v) o.selected=true; type.append(o); });
   const tgt=h("span",{style:"flex:1;min-width:140px;display:flex"});
   const drawTarget=()=>{ tgt.textContent="";
-    if (a.type==="modal"||a.type==="page"){ const s=h("select",{"aria-label":"Target",style:"width:100%"}); (a.type==="modal"?D.modals:D.pages).forEach(x=>{ const o=h("option",{value:x.id,text:x.name||x.title}); if (a.target===x.id) o.selected=true; s.append(o); });
+    if (a.type==="modal"||a.type==="page"||a.type==="post"||a.type==="doc"){ const s=h("select",{"aria-label":"Target",style:"width:100%"}); const opts={modal:D.modals,page:D.pages,post:D.posts,doc:D.media.filter(m=>m.kind==="article")}[a.type]; opts.forEach(x=>{ const o=h("option",{value:x.id,text:x.name||x.title||x.label}); if (a.target===x.id) o.selected=true; s.append(o); });
       if (!a.target && s.options[0]){ a.target=s.options[0].value; } s.addEventListener("change",()=>{ a.target=s.value; onChange(); }); tgt.append(s); }
     else if (a.type==="slide"||a.type==="url"){ const i=h("input",{type:a.type==="slide"?"number":"text",value:a.target||"",placeholder:a.type==="url"?"https://…":"Slide number","aria-label":"Target",style:"width:100%"}); i.addEventListener("input",()=>{ a.target=i.value; onChange(); }); tgt.append(i); }
   };
@@ -140,12 +145,19 @@ function actionEditor(a,onChange){
 }
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
 function mediaPicker(obj,key,opts,onChange){
-  const g=h("div",{class:"media-pick"});
+  const outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), st={cat:"",q:""};
+  const pool=()=>libFilter(Store.draft.media,{kinds:["image","video","scene"]});
+  if (pool().length>8){
+    const q=h("input",{type:"search",placeholder:"Search","aria-label":"Search the library"}); q.addEventListener("input",()=>{ st.q=q.value; draw(); });
+    outer.append(h("div",{class:"media-pick-filters"},categorySelect("",v=>{ st.cat=v; draw(); }),q));
+  }
   const draw=()=>{ g.textContent="";
     if (opts.allowNone) g.append(h("button",{type:"button",class:"none"+(!obj[key]?" on":""),text:"None",onclick:()=>{ obj[key]=""; draw(); onChange(); }}));
-    Store.draft.media.forEach(m=>{ const b=h("button",{type:"button",class:obj[key]===m.id?"on":"",title:m.label,"aria-label":m.label},mediaThumb(m.id),h("span",{text:m.label}));
+    const list=libFilter(pool(),{cat:st.cat,q:st.q}); const cur=Store.draft.media.find(m=>m.id===obj[key]);
+    if (cur && !list.includes(cur)) list.unshift(cur);
+    list.forEach(m=>{ const b=h("button",{type:"button",class:obj[key]===m.id?"on":"",title:m.label,"aria-label":m.label},mediaThumb(m.id),h("span",{text:m.label}));
       b.addEventListener("click",()=>{ obj[key]=m.id; draw(); onChange(); }); g.append(b); }); };
-  draw(); return g;
+  draw(); outer.append(g); return outer;
 }
 function iconPicker(obj,key,onChange){
   const g=h("div",{class:"icon-pick"});
@@ -264,26 +276,6 @@ function panelMotion(body){
     card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]])),
     h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows."}));
 }
-function panelMedia(body){
-  const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:assetsApi?"Upload photos or short videos, or use generated scenes. Images are picked by name everywhere else in the studio.":"Generated scenes are available here. Uploading photos and videos needs the online version with an editor account."}));
-  const up=h("input",{type:"file",accept:"image/*,video/mp4,video/webm",multiple:true,hidden:true});
-  up.addEventListener("change",async()=>{ for (const f of up.files){ try { toast("Uploading "+f.name); const r=await assetsApi.upload(f); D.media.push({id:uid("m"),label:f.name.replace(/\.[^.]+$/,""),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,alt:""}); touch(); draw(); toast("Uploaded "+f.name); } catch(e){ toast("Upload failed: "+(e&&e.message||"try a smaller file")); } } up.value=""; });
-  const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
-    assetsApi?h("button",{class:"btn primary",type:"button",html:IC.up+"Upload images or video",onclick:()=>up.click()}):null,
-    h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up);
-  const grid=h("div",{class:"lib-grid"}), det=h("div");
-  const draw=()=>{ grid.textContent=""; if (!D.media.some(m=>m.id===Admin.sel.media)) Admin.sel.media=D.media[0]?.id;
-    D.media.forEach(m=>grid.append(h("button",{class:"lib-card"+(m.id===Admin.sel.media?" on":""),type:"button",onclick:()=>{ Admin.sel.media=m.id; draw(); }},h("div",{class:"thumb"},mediaThumb(m.id)),h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:m.kind==="scene"?(m.animate?"Scene · motion":"Scene"):m.kind})))));
-    det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
-    const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); };
-    const schema=[["label","text","Name"]].concat(m.kind==="scene"?[["scene","select","Scene",{options:OPT.scenes}],["fx","range","Focus left–right",{min:0,max:1,step:.01}],["fy","range","Focus top–bottom",{min:0,max:1,step:.01}],["zoom","range","Crop zoom",{min:1,max:3,step:.05}],["animate","toggle","Plays as a video (slow motion loop)"]]:[["alt","text","Description for screen readers",{wide:true}]]);
-    det.append(card(h("span",{class:"grow"},"Edit image"),pv,fieldsFor(m,schema,()=>{ redraw(); grid.querySelector(".lib-card.on .meta span").textContent=m.label; }),
-      h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete image",onclick:e=>confirmInline(e.currentTarget,"Remove this image from the library? Places that use it will show nothing. The uploaded file stays in storage, so earlier published versions still show it.",async()=>{ D.media.splice(D.media.indexOf(m),1); touch(); draw(); })}))));
-    redraw();
-  };
-  body.append(bar,grid,det); draw();
-}
 function panelIcons(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Icons can be used in flows, buttons and text items. Paste any SVG code; scripts, links and styles are stripped automatically. Icons draw with the current text colour."}));
@@ -397,4 +389,148 @@ function panelPages(body){
     }});
 }
 
-export { versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelMedia, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+/* ================= LIBRARY =================
+   Three sources share one list (Store.draft.media):
+   - files committed to public/library/<category>/ on GitHub (item.path), found through library/index.json
+   - quick uploads to Supabase Storage (item.url)
+   - generated scenes and articles written in the studio */
+const LIB={ cat:"", kind:"", q:"", hidden:false };
+let libIndex=null;
+const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
+const slugify=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"").replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60);
+const ghUpload=cat=>`${REPO_URL}/upload/${REPO_BRANCH}/public/library/${encodeURIComponent(cat)}`;
+const ghNewFolder=cat=>`${REPO_URL}/new/${REPO_BRANCH}/public/library/${encodeURIComponent(cat)}?filename=.gitkeep`;
+const ghFile=path=>`${REPO_URL}/blob/${REPO_BRANCH}/public/library/${path.split("/").map(encodeURIComponent).join("/")}`;
+const libMissing=m=>!!(m.path&&libIndex&&!libIndex.files.some(f=>f.path===m.path));
+
+/* Adds files and folders found on GitHub that the library doesn't know yet. Returns how many were added. */
+async function syncLibrary(quiet){
+  const D=Store.draft;
+  try { const r=await fetch(LIBRARY_BASE+"index.json",{cache:"no-store"}); if (!r.ok) throw new Error(String(r.status)); libIndex=await r.json(); }
+  catch(e){ if (!quiet) toast("Couldn't read the library list from the site."); return 0; }
+  let files=0;
+  (libIndex.folders||[]).forEach(f=>{ if (/^[a-z0-9][a-z0-9-]{0,40}$/.test(f) && !D.categories.some(c=>c.id===f)) D.categories.push({id:f,label:prettyName(f)}); });
+  (libIndex.files||[]).forEach(f=>{ if (!libPathOk(f.path) || D.media.some(m=>m.path===f.path)) return;
+    D.media.push({id:uid("m"),label:prettyName(f.path),kind:f.kind,path:f.path,category:f.category||"",tags:[],alt:"",summary:"",link:"",cover:""}); files++; });
+  if (files){ scheduleSave(); toast(files===1?"1 new file from GitHub added to the library":files+" new files from GitHub added to the library"); }
+  else if (!quiet) toast("The library is up to date with GitHub.");
+  return files;
+}
+function libFilter(list,{kinds,cat,q,hidden}){
+  const qq=(q||"").trim().toLowerCase();
+  return list.filter(m=>(!kinds||kinds.includes(m.kind))&&(!cat||m.category===cat)&&(hidden||!m.hidden)
+    &&(!qq||[m.label,m.alt,m.summary,m.path,...(m.tags||[])].join(" ").toLowerCase().includes(qq)));
+}
+function categorySelect(value,onChange,{allLabel="All categories",style=""}={}){
+  const s=h("select",{"aria-label":"Category",style}); s.append(h("option",{value:"",text:allLabel}));
+  Store.draft.categories.forEach(c=>{ const o=h("option",{value:c.id,text:c.label}); if (c.id===value) o.selected=true; s.append(o); });
+  s.addEventListener("change",()=>onChange(s.value)); return s;
+}
+const DOC_ICON='<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>';
+function docThumb(m){ const D=Store.draft; if (m.cover){ const n=mediaNode(D,m.cover,{w:240,hh:180}); if (n) return n; } return h("span",{class:"doc-thumb",html:DOC_ICON}); }
+
+function panelMedia(body){
+  const D=Store.draft;
+  body.append(h("p",{class:"adm-intro",text:"Every image, video, background and article in one place, sorted into categories. Anything here can be picked wherever the studio asks for an image, and articles can be opened from any button."}));
+  const up=h("input",{type:"file",accept:"image/*,video/mp4,video/webm",multiple:true,hidden:true});
+  up.addEventListener("change",async()=>{ for (const f of up.files){ try { toast("Uploading "+f.name); const r=await assetsApi.upload(f); const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:LIB.cat||"",tags:[],alt:""}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); toast("Uploaded "+f.name); } catch(e){ toast("Upload failed: "+(e&&e.message||"try a smaller file")); } } up.value=""; });
+  const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+    h("button",{class:"btn primary",type:"button",html:IC.up+"Check GitHub for new files",onclick:async()=>{ await syncLibrary(false); touch(); draw(); }}),
+    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub",onclick:()=>up.click()}):null,
+    h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const m={id:uid("m"),label:"New article",kind:"article",category:LIB.cat||"articles",tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
+    h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:LIB.cat||"backgrounds",tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up);
+  const kinds=h("div",{class:"lib-kinds",role:"group","aria-label":"Type"});
+  const search=h("input",{type:"search",placeholder:"Search titles, tags, files","aria-label":"Search the library",value:LIB.q});
+  search.addEventListener("input",()=>{ LIB.q=search.value; drawGrid(); });
+  const hiddenT=h("label",{class:"toggle"},h("input",{type:"checkbox",checked:LIB.hidden,onchange:e=>{ LIB.hidden=e.target.checked; drawGrid(); }}),"Show hidden");
+  const filters=h("div",{class:"lib-filters"},kinds,h("span",{class:"cat-slot"}),search,hiddenT);
+  const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"});
+  const drawFilters=()=>{ kinds.textContent=""; OPT.libKinds.forEach(([v,l])=>kinds.append(h("button",{type:"button",class:"chip"+(LIB.kind===v?" on":""),text:l,onclick:()=>{ LIB.kind=v; drawFilters(); drawGrid(); }})));
+    $(".cat-slot",filters).replaceWith(Object.assign(categorySelect(LIB.cat,v=>{ LIB.cat=v; drawGrid(); }),{className:"cat-slot"})); };
+  const drawGrid=()=>{ grid.textContent="";
+    const list=libFilter(D.media,{kinds:LIB.kind?[LIB.kind]:null,cat:LIB.cat,q:LIB.q,hidden:LIB.hidden});
+    countEl.textContent=list.length+" of "+D.media.length+" items";
+    if (!list.length) grid.append(h("p",{class:"adm-intro",text:"Nothing matches. Add files on GitHub (below), or change the filters."}));
+    list.forEach(m=>grid.append(h("button",{class:"lib-card"+(m.id===Admin.sel.media?" on":"")+(m.hidden?" is-hidden":""),type:"button",onclick:()=>{ Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
+      h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id)),
+      h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.url?"Supabase":""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")})))));
+  };
+  const drawDetail=()=>{ det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
+    const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); };
+    const common=[["label","text",m.kind==="article"?"Title":"Name"],["category","category","Category"],["tags","strings","Tags (one per line)"]];
+    let schema=common;
+    if (m.kind==="scene") schema=common.concat([["scene","select","Scene",{options:OPT.scenes}],["fx","range","Focus left–right",{min:0,max:1,step:.01}],["fy","range","Focus top–bottom",{min:0,max:1,step:.01}],["zoom","range","Crop zoom",{min:1,max:3,step:.05}],["animate","toggle","Plays as a video (slow motion loop)"]]);
+    else if (m.kind==="article") schema=common.concat([["summary","area","Summary",{wide:true}],["link","text","Link (https://…), if it lives on another site",{wide:true}],["cover","media","Cover image",{wide:true,allowNone:true}]]);
+    else schema=common.concat([["alt","text","Description for screen readers",{wide:true}]]);
+    const src=m.path?h("p",{class:"mono",style:"overflow-wrap:anywhere"},"GitHub: public/library/"+m.path+" · ",h("a",{href:ghFile(m.path),target:"_blank",rel:"noopener",text:"open on GitHub"}),libMissing(m)?h("b",{style:"color:var(--bad)",text:" · not found in the latest site build"}):null)
+      :m.url?h("p",{class:"mono",text:"Stored in Supabase Storage"}):null;
+    const del=m.path
+      ?h("button",{class:"btn sm",type:"button",text:m.hidden?"Show in library again":"Hide from library",onclick:()=>{ m.hidden=!m.hidden; touch(); drawGrid(); drawDetail(); }})
+      :h("button",{class:"btn danger sm",type:"button",text:"Delete",onclick:e=>confirmInline(e.currentTarget,"Remove this from the library? Places that use it will show nothing.",()=>{ D.media.splice(D.media.indexOf(m),1); touch(); drawGrid(); drawDetail(); })});
+    det.append(card(h("span",{class:"grow"},"Edit "+({article:"article",scene:"scene",video:"video"}[m.kind]||"image")),pv,src,
+      fieldsFor(m,schema,()=>{ redraw(); drawGrid(); }),
+      h("p",{class:"hint",text:"Use it in a blog post by writing [["+m.id+"|caption]] on its own line."}),
+      h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},del)));
+    redraw();
+  };
+  const draw=()=>{ drawFilters(); drawGrid(); drawDetail(); };
+  body.append(bar,filters,countEl,grid,det,githubCard(),categoriesCard(()=>draw()));
+  draw();
+  syncLibrary(true).then(n=>{ if (n){ touch(); draw(); } });
+}
+function githubCard(){
+  const D=Store.draft, rows=h("div",{class:"gh-rows"});
+  D.categories.forEach(c=>{ const has=!libIndex||libIndex.folders.includes(c.id);
+    rows.append(h("div",{class:"gh-row"},h("span",{text:c.label}),h("code",{text:"public/library/"+c.id}),
+      h("a",{class:"btn sm",href:has?ghUpload(c.id):ghNewFolder(c.id),target:"_blank",rel:"noopener",html:has?IC.up+"Upload files":IC.plus+"Create folder"}))); });
+  return card("Add files on GitHub",
+    h("p",{class:"adm-intro",text:"Pick a category, drop your files on the GitHub page that opens, and press Commit changes. The site redeploys in about two minutes; then press Check GitHub for new files (or reopen the studio) and they appear above with the right category."}),
+    h("p",{class:"hint",text:"Images: jpg, png, webp, gif, avif, svg. Video: mp4 or webm. Articles: pdf. GitHub takes up to 25 MB per file, so compress videos first."}),rows);
+}
+function categoriesCard(onChange){
+  const D=Store.draft, rows=h("div",{class:"fields"});
+  const used=id=>D.media.some(m=>m.category===id)||D.posts.some(p=>p.category===id);
+  const draw=()=>{ rows.textContent="";
+    D.categories.forEach((c,i)=>{ const inp=h("input",{type:"text",value:c.label,"aria-label":"Category name"}); inp.addEventListener("input",()=>{ c.label=inp.value; touch(); });
+      rows.append(h("div",{class:"field wide",style:"flex-direction:row;align-items:center;gap:10px"},inp,h("code",{class:"mono",text:c.id}),
+        used(c.id)?h("span",{class:"mono",text:"in use"}):h("button",{class:"btn sm danger",type:"button",text:"Remove",onclick:()=>{ D.categories.splice(i,1); touch(); draw(); onChange(); }}))); });
+    const name=h("input",{type:"text",placeholder:"New category name","aria-label":"New category name"});
+    rows.append(h("div",{class:"field wide",style:"flex-direction:row;gap:10px"},name,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add category",onclick:()=>{ const id=slugify(name.value); if (!id||D.categories.some(c=>c.id===id)){ toast("Pick a new, different name."); return; } D.categories.push({id,label:name.value.trim()}); touch(); draw(); onChange(); toast("Added. Create its folder on GitHub from the list above."); }})));
+  };
+  draw();
+  return card("Categories",h("p",{class:"adm-intro",text:"Categories sort the library and the blog. Each one matches a folder on GitHub with the name shown in grey; renaming here changes only the label."}),rows);
+}
+
+/* ================= BLOG ================= */
+const todayIso=()=>new Date().toISOString().slice(0,10);
+function panelBlog(body){
+  const D=Store.draft;
+  const onPage=D.pages.find(p=>p.sections.some(s=>s.type==="blog"));
+  body.append(h("p",{class:"adm-intro",text:"Write posts here. Published posts appear on every page that has a Blog posts section"+(onPage?" (now: "+onPage.title+")":"; add one under Pages")+", newest first, each at its own address. Drafts are only visible in Preview draft."}));
+  const sorted=()=>D.posts.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  masterDetail(body,{items:sorted,selKey:"blog",label:p=>p.title||"Untitled",kind:p=>(p.published?"":"Draft · ")+(fmtDate(p.date)||"No date"),addLabel:"New post",
+    onAdd:()=>{ let n=1; while (D.posts.some(p=>p.slug==="new-post-"+n)) n++; const p={id:uid("p"),slug:"new-post-"+n,title:"New post",date:todayIso(),category:"",tags:[],author:D.site.brand||"",cover:"",excerpt:"",body:"",published:false}; D.posts.push(p); return p; },
+    detail:(p,redrawList)=>{
+      const slug=h("input",{type:"text",value:p.slug||"",id:uid("f")}), hint=h("span",{class:"hint",text:"The post's address: #post/"+(p.slug||"")});
+      slug.addEventListener("change",()=>{ const v=slugify(slug.value); if (!v||D.posts.some(x=>x!==p&&x.slug===v)){ hint.textContent="That address is taken or empty."; hint.style.color="var(--bad)"; slug.value=p.slug; return; } p.slug=v; slug.value=v; hint.style.color=""; hint.textContent="The post's address: #post/"+v; touch(); });
+      const meta=fieldsFor(p,[["title","text","Title",{wide:true}],["published","toggle","Published (visible to visitors)"],["date","date","Date"],["category","category","Category"],["author","text","Author"],["tags","strings","Tags (one per line)"],["excerpt","area","Short summary for the list",{wide:true}],["cover","media","Cover image",{wide:true,allowNone:true}]],
+        (v,k)=>{ if (k==="title"&&/^new-post-\d+$/.test(p.slug||"")){ const s=slugify(p.title); if (s&&!D.posts.some(x=>x!==p&&x.slug===s)){ p.slug=s; slug.value=s; hint.textContent="The post's address: #post/"+s; } } redrawList(); });
+      meta.prepend(h("div",{class:"field"},h("label",{for:slug.id,text:"Address"}),slug,hint));
+      return [
+        card(h("span",{class:"grow"},"Post"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview post",onclick:()=>{ Site.preview=true; location.hash="post/"+encodeURIComponent(p.slug||p.id); }}),meta),
+        card("Text",fieldsFor(p,[["body","prose","Body",{wide:true}]])),
+        h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete post",onclick:e=>confirmInline(e.currentTarget,"Delete this post? This can't be undone after publishing.",()=>{ D.posts.splice(D.posts.indexOf(p),1); touch(); openPanel("blog"); })}))
+      ];
+    }});
+}
+/* Large text editor with a formatting guide and an "insert from library" helper. */
+function proseField(obj,key,id,set){
+  const t=h("textarea",{id,class:"prose-edit",rows:16}); t.value=obj[key]??"";
+  t.addEventListener("input",()=>set(t.value));
+  const pick=h("select",{"aria-label":"Insert from library"}); pick.append(h("option",{value:"",text:"Insert image or video from the library…"}));
+  libFilter(Store.draft.media,{kinds:["image","video","scene"]}).forEach(m=>pick.append(h("option",{value:m.id,text:(categoryLabel(Store.draft,m.category)?categoryLabel(Store.draft,m.category)+" · ":"")+m.label})));
+  pick.addEventListener("change",()=>{ if (!pick.value) return; const ins="\n\n[["+pick.value+"|]]\n\n", a=t.selectionStart??t.value.length; t.value=t.value.slice(0,a)+ins+t.value.slice(a); pick.value=""; set(t.value); t.focus(); });
+  return h("div",{class:"prose-wrap"},t,h("div",{class:"prose-tools"},pick,h("span",{class:"hint",text:"Empty line = new paragraph · ## Heading · - list item · > quote · **bold** · *italic* · [text](https://…)"})));
+}
+
+export { LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
