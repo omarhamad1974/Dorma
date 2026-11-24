@@ -82,6 +82,12 @@ and the text. The text uses a small, safe subset of Markdown (empty line = parag
 own line places a library image or video. Published posts appear on any page with a **Blog posts**
 section (the Blog page by default), and each post has its own address, `#post/<address>`.
 
+## Loader
+
+A loader shows while the site starts. Its default look (the Dorma logo on white, wiping in over a CMYK colour line) is written into `index.html`, so it appears before any script runs. The logo file is `public/brand/dorma-logo.png`.
+
+In the studio, **Site and titles → Loader** sets what it shows (the logo image, another library image, a typed wordmark, or an SVG logo), the animation (Reveal, Draw, Pulse), the exit, the background and the minimum time. The published settings are remembered in each visitor's browser, so returning visitors see them from the first frame. The Draw animation needs an SVG logo.
+
 ## Set up (once)
 
 1. **Database.** Run `supabase/migrations/0001_site_config.sql` in the project's SQL Editor (done for Dorma

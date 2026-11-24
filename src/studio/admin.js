@@ -5,6 +5,7 @@ import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publish
 import { Site, closeModal, disposePage, openModal } from './site';
 import { A, OPT, SECTION_BLANK, SECTION_TYPES, STARTER } from './data';
 import Sortable from 'sortablejs';
+import { imageUrl, markHtml, previewLoader } from '../loader';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -213,6 +214,7 @@ function panelSite(body){
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
+  body.append(loaderCard());
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(p.title||p.id)+" in menu")); });
   body.append(card("Page titles",titles));
@@ -225,6 +227,23 @@ function panelSite(body){
     (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);font-family:var(--mono);font-size:.74rem"}))));
   var area;
   if (Store.mode==="db") body.append(versionsCard());
+}
+function loaderCard(){
+  const D=Store.draft, L=D.loader;
+  const thumb=h("div",{class:"ld-thumb"}), note=h("span",{class:"hint"});
+  const redraw=()=>{ const bad=L.logo && !sanitizeSvg(L.logo); note.textContent=bad?"That text isn't a valid SVG, so the wordmark is shown instead.":""; thumb.dataset.bg=L.bg; thumb.innerHTML=markHtml({...L,logo:bad?"":L.logo},imageUrl(L,D)); };
+  const file=h("input",{type:"file",accept:".svg,image/svg+xml",hidden:true});
+  file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; const txt=await f.text(); if (!sanitizeSvg(txt)){ toast("That file isn't a valid SVG."); return; } L.logo=txt; L.mark="svg"; touch(); openPanel("site"); });
+  const c=card("Loader",
+    h("p",{class:"adm-intro",text:"Shown while the site loads. Use the Dorma logo, another image from the library, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the Dorma logo."}),
+    thumb,
+    fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["light","White (best for the logo)"],["theme","Site background"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
+    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the built-in Dorma logo)",{allowNone:true},redraw)),
+    h("div",{class:"fields"},F(L,"logo","code","Logo SVG (optional, replaces the wordmark)",{wide:true,hint:"Paste SVG code, or upload a file. Simple outlined shapes work best with the Draw animation."},redraw)),
+    h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+      h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),
+      h("button",{class:"btn primary",type:"button",text:"Preview loader",onclick:()=>previewLoader(D)}),file),note);
+  redraw(); return c;
 }
 function versionsCard(){
   const list=h("div",{class:"fields"},h("p",{class:"mono",text:"Loading…"}));
