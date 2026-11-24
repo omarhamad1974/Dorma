@@ -84,13 +84,14 @@ const SECTIONS={
     let cur=0, busy=false, prog=null, t0=performance.now();
     // Timing: each slide can override the section's reveal times (seconds after the slide's text starts) and its duration.
     const timing=i=>{ const st=(slides[i]||{}).timing, T=sec.timing, c=(k,d)=>cue(st,k,cue(T,k,d));
-      return { eyebrow:c("eyebrow",.05), title:c("title",0), text:c("text",.25), flow:c("flow",null), duration:cue(st,"duration",0)||(+M.slideDuration||7) }; };
+      // Default story order: title, then the short paragraph 0.5s later, then the flow 1s after that, item by item.
+      return { eyebrow:c("eyebrow",.05), title:c("title",0), text:c("text",.5), flow:c("flow",1.5), stagger:c("stagger",.2), duration:cue(st,"duration",0)||(+M.slideDuration||7) }; };
     // Each slide has its own flow (or the section's default flow). Flows open modals, pages or links; they never move the slides.
     const byId={}, FL=slides.map(s=>{ const id=s.flowId||sec.flowId||""; if (!id) return null; if (byId[id]!==undefined) return byId[id];
       const c=renderFlow(cfg,id,{onItem:(j,it)=>runAction(cfg,it.action,{flow:c.flow,index:j,goSlide:go})}); return byId[id]=c; });
     const flowBox=h("div",{class:"hc-flow"}); content.append(flowBox);
     const showFlow=i=>{ flowBox.textContent=""; const c=FL[i]; if (c) flowBox.append(c.el); };
-    const playFlow=(i,base)=>{ const c=FL[i]; if (!c) return; const T=timing(i); if (T.flow==null) c.play(base); else c.play(0,base+T.flow); };
+    const playFlow=(i,base)=>{ const c=FL[i]; if (!c) return; const T=timing(i); c.play(0,base+T.flow,T.stagger); };
     const curEl=h("b",{text:"01"}), tc=h("span",{text:"00:00:00:00"}), scn=h("span",{text:"SC 01"});
     const prev=h("button",{class:"arrow",type:"button","aria-label":ui("Previous slide"),html:'<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>'});
     const next=h("button",{class:"arrow",type:"button","aria-label":ui("Next slide"),html:'<svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg>'});
