@@ -10,19 +10,44 @@ const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
 const pad = n => String(n).padStart(2,"0");
 const clone = o => JSON.parse(JSON.stringify(o));
 const uid = p => p+"-"+Math.random().toString(36).slice(2,8);
-const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* ---------- languages ----------
+   Any text in the settings can be a plain string (English) or {en,ar}. The site renders a localized copy;
+   an empty language falls back to the other one so a page is never blank. */
+const LANGS = { en:"English", ar:"العربية" };
+const LANG = { cur:"en" };
+const isTx = v => !!v && typeof v==="object" && !Array.isArray(v) && Object.keys(v).length>0 && Object.keys(v).every(k=>k==="en"||k==="ar");
+const blank = x => x==null || x==="" || (Array.isArray(x) && !x.filter(Boolean).length);
+function txt(v,lang=LANG.cur){ if (!isTx(v)) return v; const a=v[lang], b=v[lang==="ar"?"en":"ar"]; return blank(a)?(blank(b)?"":b):a; }
+/** For the studio's own lists and labels: English, else Arabic. */
+const plain = v => isTx(v) ? (blank(v.en)?(v.ar??""):v.en) : v;
+function siteLangs(cfg){ const l=cfg&&cfg.site&&cfg.site.languages; return l==="ar"?["ar"]:l==="both"?["en","ar"]:["en"]; }
+function pickLang(cfg){ const ls=siteLangs(cfg); let p=null; try { p=localStorage.getItem("dorma.lang"); } catch(e){ /* blocked */ }
+  return ls.includes(p)?p:(ls.includes(cfg.site.defaultLang)?cfg.site.defaultLang:ls[0]); }
+function setLang(l){ try { localStorage.setItem("dorma.lang",l); } catch(e){ /* blocked */ } }
+function setDocLang(lang){ const d=document.documentElement; d.lang=lang; d.dir=lang==="ar"?"rtl":"ltr"; }
+/** A copy of the settings with every {en,ar} text resolved to the visitor's language. */
+function localize(cfg){
+  if (!cfg || cfg.__lang) return cfg;
+  const lang=pickLang(cfg); LANG.cur=lang;
+  const walk=v=>isTx(v)?txt(v,lang):Array.isArray(v)?v.map(walk):(v&&typeof v==="object")?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,walk(x)])):v;
+  const out=walk(cfg); out.__lang=lang; setDocLang(lang); return out;
+}
+/** Visitor-facing words built into the site (buttons, labels), in Arabic. */
+const UI_AR = {"This site has no pages yet.": "لا توجد صفحات في الموقع بعد.", "On this page": "في هذه الصفحة", "Main": "القائمة الرئيسية", "Menu": "القائمة", "Draft preview": "معاينة المسودة", "Back to studio": "العودة إلى الاستوديو", "Open studio": "فتح الاستوديو", "Featured": "مميز", "Previous slide": "الشريحة السابقة", "Next slide": "الشريحة التالية", "New posts are on the way.": "مقالات جديدة قريبًا.", "All posts": "كل المقالات", "More posts": "مقالات أخرى", "Post not found": "المقال غير موجود", "Browse the other posts": "تصفح المقالات الأخرى", "Close": "إغلاق", "Previous": "السابق", "Next": "التالي", "Pause video": "إيقاف الفيديو مؤقتًا", "Play video": "تشغيل الفيديو", "posts": "مقالات", "items": "عناصر", "Media": "وسائط", "Gallery": "معرض", "Flow": "مسار", "Step": "الخطوة", "Blog": "المدونة", "This post isn't available": "هذا المقال غير متاح", "It may have been moved or unpublished.": "ربما نُقل أو أُلغي نشره."};
+const ui = s => LANG.cur==="ar" ? (UI_AR[s]||s) : s;
+const esc = s => String(plain(s)??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function h(tag, attrs={}, ...kids){
   const el=document.createElement(tag);
   for (const [k,v] of Object.entries(attrs||{})){
     if (v==null || v===false) continue;
     if (k==="class") el.className=v;
-    else if (k==="text") el.textContent=v;
+    else if (k==="text") el.textContent=plain(v);
     else if (k==="html") el.innerHTML=v;           // only ever passed trusted, code-built markup
     else if (k.startsWith("on")) el.addEventListener(k.slice(2),v);
-    else el.setAttribute(k, v===true?"":v);
+    else el.setAttribute(k, v===true?"":plain(v));
   }
-  for (const k of kids.flat()) if (k!=null && k!==false) el.append(k.nodeType?k:document.createTextNode(k));
+  for (const k of kids.flat()) if (k!=null && k!==false) el.append(k.nodeType?k:document.createTextNode(plain(k)));
   return el;
 }
 const ARROW_SVG = '<svg viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
@@ -57,11 +82,11 @@ function iconSvg(cfg, id){ const ic=(cfg.icons||[]).find(i=>i.id===id); return i
 function hexRgb(hex){ const m=/^#?([\da-f]{6})$/i.exec(hex||""); if(!m) return [238,241,246]; const n=parseInt(m[1],16); return [n>>16&255,n>>8&255,n&255]; }
 const rgba=(hex,a)=>`rgba(${hexRgb(hex).join(",")},${a})`;
 function applyTheme(cfg){
-  const t=cfg.theme, r=document.documentElement.style, fb='"Segoe UI",system-ui,sans-serif';
+  const t=cfg.theme, r=document.documentElement.style, fb='"IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif';
   r.setProperty("--ink",t.ink); r.setProperty("--panel",t.panel); r.setProperty("--fg",t.fg); r.setProperty("--accent",t.accent);
   r.setProperty("--muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--glass",rgba(t.fg,.05));
   r.setProperty("--accent-soft",rgba(t.accent,.12)); r.setProperty("--accent-line",rgba(t.accent,.55)); r.setProperty("--accent-glow",rgba(t.accent,.5));
-  r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--mono",`"${t.mono}",ui-monospace,Menlo,monospace`);
+  r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--mono",`"${t.mono}","IBM Plex Sans Arabic",ui-monospace,Menlo,monospace`);
   r.setProperty("--radius",(+t.radius||0)+"px"); r.setProperty("--ov",t.overlay); r.setProperty("--img-bright",t.imageBrightness);
   document.body.style.background=t.ink;
 }
@@ -94,7 +119,7 @@ const isMoving=(cfg,id)=>{ const m=mediaItem(cfg,id); return !!m && (m.kind==="v
 function mediaBox(cfg,id,{ratio=1.6,badge="",cls="",bleed=false,res=1280}={}){
   const box=h("div",{class:"ph"+(bleed?" bleed":"")+(cls?" "+cls:"")});
   const node=mediaNode(cfg,id,{w:res,hh:Math.round(res/ratio)}); if (node) box.append(node);
-  if (badge) box.append(h("span",{class:"badge",html:`<b>${isMoving(cfg,id)?"VID":"IMG"}</b> ${esc(badge)}`}));
+  if (badge && NUM.on) box.append(h("span",{class:"badge",html:`<b>${isMoving(cfg,id)?"VID":"IMG"}</b> ${esc(badge)}`}));
   return box;
 }
 
@@ -133,7 +158,7 @@ function flowItemEl(cfg,flow,it,i){
     b.innerHTML=`<span class="ic">${iconMarkup||'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>'}</span>`;
     b.setAttribute("aria-label",it.label||"Item"); b.title=it.label||"";
   } else {
-    if (it.showIndex && kind==="button") b.append(h("span",{class:"n",text:pad(i+1)}));
+    if (it.showIndex && NUM.on && kind==="button") b.append(h("span",{class:"n",text:pad(i+1)}));
     if (iconMarkup){ b.classList.add("has-ic"); b.append(h("span",{class:"ic",html:iconMarkup})); }
     b.append(document.createTextNode(it.label||""));
   }
@@ -196,7 +221,10 @@ function buttonEl(cfg,btn,cls="more"){
   const b=h("button",{class:cls,type:"button",html:esc(btn.label)+ARROW_SVG});
   b.addEventListener("click",()=>runAction(cfg,btn.action)); return b;
 }
-function eyebrowEl(num,text){ if (!num && !text) return null; const p=h("p",{class:"eyebrow"}); if (num) p.append(h("b",{text:num})); if (text) p.append(text); return p; }
+/* Numbering (01, 02 ... counters, badges, step labels) shows only when Site → Show numbering is on. */
+const NUM={on:false};
+const pn=i=>NUM.on?pad(i):"";
+function eyebrowEl(num,text){ if (!NUM.on) num=""; if (!num && !text) return null; const p=h("p",{class:"eyebrow"}); if (num) p.append(h("b",{text:num})); if (text) p.append(text); return p; }
 function emphasize(text){ return esc(text).replace(/\*([^*]+)\*/g,"<em>$1</em>"); }
 
 /* ---------- text reveal ---------- */
@@ -212,7 +240,7 @@ function splitTitle(el,text,mode){
   return $$(".c,.wi",el);
 }
 function revealTitle(cfg,el,text,delay=0){
-  const mode=cfg.motion.titleReveal;
+  let mode=cfg.motion.titleReveal; if (mode==="chars" && LANG.cur==="ar") mode="words";
   if (reduce){ el.textContent=text; return gsap.timeline(); }
   if (mode==="fade"||mode==="blur"){ el.textContent=text; el.classList.remove("split-chars");
     return gsap.timeline({delay}).fromTo(el,{y:24,autoAlpha:0,filter:mode==="blur"?"blur(14px)":"blur(0px)"},{y:0,autoAlpha:1,filter:"blur(0px)",duration:1.1,ease:ease(cfg)}); }
@@ -245,7 +273,7 @@ function renderProse(cfg,text){
   });
   return out;
 }
-const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); };
-const categoryLabel=(cfg,id)=>((cfg.categories||[]).find(c=>c.id===id)||{}).label||"";
+const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
+const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

@@ -11,6 +11,9 @@ const STARTER = {
     cta: { label: "Tell us your challenge", action: A("modal","md-contact") },
     footer: "© 2026 Dorma Advertising · Agency | Printing & Production",
     showStudioLink: true,
+    languages: "en",
+    defaultLang: "en",
+    showNumbers: false,
     logoMode: "image",
     logo: "",
     logoHeight: 34
