@@ -96,7 +96,7 @@ Each slide has its own **flow**: the buttons under its text, which open modals, 
 
 ## Timing (storytelling)
 
-Every hero, hero carousel, timeline, flow strip and modal has a **Timing** row in the studio. It gives the second each piece starts (eyebrow, title, text, image, flow, flow detail, button), counted from when the section scrolls into view, the modal opens, or the slide's text starts. Leave a box empty for the default shown, and use lower numbers to bring a piece forward. Hero carousel slides can also set their own **seconds on screen** and override the section timing. The flow's item-by-item animation still comes from the Flows panel.
+Every hero, hero carousel, timeline, flow strip and modal has a **Timing** row in the studio. It gives the second each piece starts (eyebrow, title, text, image, flow, flow detail, button), counted from when the section scrolls into view, the modal opens, or the slide's text starts. Leave a box empty for the default shown, and use lower numbers to bring a piece forward. Hero carousel slides can also set their own **seconds on screen** and override the section timing. In the hero carousel the default order is title at 0s, short paragraph at 0.5s, then the flow at 1.5s with its buttons appearing one by one (**Gap between flow items**, 0.2s). Elsewhere the flow's item-by-item animation comes from the Flows panel.
 
 ## Loader
 

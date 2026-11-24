@@ -181,18 +181,19 @@ function renderFlow(cfg,flowId,opts={}){
   });
   const ctl={flow,el,btns,seps,pairs,
     setActive(i,{fill=false}={}){ btns.forEach((b,j)=>{ b.classList.toggle("is-active",j===i); b.classList.toggle("static-active",fill&&j===i); b.setAttribute("aria-pressed",j===i?"true":"false"); }); seps.forEach((s,j)=>s.classList.toggle("lit",j<i)); },
-    play(extraDelay=0,at=null){ return animateFlow(cfg,ctl,extraDelay,at); }
+    play(extraDelay=0,at=null,stagger=null){ return animateFlow(cfg,ctl,extraDelay,at,stagger); }
   };
   return ctl;
 }
 /* ---------- timing (storytelling) ----------
    Sections and modals can carry timing:{eyebrow,title,text,media,flow,more,...}: the second each piece starts,
    counted from when the section comes into view or the modal opens. Empty = the built-in default. */
-const TIMING_PARTS = { eyebrow:"Eyebrow", title:"Title", text:"Text", media:"Image or video", flow:"Flow", detail:"Flow detail", more:"Button", duration:"Seconds on screen" };
+const TIMING_PARTS = { eyebrow:"Eyebrow", title:"Title", text:"Text", media:"Image or video", flow:"Flow", stagger:"Gap between flow items", detail:"Flow detail", more:"Button", duration:"Seconds on screen" };
 function cue(t,key,def){ const v=t&&t[key]; return v===""||v==null||isNaN(+v)?def:Math.max(0,+v); }
-function animateFlow(cfg,ctl,extraDelay=0,at=null){
+function animateFlow(cfg,ctl,extraDelay=0,at=null,stagger=null){
   const a={...(ctl.flow.anim||{mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0})};
   if (at!=null){ a.delay=at; extraDelay=0; }
+  if (stagger!=null) a.stagger=stagger;
   if (reduce) return;
   if (a.mode==="group"){ presetTween(ctl.el,a.preset,{duration:+a.duration||.8,delay:(+a.delay||0)+extraDelay,cfg}); return; }
   let seq=0;
