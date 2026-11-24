@@ -326,7 +326,7 @@ function panelMotion(body){
   Admin.refresh=play; play();
   body.append(card(h("span",{},"Preview"),prev,h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.replay+"Replay",onclick:play})),
     card("Global",fieldsFor(M,[["speed","range","Overall speed",{min:.4,max:2,step:.05}],["ease","select","Easing",{options:OPT.ease}],["titleReveal","select","Title reveal",{options:OPT.titleReveal}],["scrollReveal","select","Sections on scroll",{options:OPT.scrollReveal}],["counters","toggle","Count numbers up"],["parallax","toggle","Mouse parallax on heroes"]])),
-    card("Hero carousel",fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","range","Seconds per slide",{min:3,max:15,step:.5}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]])),
+    card("Hero carousel",fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","range","Seconds per slide",{min:3,max:15,step:.5}],["buttonGlow","range","Button glow (0 = off)",{min:0,max:1,step:.05,theme:true}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]])),
     card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]])),
     h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows."}));
 }

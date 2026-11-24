@@ -28,7 +28,7 @@ const STARTER = {
   motion: {
     speed: 1, ease: "expo",
     kenBurns: true, kbZoom: 1.18, kbDuration: 10,
-    slideDuration: 7, transition: "wipe", titleReveal: "chars",
+    slideDuration: 7, buttonGlow: 0.45, transition: "wipe", titleReveal: "chars",
     modalOpen: "line", scrollReveal: "rise", parallax: true, counters: true
   },
   /* Generated placeholder scenes. Replace them with real project photos in the studio (Images). */
@@ -156,10 +156,10 @@ const STARTER = {
   ],
   pages: [
     { id:"home", title:"Home", nav:false, layout:"cinematic", sections:[
-      { id:"s-hc", type:"heroCarousel", flowId:"f-hero", flowDrivesSlides:true, hud:true, timing:{}, replayFlow:false, slides:[
+      { id:"s-hc", type:"heroCarousel", flowId:"f-hero", hud:true, timing:{}, replayFlow:false, slides:[
         { eyebrow:"Dorma Advertising", title:"What's your next challenge?", lede:"Let's bring it to life. Ideas, experiences, and production solutions shaped around your business.", media:"m-nebula" },
-        { eyebrow:"Agency", title:"Give your idea a clear direction", lede:"Develop the idea, shape the message, and plan the experience: concepts, design, content, events, and digital.", media:"m-ridges" },
-        { eyebrow:"Printing & Production", title:"Put your brand where people experience it", lede:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city" },
+        { flowId:"f-agency", eyebrow:"Agency", title:"Give your idea a clear direction", lede:"Develop the idea, shape the message, and plan the experience: concepts, design, content, events, and digital.", media:"m-ridges" },
+        { flowId:"f-production", eyebrow:"Printing & Production", title:"Put your brand where people experience it", lede:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city" },
         { eyebrow:"Let's talk", title:"What are you planning next?", lede:"Tell us what you want to achieve. We'll help shape the way forward.", media:"m-ocean" }
       ] },
       { id:"s-intro", type:"about", num:"01", eyebrow:"Introducing Dorma", text:"You may be launching a product, preparing for an exhibition, refreshing your brand, or looking for a better way to connect with customers. Whatever comes next, it starts with *understanding what you need*.", media:"m-ridges-2", link:{ label:"About Dorma", action:A("page","about") } },
@@ -260,12 +260,11 @@ const OPT = {
 const ACTION_FIELDS = [["action","action","Action"]];
 const SECTION_TYPES = {
   heroCarousel: { label:"Hero carousel", fields:[
-    ["flowId","flow","Flow under the title"],
-    ["flowDrivesSlides","toggle","Flow items switch slides"],
+    ["flowId","flow","Default flow (for slides without their own)"],
     ["hud","toggle","Show counter and timecode"],
     ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.25],["flow",null]],hint:"Seconds from when each slide's text starts. Flow on Auto keeps the flow's own timing from the Flows panel. Each slide can override these below."}],
-    ["replayFlow","toggle","Replay the flow animation on every slide"],
-    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null]],hint:"Seconds on screen, and when each piece starts. Empty follows the section timing and Animation → Seconds per slide."}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
+    ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
+    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null]],hint:"Seconds on screen, and when each piece starts. Empty follows the section timing and Animation → Seconds per slide."}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
   hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
   chapters: { label:"Chapters", fields:[["items","list","Chapters",{ title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
@@ -282,7 +281,7 @@ const SECTION_TYPES = {
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
 const SECTION_BLANK = {
-  heroCarousel:()=>({flowId:"",flowDrivesSlides:false,hud:true,timing:{},replayFlow:false,slides:[{eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}]}),
+  heroCarousel:()=>({flowId:"",hud:true,timing:{},replayFlow:false,slides:[{eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}]}),
   hero:()=>({num:"",eyebrow:"Eyebrow",title:"New hero",lede:"",media:"m-nebula",height:"tall",flowId:""}),
   chapters:()=>({items:[]}), stats:()=>({num:"",eyebrow:"",style:"band",items:[]}),
   about:()=>({num:"",eyebrow:"About",text:"A short statement.",media:"",link:{label:"",action:A()}}),

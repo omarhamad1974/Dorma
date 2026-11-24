@@ -132,7 +132,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .hc .counter b{font-weight:500;color:var(--fg);font-size:1rem;letter-spacing:.04em}
 .hc .tc{font-variant-numeric:tabular-nums}
 .hc .tc .rec{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:10px;vertical-align:1px;animation:blink 1.4s infinite}
-.arrows{display:flex;gap:10px}
+.arrows{display:flex;gap:10px;align-items:center}
 .arrow{width:44px;height:44px;border-radius:50%;border:1px solid var(--faint);background:var(--glass);color:var(--fg);display:grid;place-items:center;cursor:pointer;transition:border-color .3s}
 .arrow:hover{border-color:var(--accent)}
 .arrow svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5}
@@ -502,3 +502,15 @@ figure{margin:0;min-width:0}
 .bi-row .field > label{font-size:.6rem;opacity:.75}
 .bi-ar input,.bi-ar textarea{font-family:"IBM Plex Sans Arabic",var(--body);text-align:right}
 @media (max-width:700px){.bi-row{grid-template-columns:1fr}}
+
+/* ---------- buttons: a soft glow that invites a click (Animation → Button glow) ---------- */
+.fi .bar-fill{display:none}
+.fi.k-button,.fi.k-icon,.fi.k-svg{animation:fiGlow 2.8s ease-in-out infinite;animation-delay:calc(var(--gi,0) * .35s)}
+.fi:hover,.fi:focus-visible{box-shadow:0 0 22px 2px var(--btn-glow),inset 0 0 12px var(--btn-glow)}
+@keyframes fiGlow{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 18px 1px var(--btn-glow),inset 0 0 10px var(--btn-glow)}}
+@media (prefers-reduced-motion:reduce){.fi.k-button,.fi.k-icon,.fi.k-svg{animation:none;box-shadow:0 0 12px var(--btn-glow)}}
+/* hero carousel: slide dots, separate from the slide's own flow */
+.hc-dots{display:flex;gap:8px;align-items:center;padding:0 6px}
+.hc-dots button{width:8px;height:8px;padding:0;border-radius:50%;border:1px solid var(--faint);background:transparent;cursor:pointer;transition:background .3s,transform .3s,border-color .3s}
+.hc-dots button.on{background:var(--accent);border-color:var(--accent);transform:scale(1.25)}
+.hc-dots button:hover{border-color:var(--accent-line)}

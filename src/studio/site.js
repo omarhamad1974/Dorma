@@ -85,25 +85,28 @@ const SECTIONS={
     // Timing: each slide can override the section's reveal times (seconds after the slide's text starts) and its duration.
     const timing=i=>{ const st=(slides[i]||{}).timing, T=sec.timing, c=(k,d)=>cue(st,k,cue(T,k,d));
       return { eyebrow:c("eyebrow",.05), title:c("title",0), text:c("text",.25), flow:c("flow",null), duration:cue(st,"duration",0)||(+M.slideDuration||7) }; };
-    const playFlow=(i,base)=>{ if (!fl) return; const T=timing(i); if (T.flow==null) fl.play(0); else fl.play(0,base+T.flow); };
-    const fl=sec.flowId?renderFlow(cfg,sec.flowId,{onItem:(i,it,b)=>{ if (sec.flowDrivesSlides && i<S.length && i!==cur) go(i); runAction(cfg,it.action,{flow:fl.flow,index:i,goSlide:go}); }}):null;
-    if (fl) content.append(fl.el);
+    // Each slide has its own flow (or the section's default flow). Flows open modals, pages or links; they never move the slides.
+    const byId={}, FL=slides.map(s=>{ const id=s.flowId||sec.flowId||""; if (!id) return null; if (byId[id]!==undefined) return byId[id];
+      const c=renderFlow(cfg,id,{onItem:(j,it)=>runAction(cfg,it.action,{flow:c.flow,index:j,goSlide:go})}); return byId[id]=c; });
+    const flowBox=h("div",{class:"hc-flow"}); content.append(flowBox);
+    const showFlow=i=>{ flowBox.textContent=""; const c=FL[i]; if (c) flowBox.append(c.el); };
+    const playFlow=(i,base)=>{ const c=FL[i]; if (!c) return; const T=timing(i); if (T.flow==null) c.play(base); else c.play(0,base+T.flow); };
     const curEl=h("b",{text:"01"}), tc=h("span",{text:"00:00:00:00"}), scn=h("span",{text:"SC 01"});
     const prev=h("button",{class:"arrow",type:"button","aria-label":ui("Previous slide"),html:'<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>'});
     const next=h("button",{class:"arrow",type:"button","aria-label":ui("Next slide"),html:'<svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg>'});
+    const dots=h("div",{class:"hc-dots",role:"tablist","aria-label":ui("Featured")});
+    S.forEach((_,i)=>dots.append(h("button",{type:"button",role:"tab","aria-label":String(i+1)+" / "+S.length,onclick:()=>go(i)})));
     const foot=h("div",{class:"foot"},NUM.on?h("div",{class:"counter"},curEl,h("span",{text:"/ "+pad(S.length)})):h("span"),
-      sec.hud?h("div",{class:"tc mono"},h("span",{class:"rec"}),scn," · ",tc," · 2.39:1"):h("span"), h("div",{class:"arrows"},prev,next));
+      sec.hud?h("div",{class:"tc mono"},h("span",{class:"rec"}),scn," · ",tc," · 2.39:1"):h("span"), h("div",{class:"arrows"},prev,dots,next));
     root.append(h("div",{class:"chrome"},h("div",{class:"wrap"},content,foot)));
     $(".eyebrow",root).style.cssText+=";";
     const style=document.createElement("style"); style.textContent=".hc .eyebrow::after{display:none}"; root.append(style);
 
     const kb=i=>{ const n=S[i].node; if (!n || reduce || !M.kenBurns) return; const z=+M.kbZoom||1.18, dirs=[[-1.5,1],[1.5,0],[1,-1],[0,1]][i%4];
       gsap.fromTo(n,{scale:i%2?1.03:z,xPercent:dirs[0],yPercent:dirs[1]},{scale:i%2?z:1.03,xPercent:-dirs[0],yPercent:-dirs[1],duration:+M.kbDuration||10,ease:"sine.inOut",overwrite:true}); };
-    const setActive=i=>{ curEl.textContent=pad(i+1); scn.textContent=NUM.on?"SC "+pad(i+1):"SC"; if (fl && sec.flowDrivesSlides && i<fl.btns.length) fl.setActive(i); };
+    const setActive=i=>{ curEl.textContent=pad(i+1); scn.textContent=NUM.on?"SC "+pad(i+1):"SC"; [...dots.children].forEach((d,j)=>{ d.classList.toggle("on",j===i); d.setAttribute("aria-selected",j===i?"true":"false"); }); };
     const startProg=i=>{ prog&&prog.kill(); const dur=timing(i).duration*(reduce?1.6:1);
-      const bar=fl&&sec.flowDrivesSlides&&fl.btns[i]?$(".bar-fill",fl.btns[i]):null;
-      if (fl) fl.btns.forEach(b=>gsap.set($(".bar-fill",b),{scaleX:0}));
-      prog=gsap.fromTo(bar||{p:0},bar?{scaleX:0}:{p:0},bar?{scaleX:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)}:{p:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)});
+      prog=gsap.fromTo({p:0},{p:0},{p:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)});
       if (modalIsOpen()) prog.pause(); };
     Site.pauseHero=()=>prog&&prog.pause(); Site.resumeHero=()=>prog&&prog.resume();
     const textIn=(delay=0)=>{ const s=slides[cur]; eyeIdx.textContent=pn(cur+1); eyeIdx.hidden=rule.hidden=!NUM.on; eyeTxt.textContent=s.eyebrow||""; lede.textContent=s.lede||"";
@@ -118,7 +121,7 @@ const SECTIONS={
       .to([eyeIdx,eyeTxt],{yPercent:-100,autoAlpha:0,duration:.4,ease:"power2.in"},0).to(lede,{y:-12,autoAlpha:0,duration:.45,ease:"power2.in"},.05);
     function go(n,dir){
       if (busy||n===cur||!S[n]) return; busy=true; prog&&prog.kill(); dir=dir??(n>cur?1:-1);
-      const a=S[cur], b=S[n], T=M.transition, D=1.5, E=ioEase(cfg);
+      const from=cur, a=S[cur], b=S[n], T=M.transition, D=1.5, E=ioEase(cfg);
       gsap.set(b.el,{zIndex:2,visibility:"visible",clipPath:"inset(0% 0% 0% 0%)",opacity:1,scale:1,xPercent:0}); gsap.set(a.el,{zIndex:1});
       b.el.setAttribute("aria-hidden","false"); a.el.setAttribute("aria-hidden","true");
       kb(n); cur=n; setActive(n);
@@ -130,7 +133,8 @@ const SECTIONS={
       else tl.fromTo(b.el,{clipPath:dir>0?"inset(0% 0% 0% 100%)":"inset(0% 100% 0% 0%)"},{clipPath:"inset(0% 0% 0% 0%)",duration:D,ease:E},0)
             .fromTo(b.par,{xPercent:12*dir},{xPercent:0,duration:D,ease:E},0).to(a.par,{xPercent:-8*dir,duration:D,ease:E},0)
             .fromTo(wipe,{left:dir>0?"100%":"0%",opacity:1},{left:dir>0?"0%":"100%",duration:D,ease:E},0).to(wipe,{opacity:0,duration:.3},1.25);
-      tl.add(()=>{ textIn(); t0=performance.now(); if (sec.replayFlow) playFlow(n,0); },.75);
+      if (FL[from]!==FL[n] && !reduce) tl.to(flowBox,{autoAlpha:0,y:-8,duration:.35,ease:"power2.in"},0);
+      tl.add(()=>{ const changed=FL[from]!==FL[n]; showFlow(n); gsap.set(flowBox,{autoAlpha:1,y:0}); textIn(); t0=performance.now(); if (changed||sec.replayFlow) playFlow(n,0); },.75);
     }
     prev.addEventListener("click",()=>go((cur-1+S.length)%S.length,-1));
     next.addEventListener("click",()=>go((cur+1)%S.length,1));
@@ -146,7 +150,7 @@ const SECTIONS={
     root._after=()=>{
       gsap.set(S[0].el,{visibility:"visible"}); S[0].el.setAttribute("aria-hidden","false"); setActive(0); kb(0);
       if (!reduce) gsap.from(S[0].el,{opacity:0,duration:1.6,ease:"power2.out"});
-      playFlow(0,.35);
+      showFlow(0); playFlow(0,.35);
       textIn(.35).eventCallback("onComplete",()=>startProg(0));
     };
     return root;
