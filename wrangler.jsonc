@@ -1,0 +1,10 @@
+{
+  // Optional: Cloudflare Workers Builds can deploy the site from this file (free, works with private repos).
+  // It builds with Vite and serves the static files in dist/.
+  "name": "dorma",
+  "compatibility_date": "2025-09-01",
+  "build": { "command": "npm run build" },
+  "assets": { "directory": "./dist" },
+  // Branch builds (pull requests) run `npx wrangler preview`, which needs this block.
+  "previews": {}
+}
