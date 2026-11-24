@@ -469,3 +469,14 @@ figure{margin:0;min-width:0}
 .prose-tools{display:flex;flex-direction:column;gap:6px}
 
 .lib-card .meta{flex-direction:column;align-items:flex-start;gap:4px}
+
+/* studio: loader thumbnail (static, no animation) */
+.ld-thumb{display:grid;place-items:center;min-height:150px;margin:4px 0 14px;border:1px solid var(--faint);border-radius:8px;background:var(--ink);overflow:hidden}
+.ld-thumb .ld-mark{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px}
+.ld-thumb .ld-word{display:flex;font-weight:600;font-size:40px;letter-spacing:.16em;margin-right:-.16em;line-height:1}
+.ld-thumb .ld-word i,.ld-thumb .ld-word b{font-style:normal;font-weight:inherit}
+.ld-thumb[data-bg="light"]{background:#fff;color:#0b1630}
+.ld-thumb .ld-img{width:200px}.ld-thumb .ld-img img{display:block;width:100%;height:auto}
+.ld-thumb .ld-logo{width:140px}.ld-thumb .ld-logo svg{display:block;width:100%;height:auto}
+.ld-thumb .ld-line{display:block;height:2px;width:140px;background:linear-gradient(90deg,#ed0677,#ffcb08,#0072bc)}
+.ld-thumb .ld-sub{font-size:10px;letter-spacing:.8em;margin-right:-.8em;opacity:.7}

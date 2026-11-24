@@ -9,8 +9,47 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&family=Manrope:wght@300;400;500;600&family=Unbounded:wght@300;400;500;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Page loader: inline so it shows before the app loads. Settings: studio → Site → Loader. */
+#loader{--ld-bg:#040915;--ld-fg:#eef2fa;--ld-accent:#ffc93c;position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--ld-bg);color:var(--ld-fg);font-family:Sora,"Segoe UI",system-ui,sans-serif;clip-path:inset(0 0 0 0);transition:clip-path .95s cubic-bezier(.77,0,.18,1),opacity .7s ease}
+#loader .ld-mark{display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px;transition:transform .8s cubic-bezier(.77,0,.18,1),opacity .5s}
+#loader .ld-word{display:flex;font-weight:600;font-size:clamp(40px,10vw,92px);line-height:1;letter-spacing:.16em;margin-right:-.16em}
+#loader .ld-word i{display:inline-block;overflow:hidden;font-style:normal;padding:.04em 0}
+#loader .ld-word b{display:inline-block;font-weight:inherit;transform:translateY(110%);animation:ldUp .9s cubic-bezier(.16,1,.3,1) forwards;animation-delay:calc(.12s + var(--i) * .08s)}
+#loader[data-bg="light"]{--ld-bg:#ffffff!important;--ld-fg:#0b1630!important}
+#loader .ld-img{position:relative;width:min(238px,62vw);clip-path:inset(0 100% 0 0);animation:ldWipe 1.1s .15s cubic-bezier(.77,0,.18,1) forwards}
+#loader .ld-img img{display:block;width:100%;height:auto;animation:ldSettle 1.6s .15s cubic-bezier(.16,1,.3,1) both}
+#loader[data-style="pulse"] .ld-img{clip-path:none;animation:ldFade .9s both,ldBreathe 2.4s 1s ease-in-out infinite}
+#loader .ld-logo{width:clamp(120px,32vw,260px);animation:ldFade .8s .1s both}
+#loader .ld-logo svg{display:block;width:100%;height:auto}
+#loader .ld-line{position:relative;display:block;height:2px;width:clamp(120px,30vw,280px);background:rgba(127,127,127,.18);overflow:hidden;transform:scaleX(0);animation:ldGrow .8s .55s cubic-bezier(.65,0,.35,1) forwards}
+#loader .ld-line::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,#ed0677,#ffcb08,#0072bc);transform:translateX(-100%);animation:ldRun 1.5s 1.1s cubic-bezier(.65,0,.35,1) infinite}
+#loader .ld-sub{font-size:clamp(10px,1.6vw,13px);font-weight:500;letter-spacing:.9em;margin-right:-.9em;opacity:0;animation:ldSub 1.2s .75s cubic-bezier(.16,1,.3,1) forwards}
+#loader[data-style="draw"] .ld-word b{transform:none;color:transparent;-webkit-text-stroke:1px var(--ld-fg);animation:ldInk 1.6s cubic-bezier(.65,0,.35,1) forwards;animation-delay:calc(.1s + var(--i) * .12s)}
+#loader[data-style="draw"] .ld-logo{animation:none}
+#loader[data-style="draw"] .ld-logo svg *{stroke:var(--ld-fg);stroke-width:1.5px;vector-effect:non-scaling-stroke;stroke-dasharray:1;stroke-dashoffset:1;fill-opacity:0;animation:ldDraw 1.8s .1s cubic-bezier(.65,0,.35,1) forwards,ldFill .8s 1.5s ease forwards}
+#loader[data-style="pulse"] .ld-word b{transform:none;opacity:0;animation:ldFade .9s forwards,ldBreathe 2.4s 1s ease-in-out infinite;animation-delay:calc(var(--i) * .06s),calc(1s + var(--i) * .1s)}
+#loader[data-style="pulse"] .ld-logo{animation:ldFade .9s both,ldBreathe 2.4s 1s ease-in-out infinite}
+#loader.out[data-exit="wipe"]{clip-path:inset(0 0 100% 0)}
+#loader.out[data-exit="fade"]{opacity:0}
+#loader.out .ld-mark{transform:translateY(-40px);opacity:0}
+@keyframes ldUp{to{transform:none}}
+@keyframes ldWipe{to{clip-path:inset(0 0 0 0)}}
+@keyframes ldSettle{from{transform:scale(1.08);filter:blur(6px)}to{transform:none;filter:none}}
+@keyframes ldFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes ldGrow{to{transform:scaleX(1)}}
+@keyframes ldRun{to{transform:translateX(250%)}}
+@keyframes ldSub{from{opacity:0;letter-spacing:1.4em}to{opacity:.72;letter-spacing:.9em}}
+@keyframes ldInk{0%{color:transparent;-webkit-text-stroke-color:transparent}45%{color:transparent;-webkit-text-stroke-color:var(--ld-fg)}100%{color:var(--ld-fg);-webkit-text-stroke-color:var(--ld-fg)}}
+@keyframes ldDraw{to{stroke-dashoffset:0}}
+@keyframes ldFill{to{fill-opacity:1}}
+@keyframes ldBreathe{50%{opacity:.45;text-shadow:0 0 18px var(--ld-accent);filter:drop-shadow(0 0 10px var(--ld-accent))}}
+@media (prefers-reduced-motion:reduce){#loader *,#loader *::after{animation:none!important;clip-path:none!important;filter:none!important;transform:none!important;opacity:1!important;color:var(--ld-fg)!important;stroke-dashoffset:0!important;fill-opacity:1!important}#loader .ld-line::after{display:none}#loader{transition:opacity .3s}#loader.out{clip-path:none;opacity:0}}
+</style>
 </head>
 <body>
+<div id="loader" role="status" aria-label="Dorma Advertising, loading" data-style="reveal" data-exit="wipe" data-bg="light"><div class="ld-mark"><div class="ld-img"><img src="./brand/dorma-logo.png" alt=""></div><span class="ld-line"></span></div></div>
+<script>try{var c=JSON.parse(localStorage.getItem("dorma.loader")||"null"),l=document.getElementById("loader");if(c&&l){if(c.opts&&c.opts.enabled===false)l.style.display="none";var v={"--ld-bg":c.ink,"--ld-fg":c.fg,"--ld-accent":c.accent};for(var k in v)if(/^#[0-9a-f]{6}$/i.test(v[k]||""))l.style.setProperty(k,v[k]);}}catch(e){}</script>
 <div id="app"></div>
 <div id="modalRoot"></div>
 <script type="module" src="/src/main.ts"></script>

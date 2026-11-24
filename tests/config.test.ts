@@ -104,3 +104,11 @@ describe('starter template', () => {
     for (const p of S.pages) for (const s of p.sections) expect(SECTION_TYPES, s.type).toHaveProperty(s.type);
   });
 });
+
+describe('loader settings', () => {
+  it('start with the Dorma logo image on a white background', () => {
+    const L = normalize(null).loader;
+    expect(L).toMatchObject({ enabled: true, mark: 'image', bg: 'light', style: 'reveal' });
+    expect(normalize({ loader: { style: 'pulse' } }).loader.mark).toBe('image');
+  });
+});

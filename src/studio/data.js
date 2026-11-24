@@ -12,6 +12,7 @@ const STARTER = {
     footer: "© 2026 Dorma Advertising · Agency | Printing & Production",
     showStudioLink: true
   },
+  loader: { enabled: true, mark: "image", image: "", bg: "light", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {
     ink: "#040915", panel: "#0b1630", fg: "#eef2fa", accent: "#ffc93c",
     mutedOpacity: 0.66, lineOpacity: 0.14,
