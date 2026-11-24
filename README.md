@@ -50,6 +50,37 @@ The key in `src/config.ts` is the public "publishable" key, which is safe in the
 | `src/studio/admin.js` | The studio: sign-in, every panel, the field editors and published versions. |
 | `src/studio/store.ts` | Supabase: loading, autosave, publish, sign-in and uploads. Falls back to browser storage offline. |
 | `src/studio/scenes.js` | Generated placeholder images used until real photos are uploaded. |
+| `scripts/library-index.mjs` | Lists the files in `public/library/` for the studio (runs before dev and build). |
+
+## Media library
+
+The studio's **Library** holds every image, video, background and article, sorted into categories
+(Brand & Identity, Photo & Video, Events & Activations, Exhibitions & Booths, Digital & Social,
+Print & Packaging, Signage & Fabrication, Gifts & Displays, Backgrounds & Textures, Articles & Guides).
+Anything in it can be picked wherever the studio asks for an image; articles can be opened from any button.
+
+Files live in the repository for now, one folder per category: `public/library/<category>/`.
+
+1. Studio → Library → **Add files on GitHub** → **Upload files** next to a category (or open the folder on
+   GitHub → Add file → Upload files) → drop files → **Commit changes**.
+2. The site redeploys in about two minutes. `scripts/library-index.mjs` writes `library/index.json` at build time.
+3. Open the studio's Library (or press **Check GitHub for new files**): new files are added with their
+   category from the folder. Give them titles, descriptions and tags there.
+
+Library items store paths relative to the library folder (`exhibitions/booth-01.jpg`), and
+`LIBRARY_BASE` in `src/config.ts` turns them into addresses. To move the files later (a CDN, Supabase
+Storage, S3), copy them with the same folder layout and set `VITE_LIBRARY_BASE`; nothing saved needs to change.
+**Quick upload (Supabase)** in the Library is still there for one-off uploads from a phone.
+
+Keep files small: GitHub's web upload takes up to 25 MB per file, and a repository should stay well under 1 GB.
+
+## Blog
+
+Studio → **Blog** writes posts: title, date, category, tags, cover image from the library, a short summary,
+and the text. The text uses a small, safe subset of Markdown (empty line = paragraph, `## heading`,
+`- list`, `> quote`, `**bold**`, `*italic*`, `[text](https://…)`), and `[[media-id|caption]]` on its
+own line places a library image or video. Published posts appear on any page with a **Blog posts**
+section (the Blog page by default), and each post has its own address, `#post/<address>`.
 
 ## Set up (once)
 
