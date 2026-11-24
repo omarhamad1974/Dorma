@@ -114,3 +114,16 @@ describe('loader settings', () => {
     expect(normalize({ loader: { style: 'pulse' } }).loader.mark).toBe('image');
   });
 });
+
+describe('timing', () => {
+  it('keeps timing objects on sections, slides and modals', () => {
+    const c = normalize(null);
+    const hc = c.pages[0].sections[0];
+    expect(hc.timing).toEqual({});
+    hc.slides[0].timing = { duration: 3, title: 1.2 };
+    c.modals[0].timing = { title: 2 };
+    const again = normalize(JSON.parse(JSON.stringify(c)));
+    expect(again.pages[0].sections[0].slides[0].timing).toEqual({ duration: 3, title: 1.2 });
+    expect(again.modals[0].timing).toEqual({ title: 2 });
+  });
+});
