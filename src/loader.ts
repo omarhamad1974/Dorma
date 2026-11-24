@@ -2,7 +2,7 @@
    The default markup and styles live inline in index.html so the loader paints before any script.
    Settings come from config.loader (studio → Site → Loader). The last published settings are cached
    in this browser so the next visit starts with the right logo, text and colours. */
-import { esc, mediaItem, mediaUrl, sanitizeSvg } from './studio/core';
+import { BUILTIN_LOGO_WHITE, brandLogoUrl, esc, mediaItem, mediaUrl, sanitizeSvg } from './studio/core';
 
 const BUILTIN_LOGO = `${import.meta.env.BASE_URL}brand/dorma-logo.png`;
 
@@ -25,7 +25,7 @@ function clean(o: Partial<LoaderOpts> | undefined): LoaderOpts {
     enabled: x.enabled !== false,
     mark: x.mark === 'wordmark' || x.mark === 'svg' ? x.mark : 'image',
     image: typeof x.image === 'string' ? x.image : '',
-    bg: x.bg === 'theme' ? 'theme' : 'light',
+    bg: x.bg === 'light' ? 'light' : 'theme',
     text: typeof x.text === 'string' ? x.text.slice(0, 24) : 'DORMA',
     sub: typeof x.sub === 'string' ? x.sub.slice(0, 40) : 'ADVERTISING',
     logo: typeof x.logo === 'string' ? x.logo : '',
@@ -35,15 +35,15 @@ function clean(o: Partial<LoaderOpts> | undefined): LoaderOpts {
   };
 }
 
-/** The logo image URL: a library image, or the built-in Dorma logo. Only same-site or library URLs. */
+/** The logo image URL: a library image chosen for the loader, else the colour logo on white or the header logo on the dark background. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function imageUrl(o: LoaderOpts, cfg?: any): string {
   const m = o.image && cfg ? mediaItem(cfg, o.image) : null;
-  return (m && m.kind === 'image' && mediaUrl(m)) || BUILTIN_LOGO;
+  return (m && m.kind === 'image' && mediaUrl(m)) || (o.bg === 'light' ? BUILTIN_LOGO : cfg ? brandLogoUrl(cfg) : BUILTIN_LOGO_WHITE);
 }
 
 /** Markup for the mark: the logo image, pasted SVG logo, or the wordmark split into letters. */
-export function markHtml(o: LoaderOpts, img = BUILTIN_LOGO): string {
+export function markHtml(o: LoaderOpts, img = BUILTIN_LOGO_WHITE): string {
   const logo = o.mark === 'svg' && o.logo ? sanitizeSvg(o.logo) : '';
   const word = o.mark === 'image'
     ? `<div class="ld-img"><img src="${esc(img)}" alt=""></div>`
@@ -70,7 +70,7 @@ export function initLoader(): void {
   if (!c) return;
   const o = clean(c.opts);
   if (!o.enabled) { root.remove(); return; }
-  paint(root, o, c, typeof c.img === 'string' && /^(https:\/\/|\.?\/)/.test(c.img) ? c.img : BUILTIN_LOGO);
+  paint(root, o, c, typeof c.img === 'string' && /^(https:\/\/|\.?\/)/.test(c.img) ? c.img : BUILTIN_LOGO_WHITE);
 }
 
 /** Remember the live settings for the next visit, then fade the loader out once the minimum time has passed. */

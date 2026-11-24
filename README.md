@@ -84,7 +84,7 @@ section (the Blog page by default), and each post has its own address, `#post/<a
 
 ## Loader
 
-A loader shows while the site starts. Its default look (the Dorma logo on white, wiping in over a CMYK colour line) is written into `index.html`, so it appears before any script runs. The logo file is `public/brand/dorma-logo.png`.
+A loader shows while the site starts. Its default look (the white Dorma logo on the dark site background, wiping in over a CMYK colour line) is written into `index.html`, so it appears before any script runs. The logo files are `public/brand/dorma-logo-white.png` (header and dark loader) and `public/brand/dorma-logo.png` (colour, used on the white loader background). The header logo is set in Site and titles → Logo; the loader uses it unless another image is picked.
 
 In the studio, **Site and titles → Loader** sets what it shows (the logo image, another library image, a typed wordmark, or an SVG logo), the animation (Reveal, Draw, Pulse), the exit, the background and the minimum time. The published settings are remembered in each visitor's browser, so returning visitors see them from the first frame. The Draw animation needs an SVG logo.
 

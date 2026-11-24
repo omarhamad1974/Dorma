@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl } from './core';
 import { Store } from './store';
 import { A } from './data';
 
@@ -43,7 +43,9 @@ function renderSite(cfg,pageId){
 function siteHeader(cfg,page){
   const nav=h("nav",{class:"site-nav","aria-label":"Main"});
   (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id || (page.isPost && p.id===blogHome(cfg))) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
-  const home=h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"");
+  const home=cfg.site.logoMode==="text"
+    ? h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"")
+    : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},h("img",{src:brandLogoUrl(cfg),alt:cfg.site.brand||"",style:`height:${Math.min(80,Math.max(16,+cfg.site.logoHeight||34))}px`}));
   const menu=h("button",{class:"menu-btn",type:"button","aria-label":"Menu",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>',onclick:()=>nav.classList.toggle("open")});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
   const sp=Site.preview?null:studioPill(cfg);

@@ -76,6 +76,9 @@ function mediaItem(cfg,id){ return (cfg.media||[]).find(m=>m.id===id); }
 /* A safe relative path inside the library folder, e.g. "exhibitions/booth-01.jpg". */
 const libPathOk=p=>typeof p==="string" && /^[\w\-. ()&+,]+(\/[\w\-. ()&+,]+)*$/.test(p) && !p.split("/").some(x=>x===".."||x===".");
 const libraryUrl=p=>libPathOk(p)?LIBRARY_BASE+p.split("/").map(encodeURIComponent).join("/"):"";
+const BUILTIN_LOGO_WHITE = `${import.meta.env.BASE_URL}brand/dorma-logo-white.png`;
+/** The header logo: a library image chosen in the studio, or the built-in white Dorma logo. */
+function brandLogoUrl(cfg){ const m=cfg&&cfg.site&&cfg.site.logo?mediaItem(cfg,cfg.site.logo):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_WHITE; }
 function mediaUrl(m){ if (m.path) return libraryUrl(m.path); return isMediaUrl(m.url)?m.url:""; }
 function mediaNode(cfg,id,{w=1280,hh=800}={}){
   const m=mediaItem(cfg,id); if (!m) return null;
@@ -239,4 +242,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>((cfg.categories||[]).find(c=>c.id===id)||{}).label||"";
 
-export { libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

@@ -106,9 +106,11 @@ describe('starter template', () => {
 });
 
 describe('loader settings', () => {
-  it('start with the Dorma logo image on a white background', () => {
+  it('start with the white Dorma logo on the dark background', () => {
     const L = normalize(null).loader;
-    expect(L).toMatchObject({ enabled: true, mark: 'image', bg: 'light', style: 'reveal' });
+    expect(L).toMatchObject({ enabled: true, mark: 'image', bg: 'theme', style: 'reveal' });
+    expect(normalize(null).site).toMatchObject({ logoMode: 'image', logo: '' });
+    expect(normalize({ site: { brand: 'X' } }).site.logoMode).toBe('image');
     expect(normalize({ loader: { style: 'pulse' } }).loader.mark).toBe('image');
   });
 });

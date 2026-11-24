@@ -214,6 +214,8 @@ function panelSite(body){
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
+  body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
+    fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}]])));
   body.append(loaderCard());
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(p.title||p.id)+" in menu")); });
@@ -235,10 +237,10 @@ function loaderCard(){
   const file=h("input",{type:"file",accept:".svg,image/svg+xml",hidden:true});
   file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; const txt=await f.text(); if (!sanitizeSvg(txt)){ toast("That file isn't a valid SVG."); return; } L.logo=txt; L.mark="svg"; touch(); openPanel("site"); });
   const c=card("Loader",
-    h("p",{class:"adm-intro",text:"Shown while the site loads. Use the Dorma logo, another image from the library, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the Dorma logo."}),
+    h("p",{class:"adm-intro",text:"Shown while the site loads. By default it uses the header logo on the dark site background. You can also pick another library image, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the white Dorma logo."}),
     thumb,
-    fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["light","White (best for the logo)"],["theme","Site background"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
-    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the built-in Dorma logo)",{allowNone:true},redraw)),
+    fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["theme","Site background (dark)"],["light","White (uses the colour logo)"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
+    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the header logo)",{allowNone:true},redraw)),
     h("div",{class:"fields"},F(L,"logo","code","Logo SVG (optional, replaces the wordmark)",{wide:true,hint:"Paste SVG code, or upload a file. Simple outlined shapes work best with the Draw animation."},redraw)),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),

@@ -306,6 +306,7 @@ figure{margin:0;min-width:0}
 /* ================= ADMIN STUDIO ================= */
 .adm{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--ink)}
 .adm-side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px;padding:22px 14px;border-right:1px solid var(--faint);background:color-mix(in srgb,var(--panel) 60%,var(--ink));overflow:auto}
+.brand-logo img{display:block;width:auto;max-width:min(240px,46vw);object-fit:contain}
 .adm-side .brand{padding:4px 10px 18px;font-size:.8rem}
 .adm-side button{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:8px;border:0;background:none;color:var(--muted);text-align:left;cursor:pointer;font-size:.9rem}
 .adm-side button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
