@@ -127,3 +127,11 @@ describe('timing', () => {
     expect(again.modals[0].timing).toEqual({ title: 2 });
   });
 });
+
+describe('image overlays', () => {
+  it('starts with the site overlay off and fills it in for older saved settings', () => {
+    expect(S.theme.imageOverlay.mode).toBe('none');
+    const out = normalize({ theme: { accent: '#7fd4ff' } });
+    expect(out.theme.imageOverlay).toEqual(S.theme.imageOverlay);
+  });
+});
