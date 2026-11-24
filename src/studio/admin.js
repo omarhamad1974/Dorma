@@ -1,5 +1,5 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -89,7 +89,8 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
   switch(kind){
     case "text": case "number": {
       const i=h("input",{id,type:kind==="number"?"number":"text",value:obj[key]??"",step:opts.step||"any"});
-      i.addEventListener("input",()=>set(kind==="number"?(i.value===""?0:+i.value):i.value)); wrap.append(i); break; }
+      if (opts.placeholder) i.placeholder=opts.placeholder; if (opts.min!=null) i.min=opts.min;
+      i.addEventListener("input",()=>set(kind==="number"?(i.value===""?(opts.optional?"":0):+i.value):i.value)); wrap.append(i); break; }
     case "area": case "code": {
       const t=h("textarea",{id,class:kind==="code"?"code":"",spellcheck:kind==="code"?"false":"true"}); t.value=obj[key]??"";
       t.addEventListener("input",()=>set(t.value)); wrap.append(t); break; }
@@ -123,6 +124,12 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
     case "button": { obj[key]=obj[key]||{label:"",action:A()}; const b=obj[key];
       const i=h("input",{id,type:"text",value:b.label||"",placeholder:"Label (empty hides it)"}); i.addEventListener("input",()=>{ b.label=i.value; onChange(b); touch(); });
       wrap.append(i,actionEditor(b.action=b.action||A(),()=>{ onChange(b); touch(); })); wrap.classList.add("wide"); break; }
+    case "timing": { lab.removeAttribute("for"); wrap.classList.add("wide"); obj[key]=obj[key]&&typeof obj[key]==="object"?obj[key]:{}; const T=obj[key];
+      const g=h("div",{class:"timing-grid"});
+      (opts.parts||[]).forEach(([k,def])=>{ const i=h("input",{type:"number",min:0,step:k==="duration"?.5:.05,value:T[k]??"",placeholder:def==null?"Auto":String(def),"aria-label":TIMING_PARTS[k]+" (seconds)"});
+        i.addEventListener("input",()=>{ if (i.value==="") delete T[k]; else T[k]=Math.max(0,+i.value); onChange(T,key); touch(); });
+        g.append(h("label",{class:"timing-cell"},h("span",{text:TIMING_PARTS[k]}),i)); });
+      wrap.append(g); if (!opts.hint) wrap.append(h("span",{class:"hint",text:"Seconds from when this comes into view. Empty uses the default shown. Lower numbers come first, so you can change the order."})); break; }
     case "list": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(listEditor(obj,key,opts,onChange)); break; }
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
@@ -214,6 +221,8 @@ function panelSite(body){
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
+  body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
+    fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}]])));
   body.append(loaderCard());
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(p.title||p.id)+" in menu")); });
@@ -235,10 +244,10 @@ function loaderCard(){
   const file=h("input",{type:"file",accept:".svg,image/svg+xml",hidden:true});
   file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; const txt=await f.text(); if (!sanitizeSvg(txt)){ toast("That file isn't a valid SVG."); return; } L.logo=txt; L.mark="svg"; touch(); openPanel("site"); });
   const c=card("Loader",
-    h("p",{class:"adm-intro",text:"Shown while the site loads. Use the Dorma logo, another image from the library, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the Dorma logo."}),
+    h("p",{class:"adm-intro",text:"Shown while the site loads. By default it uses the header logo on the dark site background. You can also pick another library image, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the white Dorma logo."}),
     thumb,
-    fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["light","White (best for the logo)"],["theme","Site background"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
-    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the built-in Dorma logo)",{allowNone:true},redraw)),
+    fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["theme","Site background (dark)"],["light","White (uses the colour logo)"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
+    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the header logo)",{allowNone:true},redraw)),
     h("div",{class:"fields"},F(L,"logo","code","Logo SVG (optional, replaces the wordmark)",{wide:true,hint:"Paste SVG code, or upload a file. Simple outlined shapes work best with the Draw animation."},redraw)),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),
@@ -370,6 +379,7 @@ function panelModals(body){
       drawMedia();
       const base=[["name","text","Name in the studio"],["type","select","Type",{options:OPT.modalTypes}],["kicker","text","Small label"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["caption","strings",m.type===2?"Captions, one per gallery item":"Caption items, one per line (shown with the flow separators)",{wide:true}]];
       if (m.type===3) base.push(["flowId","flow","Flow inside the modal"]);
+      base.push(["timing","timing","Timing",{parts:m.type===3?[["eyebrow",.75],["title",.81],["text",.87],["flow",1],["detail",.93],["media",.99],["more",1.05]]:[["eyebrow",.75],["title",.81],["text",.87],["media",.93],["more",.99]],hint:"Seconds from when the modal starts opening. Empty uses the default shown. Lower numbers come first."}]);
       return [
         card(h("span",{class:"grow"},"Content"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview modal",onclick:()=>openModal(D,m.id)}),fieldsFor(m,base,(v,k)=>{ if (k==="type"){ openPanel("modals"); } else redrawList(); })),
         card("Media",mediaBoxEl), card("More button",h("div",{class:"fields"},F(m,"more","button","More button"))),

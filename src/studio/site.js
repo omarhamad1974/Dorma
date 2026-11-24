@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue } from './core';
 import { Store } from './store';
 import { A } from './data';
 
@@ -8,7 +8,7 @@ import { A } from './data';
 const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
 function disposePage(){
   Site.disposers.splice(0).forEach(f=>{ try{ f(); }catch(e){} });
-  if (window.ScrollTrigger) ScrollTrigger.getAll().forEach(t=>t.kill());
+  if (ScrollTrigger) ScrollTrigger.getAll().forEach(t=>t.kill());
   gsap.globalTimeline.getChildren(true,true,true).forEach(t=>t.kill());
 }
 function onWin(type,fn,opts){ addEventListener(type,fn,opts); Site.disposers.push(()=>removeEventListener(type,fn,opts)); }
@@ -43,7 +43,9 @@ function renderSite(cfg,pageId){
 function siteHeader(cfg,page){
   const nav=h("nav",{class:"site-nav","aria-label":"Main"});
   (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id || (page.isPost && p.id===blogHome(cfg))) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
-  const home=h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"");
+  const home=cfg.site.logoMode==="text"
+    ? h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"")
+    : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},h("img",{src:brandLogoUrl(cfg),alt:cfg.site.brand||"",style:`height:${Math.min(80,Math.max(16,+cfg.site.logoHeight||34))}px`}));
   const menu=h("button",{class:"menu-btn",type:"button","aria-label":"Menu",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>',onclick:()=>nav.classList.toggle("open")});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
   const sp=Site.preview?null:studioPill(cfg);
@@ -77,6 +79,10 @@ const SECTIONS={
     const title=h("h1",{class:"title"}), lede=h("p",{class:"lede"});
     const content=h("div",{class:"content","aria-live":"polite"},eyebrow,title,lede);
     let cur=0, busy=false, prog=null, t0=performance.now();
+    // Timing: each slide can override the section's reveal times (seconds after the slide's text starts) and its duration.
+    const timing=i=>{ const st=(slides[i]||{}).timing, T=sec.timing, c=(k,d)=>cue(st,k,cue(T,k,d));
+      return { eyebrow:c("eyebrow",.05), title:c("title",0), text:c("text",.25), flow:c("flow",null), duration:cue(st,"duration",0)||(+M.slideDuration||7) }; };
+    const playFlow=(i,base)=>{ if (!fl) return; const T=timing(i); if (T.flow==null) fl.play(0); else fl.play(0,base+T.flow); };
     const fl=sec.flowId?renderFlow(cfg,sec.flowId,{onItem:(i,it,b)=>{ if (sec.flowDrivesSlides && i<S.length && i!==cur) go(i); runAction(cfg,it.action,{flow:fl.flow,index:i,goSlide:go}); }}):null;
     if (fl) content.append(fl.el);
     const curEl=h("b",{text:"01"}), tc=h("span",{text:"00:00:00:00"}), scn=h("span",{text:"SC 01"});
@@ -91,16 +97,19 @@ const SECTIONS={
     const kb=i=>{ const n=S[i].node; if (!n || reduce || !M.kenBurns) return; const z=+M.kbZoom||1.18, dirs=[[-1.5,1],[1.5,0],[1,-1],[0,1]][i%4];
       gsap.fromTo(n,{scale:i%2?1.03:z,xPercent:dirs[0],yPercent:dirs[1]},{scale:i%2?z:1.03,xPercent:-dirs[0],yPercent:-dirs[1],duration:+M.kbDuration||10,ease:"sine.inOut",overwrite:true}); };
     const setActive=i=>{ curEl.textContent=pad(i+1); scn.textContent="SC "+pad(i+1); if (fl && sec.flowDrivesSlides && i<fl.btns.length) fl.setActive(i); };
-    const startProg=i=>{ prog&&prog.kill(); const dur=(+M.slideDuration||7)*(reduce?1.6:1);
+    const startProg=i=>{ prog&&prog.kill(); const dur=timing(i).duration*(reduce?1.6:1);
       const bar=fl&&sec.flowDrivesSlides&&fl.btns[i]?$(".bar-fill",fl.btns[i]):null;
       if (fl) fl.btns.forEach(b=>gsap.set($(".bar-fill",b),{scaleX:0}));
       prog=gsap.fromTo(bar||{p:0},bar?{scaleX:0}:{p:0},bar?{scaleX:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)}:{p:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)});
       if (modalIsOpen()) prog.pause(); };
     Site.pauseHero=()=>prog&&prog.pause(); Site.resumeHero=()=>prog&&prog.resume();
     const textIn=(delay=0)=>{ const s=slides[cur]; eyeIdx.textContent=pad(cur+1); eyeTxt.textContent=s.eyebrow||""; lede.textContent=s.lede||"";
-      const tl=gsap.timeline({delay}); tl.add(revealTitle(cfg,title,s.title||"",0),0);
-      if (!reduce){ tl.fromTo(rule,{scaleX:0},{scaleX:1,duration:.9,ease:ease(cfg)},0).fromTo([eyeIdx,eyeTxt],{yPercent:100,autoAlpha:0},{yPercent:0,autoAlpha:1,duration:.7,ease:"power3.out",stagger:.08},.05)
-        .fromTo(lede,{y:18,autoAlpha:0,filter:"blur(8px)"},{y:0,autoAlpha:1,filter:"blur(0px)",duration:1,ease:"power3.out"},.25); }
+      const T=timing(cur), tl=gsap.timeline({delay});
+      if (!reduce){ gsap.set([eyeIdx,eyeTxt],{yPercent:100,autoAlpha:0}); gsap.set(lede,{y:18,autoAlpha:0}); gsap.set(title,{autoAlpha:0}); }
+      tl.add(()=>{ gsap.set(title,{autoAlpha:1}); revealTitle(cfg,title,s.title||"",0); },T.title);
+      if (!reduce){ tl.fromTo(rule,{scaleX:0},{scaleX:1,duration:.9,ease:ease(cfg)},Math.max(0,T.eyebrow-.05)).fromTo([eyeIdx,eyeTxt],{yPercent:100,autoAlpha:0},{yPercent:0,autoAlpha:1,duration:.7,ease:"power3.out",stagger:.08},T.eyebrow)
+        .fromTo(lede,{y:18,autoAlpha:0,filter:"blur(8px)"},{y:0,autoAlpha:1,filter:"blur(0px)",duration:1,ease:"power3.out"},T.text); }
+      tl.to({},{duration:reduce?0:1.1},Math.max(T.title,T.text,T.eyebrow));
       return tl; };
     const textOut=()=>reduce?gsap.timeline():gsap.timeline().to(title.children.length?$$(".c,.wi",title):title,{yPercent:-115,autoAlpha:title.classList.contains("split-chars")?1:0,duration:.55,ease:"power3.in",stagger:.01})
       .to([eyeIdx,eyeTxt],{yPercent:-100,autoAlpha:0,duration:.4,ease:"power2.in"},0).to(lede,{y:-12,autoAlpha:0,duration:.45,ease:"power2.in"},.05);
@@ -118,7 +127,7 @@ const SECTIONS={
       else tl.fromTo(b.el,{clipPath:dir>0?"inset(0% 0% 0% 100%)":"inset(0% 100% 0% 0%)"},{clipPath:"inset(0% 0% 0% 0%)",duration:D,ease:E},0)
             .fromTo(b.par,{xPercent:12*dir},{xPercent:0,duration:D,ease:E},0).to(a.par,{xPercent:-8*dir,duration:D,ease:E},0)
             .fromTo(wipe,{left:dir>0?"100%":"0%",opacity:1},{left:dir>0?"0%":"100%",duration:D,ease:E},0).to(wipe,{opacity:0,duration:.3},1.25);
-      tl.add(()=>{ textIn(); t0=performance.now(); },.75);
+      tl.add(()=>{ textIn(); t0=performance.now(); if (sec.replayFlow) playFlow(n,0); },.75);
     }
     prev.addEventListener("click",()=>go((cur-1+S.length)%S.length,-1));
     next.addEventListener("click",()=>go((cur+1)%S.length,1));
@@ -134,7 +143,7 @@ const SECTIONS={
     root._after=()=>{
       gsap.set(S[0].el,{visibility:"visible"}); S[0].el.setAttribute("aria-hidden","false"); setActive(0); kb(0);
       if (!reduce) gsap.from(S[0].el,{opacity:0,duration:1.6,ease:"power2.out"});
-      if (fl) fl.play(0);
+      playFlow(0,.35);
       textIn(.35).eventCallback("onComplete",()=>startProg(0));
     };
     return root;
@@ -151,9 +160,11 @@ const SECTIONS={
     root.append(inner);
     root._after=()=>{
       const n=box.firstElementChild; if (n && !reduce && cfg.motion.kenBurns) gsap.fromTo(n,{scale:+cfg.motion.kbZoom||1.16},{scale:1.02,xPercent:-1.5,duration:(+cfg.motion.kbDuration||10)*1.4,ease:"sine.inOut",repeat:-1,yoyo:true});
-      revealTitle(cfg,t,sec.title||"",.15);
-      if (!reduce) gsap.fromTo($$("[data-in]",root),{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),stagger:.1,delay:.1});
-      if (fl) fl.play(.4);
+      const T=sec.timing;
+      revealTitle(cfg,t,sec.title||"",cue(T,"title",.15));
+      if (!reduce){ if (eb) gsap.fromTo(eb,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:cue(T,"eyebrow",.1)});
+        const ld=$(".lede",inner); if (ld) gsap.fromTo(ld,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:cue(T,"text",.2)}); }
+      if (fl){ const at=cue(T,"flow",null); if (at==null) fl.play(.4); else fl.play(0,at); }
     };
     return root;
   },
@@ -169,7 +180,7 @@ const SECTIONS={
     return h("section",{class:"sec"},w);
   },
   stats(cfg,sec){
-    const w=h("div",{class:"wrap"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.rv=""; eb.style.marginBottom="28px"; w.append(eb); }
+    const w=h("div",{class:"wrap"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.style.marginBottom="28px"; w.append(eb); }
     const style=sec.style||"band", grid=h("div",{class:"st-"+style});
     (sec.items||[]).forEach(it=>{
       const num=h("span",{class:"count","data-to":it.value,"data-dec":it.decimals||0,text:fmtNum(it.value,it.decimals)});
@@ -269,7 +280,7 @@ const SECTIONS={
         const open=!row.classList.contains("open");
         $$(".acc-row.open",acc).forEach(r=>{ if (r!==row){ r.classList.remove("open"); $(".acc-btn",r).setAttribute("aria-expanded","false"); const p=$(".acc-panel",r); gsap.fromTo(p,{height:p.scrollHeight},{height:0,duration:reduce?0:.6,ease:ioEase(cfg),clearProps:"height"}); } });
         row.classList.toggle("open",open); btn.setAttribute("aria-expanded",open);
-        gsap.fromTo(panel,{height:open?0:panel.scrollHeight},{height:open?panel.scrollHeight:0,duration:reduce?0:.65,ease:ioEase(cfg),clearProps:"height",onComplete:()=>window.ScrollTrigger&&ScrollTrigger.refresh()});
+        gsap.fromTo(panel,{height:open?0:panel.scrollHeight},{height:open?panel.scrollHeight:0,duration:reduce?0:.65,ease:ioEase(cfg),clearProps:"height",onComplete:()=>ScrollTrigger&&ScrollTrigger.refresh()});
       });
       row.append(btn,panel); acc.append(row);
     });
@@ -278,19 +289,21 @@ const SECTIONS={
   timeline(cfg,sec){
     const w=h("div",{class:"wrap"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.rv=""; eb.style.marginBottom="28px"; w.append(eb); }
     const detail=h("div",{class:"detail","aria-live":"polite"});
-    const right=h("div",{class:"txt","data-rv":""});
+    const right=h("div",{class:"txt"});
     const fl=sec.flowId?renderFlow(cfg,sec.flowId,{onItem:(i,it)=>{ show(i,true); runAction(cfg,it.action,{flow:fl.flow,index:i}); }}):null;
     const show=(i,anim)=>{ if (!fl) return; fl.setActive(i,{fill:true}); const it=fl.flow.items[i]; detail.innerHTML=`<small class="mono"><b>${esc(it.label)}</b> · ${pad(i+1)} / ${pad(fl.flow.items.length)}</small><p>${esc(it.detail||"")}</p>`;
       if (anim && !reduce) gsap.fromTo($("p",detail),{autoAlpha:0,y:8},{autoAlpha:1,y:0,duration:.45,ease:"power3.out"}); };
     if (fl){ right.append(fl.el,detail); show(fl.flow.items.length-1,false); }
-    w.append(h("div",{class:"tl"},h("p",{class:"about",style:"display:block"},h("span",{class:"big",style:"display:block;margin:0;font-family:var(--display);font-size:clamp(1.3rem,2.3vw,2rem);line-height:1.3;letter-spacing:-.02em",html:emphasize(sec.text||"")})),right));
-    const s=h("section",{class:"sec"},w); s._flow=fl; return s;
+    const stmt=h("p",{class:"about",style:"display:block"},h("span",{class:"big",style:"display:block;margin:0;font-family:var(--display);font-size:clamp(1.3rem,2.3vw,2rem);line-height:1.3;letter-spacing:-.02em",html:emphasize(sec.text||"")}));
+    w.append(h("div",{class:"tl"},stmt,right));
+    const s=h("section",{class:"sec"},w);
+    s._seq={timing:sec.timing,parts:[["eyebrow",eb,0],["text",stmt,.1],["flow",fl,.2],["detail",fl?detail:null,.5]]}; return s;
   },
   flowStrip(cfg,sec){
     const w=h("div",{class:"wrap txt"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb) w.append(eb);
-    if (sec.title) w.append(h("h2",{class:"h2",text:sec.title}));
+    const t=sec.title?h("h2",{class:"h2",text:sec.title}):null; if (t) w.append(t);
     const fl=sec.flowId?renderFlow(cfg,sec.flowId):null; if (fl) w.append(fl.el);
-    const s=h("section",{class:"sec"},w); s._flow=fl; return s;
+    const s=h("section",{class:"sec"},w); s._seq={timing:sec.timing,parts:[["eyebrow",eb,0],["title",t,.1],["flow",fl,.2]]}; return s;
   },
   banner(cfg,sec){
     return h("section",{class:"sec",style:"padding-block:0"},h("div",{class:"wrap banner","data-rv":""},mediaBox(cfg,sec.media,{ratio:2.39,res:1920,cls:"kb-scrub"}),captionEl(sec.caption)));
@@ -302,10 +315,22 @@ const SECTIONS={
 };
 function fmtNum(v,dec){ v=+v||0; dec=+dec||0; return dec?v.toFixed(dec):Math.round(v).toLocaleString("en-US"); }
 
+/** Plays a section's pieces at their timing (seconds from when the section comes into view). */
+function playSequence(cfg,sec,seq,ST){
+  const parts=seq.parts.filter(p=>p[1]);
+  if (reduce) return;
+  const node=(k,el)=>k==="flow"?el.el:el;
+  const run=()=>parts.forEach(([k,el,def])=>{ const at=cue(seq.timing,k,def);
+    if (k==="flow"){ gsap.set(el.el,{autoAlpha:1}); el.play(0,at); }
+    else gsap.fromTo(el,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:at}); });
+  parts.forEach(([k,el])=>gsap.set(node(k,el),{autoAlpha:0}));
+  if (!ST || sec.getBoundingClientRect().top<innerHeight*.9){ run(); return; }
+  ST.create({trigger:sec,start:"top 85%",once:true,onEnter:run});
+}
 function afterRender(cfg,page){
   const main=$("#main"); if (!main) return;
   $$("section",main).forEach(s=>{ if (s._after) s._after(); });
-  const M=cfg.motion, ST=window.ScrollTrigger;
+  const M=cfg.motion, ST=ScrollTrigger;
   // scroll reveals: only for things below the first screen, so the page is complete at rest
   if (!reduce && M.scrollReveal!=="none" && ST) $$("[data-rv]",main).forEach(el=>{
     if (el.getBoundingClientRect().top<innerHeight*.9) return;
@@ -313,6 +338,7 @@ function afterRender(cfg,page){
     ST.create({trigger:el,start:"top 90%",once:true,onEnter:()=>gsap.to(el,{y:0,autoAlpha:1,duration:1,ease:ease(cfg)})});
   });
   if (!reduce && M.kenBurns && ST) $$(".kb-scrub > canvas,.kb-scrub > img,.kb-scrub > video",main).forEach(n=>gsap.fromTo(n,{scale:1.2},{scale:1,ease:"none",scrollTrigger:{trigger:n.parentNode,start:"top bottom",end:"bottom top",scrub:true}}));
+  $$("section",main).forEach(s=>{ if (s._seq) playSequence(cfg,s,s._seq,ST); });
   $$("section",main).forEach(s=>{ if (s._flow && ST){ const fl=s._flow; if (s.getBoundingClientRect().top<innerHeight*.9) fl.play(.2); else { gsap.set(fl.el,{autoAlpha:0}); ST.create({trigger:fl.el,start:"top 92%",once:true,onEnter:()=>{ gsap.set(fl.el,{autoAlpha:1}); fl.play(0); }}); } } });
   $$(".count",main).forEach(el=>{ if (reduce || !M.counters || !ST) return; const to=+el.dataset.to, dec=+el.dataset.dec;
     ST.create({trigger:el,start:"top 92%",once:true,onEnter:()=>{ const o={v:0}; gsap.to(o,{v:to,duration:1.8,ease:"expo.out",onUpdate:()=>el.textContent=fmtNum(o.v,dec)}); }}); });
@@ -358,7 +384,7 @@ function openModal(cfg,id,ctx={}){
   } else { const panel=$(".panel",root); fillModal(md,panel); }
 }
 function fillModal(md,panel){
-  const cfg=MS.cfg; MS.tweens.forEach(t=>t.kill()); MS.tweens=[];
+  const cfg=MS.cfg; MS.md=md; MS.tweens.forEach(t=>t.kill()); MS.tweens=[];
   panel.className="panel t"+md.type; panel.textContent=""; panel.setAttribute("aria-label",(md.kicker?md.kicker+": ":"")+(md.title||""));
   panel.append(h("span",{class:"scan"}),...["a","b","c","d"].map(c=>h("span",{class:"corner "+c})));
   const multi=MS.seq.length>1;
@@ -366,9 +392,9 @@ function fillModal(md,panel){
     h("span",{class:"m-kind",text:["","Media","Gallery","Flow"][md.type]||""}),
     h("button",{class:"m-close",type:"button","aria-label":"Close",html:'<svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3 3 13"/></svg>',onclick:()=>closeModal()})));
   const body=h("div",{class:"m-body"});
-  const head=[md.kicker?h("p",{class:"eyebrow","data-anim":"",text:md.kicker}):null,h("h2",{class:"m-title","data-anim":"",text:md.title||""})];
-  const text=md.text?h("p",{class:"lede","data-anim":"",text:md.text}):null;
-  const more=md.more&&md.more.label?h("button",{class:"more","data-anim":"",type:"button",style:"margin-top:6px",html:esc(md.more.label)+ARROW_SVG,onclick:()=>{ const a=md.more.action; closeModal(); setTimeout(()=>runAction(cfg,a),reduce?0:500); }}):null;
+  const head=[md.kicker?h("p",{class:"eyebrow","data-anim":"","data-part":"eyebrow",text:md.kicker}):null,h("h2",{class:"m-title","data-anim":"","data-part":"title",text:md.title||""})];
+  const text=md.text?h("p",{class:"lede","data-anim":"","data-part":"text",text:md.text}):null;
+  const more=md.more&&md.more.label?h("button",{class:"more","data-anim":"","data-part":"more",type:"button",style:"margin-top:6px",html:esc(md.more.label)+ARROW_SVG,onclick:()=>{ const a=md.more.action; closeModal(); setTimeout(()=>runAction(cfg,a),reduce?0:500); }}):null;
   const media=md.media||[];
   if (md.type===2){
     body.append(h("div",{class:"m-intro"},h("div",{class:"m-main"},head),h("div",{class:"m-main"},text,more)));
@@ -379,11 +405,11 @@ function fillModal(md,panel){
     const fig=modalFigure(cfg,media[0],md.caption,{ratio:1.6,res:1280,badge:pad(MS.idx+1)});
     const main=h("div",{class:"m-main"},...head,text);
     if (md.type===3 && md.flowId){
-      const det=h("div",{class:"detail","data-anim":"","aria-live":"polite"});
+      const det=h("div",{class:"detail","data-anim":"","data-part":"detail","aria-live":"polite"});
       const fl=renderFlow(cfg,md.flowId,{onItem:(i,it)=>{ show(i,true); if (it.action&&it.action.type!=="none"&&it.action.type!=="modal") runAction(cfg,it.action); }});
       const show=(i,anim)=>{ fl.setActive(i,{fill:true}); const it=fl.flow.items[i]; det.innerHTML=`<small class="mono"><b>${pad(i+1)}</b> / ${pad(fl.flow.items.length)} · ${esc(it.label)}</small><p>${esc(it.detail||"")}</p>`;
         if (anim && !reduce) gsap.fromTo(det,{autoAlpha:0,y:8},{autoAlpha:1,y:0,duration:.45,ease:"power3.out"}); };
-      if (fl){ fl.el.dataset.anim=""; main.append(fl.el,det); show(0,false); MS.subflow=fl; }
+      if (fl){ fl.el.dataset.anim=""; fl.el.dataset.part="flow"; main.append(fl.el,det); show(0,false); MS.subflow=fl; }
     } else MS.subflow=null;
     if (more) main.append(more);
     if (md.type===3){ body.append(main,fig); } else body.append(fig,main);
@@ -398,7 +424,7 @@ function fillModal(md,panel){
   setTimeout(()=>{ const c=$(".m-close",panel); c&&c.focus({preventScroll:true}); },reduce?30:700);
 }
 function modalFigure(cfg,mid,caption,{ratio,res,badge}){
-  const fig=h("figure",{class:"m-fig","data-anim":""});
+  const fig=h("figure",{class:"m-fig","data-anim":"","data-part":"media"});
   const box=mediaBox(cfg,mid,{ratio,res,badge,cls:"m-media"}); fig.append(box,captionEl(caption));
   const n=box.firstElementChild;
   if (n && isMoving(cfg,mid)){
@@ -427,8 +453,11 @@ function animateModalIn(cfg,panel,scrim){
   } else if (style==="scale") tl.fromTo(panel,{scale:.85,autoAlpha:0},{scale:1,autoAlpha:1,duration:.8,ease:ease(cfg)},.05);
   else if (style==="slide") tl.fromTo(panel,{yPercent:30,autoAlpha:0},{yPercent:0,autoAlpha:1,duration:.9,ease:ease(cfg)},.05);
   else tl.fromTo(panel,{autoAlpha:0},{autoAlpha:1,duration:.6},.05);
-  tl.fromTo(items,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.7,ease:"power3.out",stagger:.06},style==="line"?.75:.3);
-  if (MS.subflow) tl.add(()=>MS.subflow.play(0),style==="line"?1:.5);
+  // Timing values count from when the modal starts opening; the defaults keep the original stagger.
+  const shift=style==="line"?0:-.45, T=MS.md&&MS.md.timing;
+  items.forEach((el,i)=>{ const k=el.dataset.part, at=k?cue(T,k,null):null;
+    tl.fromTo(el,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.7,ease:"power3.out"},at==null?(style==="line"?.75:.3)+i*.06:Math.max(0,at+shift)); });
+  if (MS.subflow){ const at=cue(T,"flow",null); tl.add(()=>MS.subflow.play(0),at==null?(style==="line"?1:.5):Math.max(0,at+shift)); }
 }
 function stepModal(dir){
   if (MS.seq.length<2) return;
