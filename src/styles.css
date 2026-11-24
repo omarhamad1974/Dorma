@@ -484,3 +484,21 @@ figure{margin:0;min-width:0}
 .ld-thumb .ld-logo{width:140px}.ld-thumb .ld-logo svg{display:block;width:100%;height:auto}
 .ld-thumb .ld-line{display:block;height:2px;width:140px;background:linear-gradient(90deg,#ed0677,#ffcb08,#0072bc)}
 .ld-thumb .ld-sub{font-size:10px;letter-spacing:.8em;margin-right:-.8em;opacity:.7}
+
+/* ---------- languages ---------- */
+.lang-pill{font-family:var(--body);letter-spacing:0;text-transform:none}
+.blist li span.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;transform:translateY(-2px)}
+/* Arabic: letters join, so no letter-spacing or uppercase anywhere; mirror direction-bound icons */
+[dir="rtl"] body *{letter-spacing:0!important;text-transform:none!important}
+[dir="rtl"] .arrow svg,[dir="rtl"] .more svg,[dir="rtl"] .arrow-link svg,[dir="rtl"] .m-nav svg,[dir="rtl"] .btn-arrow svg{transform:scaleX(-1)}
+[dir="rtl"] .lede,[dir="rtl"] p{line-height:1.8}
+[dir="rtl"] .eyebrow,[dir="rtl"] .mono,[dir="rtl"] .pill,[dir="rtl"] .cap,[dir="rtl"] small,[dir="rtl"] .m-head{font-family:"IBM Plex Sans Arabic",var(--body)}
+/* Text without an Arabic version falls back to English: let each paragraph take its own direction */
+[dir="rtl"] p,[dir="rtl"] li,[dir="rtl"] .h3{unicode-bidi:plaintext}
+/* studio: English and Arabic side by side */
+.field.bi{display:flex;flex-direction:column;gap:8px}
+.bi-label{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.bi-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bi-row .field > label{font-size:.6rem;opacity:.75}
+.bi-ar input,.bi-ar textarea{font-family:"IBM Plex Sans Arabic",var(--body);text-align:right}
+@media (max-width:700px){.bi-row{grid-template-columns:1fr}}

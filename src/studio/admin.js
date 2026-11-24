@@ -1,5 +1,5 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -34,7 +34,7 @@ function touch(opts={}){ scheduleSave(); if (opts.theme) applyTheme(Store.draft)
 
 let renderTok=0;
 async function renderAdmin(){
-  const tok=++renderTok;
+  const tok=++renderTok; setDocLang("en");
   disposePage(); closeModal(true);
   const app=$("#app");
   if (!Store.canEdit){ app.textContent=""; app.append(Store.session?notEditor():signInForm()); return; }
@@ -42,7 +42,7 @@ async function renderAdmin(){
   if (tok!==renderTok) return; // a newer render started while the draft was loading
   app.textContent="";
   assetsApi=media();
-  applyTheme(Store.draft); document.title="Studio · "+(Store.draft.site.brand||"Site");
+  applyTheme(Store.draft); document.title="Studio · "+(plain(Store.draft.site.brand)||"Site");
   const side=h("nav",{class:"adm-side","aria-label":"Studio sections"},h("a",{class:"brand",href:"#"+Store.draft.site.homePage},h("span",{class:"mark"}),"Studio"));
   const mnav=h("div",{class:"adm-mobile-nav"});
   PANELS.forEach(([k,l])=>{
@@ -82,7 +82,20 @@ function openPanel(k){
 }
 
 /* ---------- generic field engine ---------- */
+/* Bilingual entry: when the site has Arabic, every text box shows English and Arabic side by side.
+   Settings that are not shown to visitors as text (ids, slugs, links, studio names, library files, the loader) stay single. */
+const MONO_KEYS=new Set(["id","slug","name","path","url","target","code","homePage","logo","image"]);
+const MEDIA_KINDS=new Set(["image","video","scene","article"]);
+function bilingual(obj,key,kind){
+  const D=Store.draft; if (!D || D.site.languages==="en" || !D.site.languages) return false;
+  if (!["text","area","strings","prose"].includes(kind) || MONO_KEYS.has(key) || Array.isArray(obj)) return false;
+  return !(obj===D.loader || (obj && MEDIA_KINDS.has(obj.kind)));
+}
 function F(obj,key,kind,label,opts={},onChange=()=>{}){
+  if (!opts.lang && bilingual(obj,key,kind)) return biField(obj,key,kind,label,opts,onChange);
+  if (!opts.lang && isTx(obj[key])){ // English-only site: edit the English text and keep any Arabic already written
+    const v=obj[key], tmp={x:v.en??""}; return F(tmp,"x",kind,label,{...opts,lang:"en"},(nv)=>{ obj[key]=blankTx(v.ar)?nv:{en:nv,ar:v.ar}; onChange(obj[key],key); });
+  }
   const D=Store.draft, wrap=h("div",{class:"field"+(opts.wide?" wide":"")}), id=uid("f");
   const lab=h("label",{for:id,text:label}); wrap.append(lab);
   const set=(v,extra)=>{ obj[key]=v; onChange(v,key); touch(extra); };
@@ -122,8 +135,8 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
     case "icon": wrap.append(iconPicker(obj,key,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "action": { obj[key]=obj[key]||A(); wrap.append(actionEditor(obj[key],()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break; }
     case "button": { obj[key]=obj[key]||{label:"",action:A()}; const b=obj[key];
-      const i=h("input",{id,type:"text",value:b.label||"",placeholder:"Label (empty hides it)"}); i.addEventListener("input",()=>{ b.label=i.value; onChange(b); touch(); });
-      wrap.append(i,actionEditor(b.action=b.action||A(),()=>{ onChange(b); touch(); })); wrap.classList.add("wide"); break; }
+      const lf=F(b,"label","text","Label (empty hides it)",{},()=>onChange(b)); lf.classList.add("wide");
+      wrap.append(lf,actionEditor(b.action=b.action||A(),()=>{ onChange(b); touch(); })); wrap.classList.add("wide"); break; }
     case "timing": { lab.removeAttribute("for"); wrap.classList.add("wide"); obj[key]=obj[key]&&typeof obj[key]==="object"?obj[key]:{}; const T=obj[key];
       const g=h("div",{class:"timing-grid"});
       (opts.parts||[]).forEach(([k,def])=>{ const i=h("input",{type:"number",min:0,step:k==="duration"?.5:.05,value:T[k]??"",placeholder:def==null?"Auto":String(def),"aria-label":TIMING_PARTS[k]+" (seconds)"});
@@ -134,6 +147,17 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
   return wrap;
+}
+const blankTx=x=>x==null||x===""||(Array.isArray(x)&&!x.length);
+function biField(obj,key,kind,label,opts,onChange){
+  const v=obj[key], cur={en:isTx(v)?(v.en??(kind==="strings"?[]:"")):(v??(kind==="strings"?[]:"")), ar:isTx(v)?(v.ar??(kind==="strings"?[]:"")):(kind==="strings"?[]:"")};
+  const wrap=h("div",{class:"field bi wide"},h("span",{class:"bi-label",text:label}));
+  const row=h("div",{class:"bi-row"});
+  ["en","ar"].forEach(l=>{ const tmp={x:cur[l]};
+    const f=F(tmp,"x",kind,l==="en"?"English":"العربية",{...opts,wide:false,hint:l==="en"?opts.hint:"",lang:l},nv=>{ cur[l]=nv; obj[key]={en:cur.en,ar:cur.ar}; onChange(obj[key],key); });
+    f.classList.add("bi-"+l); if (l==="ar") $$("input,textarea",f).forEach(i=>{ i.dir="rtl"; i.lang="ar"; });
+    row.append(f); });
+  wrap.append(row); return wrap;
 }
 function fieldsFor(obj,schema,onChange){ const g=h("div",{class:"fields"}); schema.forEach(([k,kind,l,o])=>g.append(F(obj,k,kind,l,o||{},onChange))); return g; }
 function actionEditor(a,onChange){
@@ -221,11 +245,13 @@ function panelSite(body){
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
+  body.append(card("Languages and numbering",h("p",{class:"adm-intro",text:"Choose the languages visitors can read. With both, a switch in the header lets them change language. When Arabic is on, every text box in the studio shows English and Arabic side by side. A language left empty shows the other language's text."}),
+    fieldsFor(D.site,[["languages","select","Site languages",{options:[["en","English only"],["ar","Arabic only"],["both","English and Arabic"]]}],["defaultLang","select","Language for first-time visitors",{options:[["en","English"],["ar","العربية"]]}],["showNumbers","toggle","Show numbering (01, 02… counters, steps and badges)"]],(v,k)=>{ if (k==="languages") openPanel("site"); })));
   body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
     fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}]])));
   body.append(loaderCard());
   const titles=h("div",{class:"fields"});
-  D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(p.title||p.id)+" in menu")); });
+  D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(plain(p.title)||p.id)+" in menu")); });
   body.append(card("Page titles",titles));
   body.append(card("Backup",h("p",{class:"adm-intro",text:"Copy every setting as text to keep a backup, or paste a backup to replace the draft."}),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
@@ -426,7 +452,7 @@ function panelPages(body){
 const LIB={ cat:"", kind:"", q:"", hidden:false };
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
-const slugify=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"").replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60);
+const slugify=s=>String(plain(s)||"").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"").replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60);
 const ghUpload=cat=>`${REPO_URL}/upload/${REPO_BRANCH}/public/library/${encodeURIComponent(cat)}`;
 const ghNewFolder=cat=>`${REPO_URL}/new/${REPO_BRANCH}/public/library/${encodeURIComponent(cat)}?filename=.gitkeep`;
 const ghFile=path=>`${REPO_URL}/blob/${REPO_BRANCH}/public/library/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -520,7 +546,7 @@ function categoriesCard(onChange){
   const D=Store.draft, rows=h("div",{class:"fields"});
   const used=id=>D.media.some(m=>m.category===id)||D.posts.some(p=>p.category===id);
   const draw=()=>{ rows.textContent="";
-    D.categories.forEach((c,i)=>{ const inp=h("input",{type:"text",value:c.label,"aria-label":"Category name"}); inp.addEventListener("input",()=>{ c.label=inp.value; touch(); });
+    D.categories.forEach((c,i)=>{ const inp=F(c,"label","text","Name"); inp.style.flex="1";
       rows.append(h("div",{class:"field wide",style:"flex-direction:row;align-items:center;gap:10px"},inp,h("code",{class:"mono",text:c.id}),
         used(c.id)?h("span",{class:"mono",text:"in use"}):h("button",{class:"btn sm danger",type:"button",text:"Remove",onclick:()=>{ D.categories.splice(i,1); touch(); draw(); onChange(); }}))); });
     const name=h("input",{type:"text",placeholder:"New category name","aria-label":"New category name"});
@@ -535,7 +561,7 @@ const todayIso=()=>new Date().toISOString().slice(0,10);
 function panelBlog(body){
   const D=Store.draft;
   const onPage=D.pages.find(p=>p.sections.some(s=>s.type==="blog"));
-  body.append(h("p",{class:"adm-intro",text:"Write posts here. Published posts appear on every page that has a Blog posts section"+(onPage?" (now: "+onPage.title+")":"; add one under Pages")+", newest first, each at its own address. Drafts are only visible in Preview draft."}));
+  body.append(h("p",{class:"adm-intro",text:"Write posts here. Published posts appear on every page that has a Blog posts section"+(onPage?" (now: "+plain(onPage.title)+")":"; add one under Pages")+", newest first, each at its own address. Drafts are only visible in Preview draft."}));
   const sorted=()=>D.posts.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   masterDetail(body,{items:sorted,selKey:"blog",label:p=>p.title||"Untitled",kind:p=>(p.published?"":"Draft · ")+(fmtDate(p.date)||"No date"),addLabel:"New post",
     onAdd:()=>{ let n=1; while (D.posts.some(p=>p.slug==="new-post-"+n)) n++; const p={id:uid("p"),slug:"new-post-"+n,title:"New post",date:todayIso(),category:"",tags:[],author:D.site.brand||"",cover:"",excerpt:"",body:"",published:false}; D.posts.push(p); return p; },

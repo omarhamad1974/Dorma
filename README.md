@@ -82,6 +82,14 @@ and the text. The text uses a small, safe subset of Markdown (empty line = parag
 own line places a library image or video. Published posts appear on any page with a **Blog posts**
 section (the Blog page by default), and each post has its own address, `#post/<address>`.
 
+## Languages (English and Arabic)
+
+Studio → Site and titles → **Languages and numbering** sets the site to English only, Arabic only, or both. With both, visitors get a language switch in the header, and first-time visitors see the language chosen there.
+
+When Arabic is on, every text box in the studio shows **English and Arabic side by side**. Text is saved as `{en, ar}`, and plain strings still work as English. If one language is left empty, the site shows the other one, so a page is never blank. The Arabic site runs right to left in IBM Plex Sans Arabic. Titles reveal word by word, because Arabic letters join, and arrows are mirrored. Built-in words such as Next, Close and All posts have Arabic versions in `UI_AR` in `src/studio/core.js`.
+
+The same card has **Show numbering**, which is off by default. It controls the 01/02 counters, step labels, badges and numbered lists.
+
 ## Timing (storytelling)
 
 Every hero, hero carousel, timeline, flow strip and modal has a **Timing** row in the studio. It gives the second each piece starts (eyebrow, title, text, image, flow, flow detail, button), counted from when the section scrolls into view, the modal opens, or the slide's text starts. Leave a box empty for the default shown, and use lower numbers to bring a piece forward. Hero carousel slides can also set their own **seconds on screen** and override the section timing. The flow's item-by-item animation still comes from the Flows panel.
