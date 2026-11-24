@@ -240,7 +240,7 @@ function notEditor(){
       h("button",{class:"btn",type:"button",text:"Sign out",onclick:async()=>{ await signOut(); route(); }}),
       h("a",{class:"more",href:"#"+(Store.live?.site.homePage||"home"),html:"Back to the site"+ARROW_SVG}))));
 }
-const PALETTES=[["Ember","#ff9e5e","#05060a","#10121b","#eef1f6"],["Glacier","#7fd4ff","#04070b","#0e141c","#eaf3f8"],["Violet","#a58bff","#06050b","#120f1d","#f0eef8"],["Rose","#ff7a9c","#070507","#171018","#f6eef1"],["Brass","#e3b866","#070604","#16130d","#f3efe6"],["Mono","#f2f2f2","#050505","#121212","#f2f2f2"]];
+const PALETTES=[["Dorma","#ffc93c","#040915","#0b1630","#eef2fa"],["Ember","#ff9e5e","#05060a","#10121b","#eef1f6"],["Glacier","#7fd4ff","#04070b","#0e141c","#eaf3f8"],["Violet","#a58bff","#06050b","#120f1d","#f0eef8"],["Rose","#ff7a9c","#070507","#171018","#f6eef1"],["Brass","#e3b866","#070604","#16130d","#f3efe6"],["Mono","#f2f2f2","#050505","#121212","#f2f2f2"]];
 function panelTheme(body){
   const T=Store.draft.theme;
   const sw=h("div",{class:"swatches"}); PALETTES.forEach(([n,a,ink,panel,fg])=>sw.append(h("button",{type:"button",onclick:()=>{ Object.assign(T,{accent:a,ink,panel,fg}); touch({theme:true}); openPanel("theme"); }},h("i",{style:`background:linear-gradient(135deg,${ink} 50%,${a} 50%)`}),n)));
