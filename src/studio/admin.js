@@ -208,20 +208,34 @@ function actionEditor(a,onChange){
   return row;
 }
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
+/* Image picker: compact thumbnails (size remembered per browser), category + search filters shared by every picker this session */
+const PICK={ cat:"", q:"" };
+const PICK_SIZES=[["s","Small",56],["m","Medium",84],["l","Large",130]];
+const pickSize=()=>{ try { const v=localStorage.getItem("dorma.pickSize"); return PICK_SIZES.some(z=>z[0]===v)?v:"s"; } catch { return "s"; } };
+function setPickSize(v){ try { localStorage.setItem("dorma.pickSize",v); } catch { /* storage blocked */ } }
 function mediaPicker(obj,key,opts,onChange){
-  const outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), st={cat:"",q:""};
-  const pool=()=>libFilter(Store.draft.media,{kinds:["image","video","scene"]});
-  if (pool().length>8){
-    const q=h("input",{type:"search",placeholder:"Search","aria-label":"Search the library"}); q.addEventListener("input",()=>{ st.q=q.value; draw(); });
-    outer.append(h("div",{class:"media-pick-filters"},categorySelect("",v=>{ st.cat=v; draw(); }),q));
-  }
-  const draw=()=>{ g.textContent="";
-    if (opts.allowNone) g.append(h("button",{type:"button",class:"none"+(!obj[key]?" on":""),text:"None",onclick:()=>{ obj[key]=""; draw(); onChange(); }}));
-    const list=libFilter(pool(),{cat:st.cat,q:st.q}); const cur=Store.draft.media.find(m=>m.id===obj[key]);
-    if (cur && !list.includes(cur)) list.unshift(cur);
+  const D=Store.draft, outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), countEl=h("span",{class:"media-pick-count"});
+  const pool=()=>libFilter(D.media,{kinds:["image","video","scene"]});
+  const applySize=v=>{ const z=PICK_SIZES.find(x=>x[0]===v)||PICK_SIZES[0]; g.style.setProperty("--pick",z[2]+"px"); g.dataset.size=z[0]; };
+  const cats=h("select",{"aria-label":"Category"});
+  const fillCats=()=>{ cats.textContent=""; const all=pool(); cats.append(h("option",{value:"",text:"All categories ("+all.length+")"}));
+    D.categories.forEach(c=>{ const n=all.filter(m=>m.category===c.id).length; if (!n && PICK.cat!==c.id) return; const o=h("option",{value:c.id,text:c.label+" ("+n+")"}); if (c.id===PICK.cat) o.selected=true; cats.append(o); });
+    const un=all.filter(m=>!m.category).length; if (un){ const o=h("option",{value:"_none",text:"No category ("+un+")"}); if (PICK.cat==="_none") o.selected=true; cats.append(o); }
+    if (cats.value!==PICK.cat) PICK.cat=cats.value; };
+  cats.addEventListener("change",()=>{ PICK.cat=cats.value; draw(); });
+  const q=h("input",{type:"search",placeholder:"Search name or tag","aria-label":"Search images",value:PICK.q}); q.addEventListener("input",()=>{ PICK.q=q.value; draw(); });
+  const sizes=h("div",{class:"media-pick-size",role:"group","aria-label":"Thumbnail size"});
+  const drawSizes=()=>{ sizes.textContent=""; const cur=pickSize(); PICK_SIZES.forEach(([v,l])=>sizes.append(h("button",{type:"button",class:cur===v?"on":"",text:v.toUpperCase(),title:l+" thumbnails","aria-label":l+" thumbnails","aria-pressed":String(cur===v),onclick:()=>{ setPickSize(v); applySize(v); drawSizes(); }}))); };
+  outer.append(h("div",{class:"media-pick-filters"},cats,q,sizes,countEl));
+  const draw=()=>{ g.textContent=""; fillCats();
+    if (opts.allowNone) g.append(h("button",{type:"button",class:"none"+(!obj[key]?" on":""),text:"None",title:"No image",onclick:()=>{ obj[key]=""; draw(); onChange(); }}));
+    const all=pool(), list=PICK.cat==="_none"?libFilter(all.filter(m=>!m.category),{q:PICK.q}):libFilter(all,{cat:PICK.cat,q:PICK.q});
+    countEl.textContent=list.length===all.length?all.length+" items":list.length+" of "+all.length;
+    const cur=D.media.find(m=>m.id===obj[key]); if (cur && !list.includes(cur)) list.unshift(cur);
     list.forEach(m=>{ const b=h("button",{type:"button",class:obj[key]===m.id?"on":"",title:m.label,"aria-label":m.label},mediaThumb(m.id),h("span",{text:m.label}));
-      b.addEventListener("click",()=>{ obj[key]=m.id; draw(); onChange(); }); g.append(b); }); };
-  draw(); outer.append(g); return outer;
+      b.addEventListener("click",()=>{ obj[key]=m.id; draw(); onChange(); }); g.append(b); });
+    if (!list.length) g.append(h("p",{class:"media-pick-empty",text:"Nothing matches. Try another category or clear the search."})); };
+  applySize(pickSize()); drawSizes(); draw(); outer.append(h("div",{class:"media-pick-scroll"},g)); return outer;
 }
 function iconPicker(obj,key,onChange){
   const g=h("div",{class:"icon-pick"});
