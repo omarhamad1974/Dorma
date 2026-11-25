@@ -127,12 +127,14 @@ function flowAnim(cfg,flow){
   return {...((useOwn?own:g)||own||g||{mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0})};
 }
 const look=x=>x&&x.look&&x.look.custom?x.look:null;
-/** A carousel slide's look: the slide's own (if custom), then the carousel's (if custom), then the global slide style. */
+/** A carousel slide's look: the slide's own (if custom), then the carousel's (if custom), then the global slide style.
+    The image filter follows the same chain: slide, carousel, the global carousel filter (theme.slide.overlay),
+    and when none of them sets one, the image's own filter and the site-wide one. */
 function slideLook(cfg,sec,slide){
   const g=(cfg.theme&&cfg.theme.slide)||{}, c=look(sec), s=look(slide);
   const col=k=>[s,c,g].map(o=>o&&o[k]).find(hexOk)||"";
-  const n=k=>[s,c].map(o=>o&&o[k]).find(v=>v!==""&&v!=null&&!isNaN(+v));
-  const ov=[s,c].map(o=>o&&o.overlay).find(o=>o&&typeof o==="object"&&o.mode&&o.mode!=="default");
+  const n=k=>[s,c,g].map(o=>o&&o[k]).find(v=>v!==""&&v!=null&&!isNaN(+v));
+  const ov=[s,c,g].map(o=>o&&o.overlay).find(o=>o&&typeof o==="object"&&o.mode&&o.mode!=="default");
   return { title:col("title"), text:col("text"), accent:col("accent"), headerText:col("headerText"), overlay:ov||null, intensity:n("intensity"), shade:n("shade") };
 }
 const EASES={expo:"expo",power3:"power3",sine:"sine",back:"back",elastic:"elastic"};

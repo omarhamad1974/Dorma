@@ -3,7 +3,7 @@ import { hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, 
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
-import { parseSlidesMd, applySlidesImport, resolveImage } from './mdslides';
+import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
@@ -30,11 +30,13 @@ const IC={
   sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
   down:'<svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>',
+  expand:'<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
+  upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser. */
@@ -98,7 +100,7 @@ function openPanel(k){
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
+  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -127,13 +129,13 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       i.addEventListener("input",()=>set(kind==="number"?(i.value===""?(opts.optional?"":0):+i.value):i.value)); wrap.append(i); break; }
     case "area": case "code": {
       const t=h("textarea",{id,class:kind==="code"?"code":"",spellcheck:kind==="code"?"false":"true"}); t.value=obj[key]??"";
-      t.addEventListener("input",()=>set(t.value)); wrap.append(t); break; }
+      t.addEventListener("input",()=>set(t.value)); wrap.append(expandable(t,opts.groupLabel?opts.groupLabel+" · "+label:label)); break; }
     case "strings": {
       const t=h("textarea",{id,rows:3}); t.value=(obj[key]||[]).join("\n");
-      t.addEventListener("input",()=>set(t.value.split("\n").map(s=>s.trim()).filter(Boolean))); wrap.append(t); break; }
+      t.addEventListener("input",()=>set(t.value.split("\n").map(s=>s.trim()).filter(Boolean))); wrap.append(expandable(t,opts.groupLabel?opts.groupLabel+" · "+label:label)); break; }
     case "range": {
       const i=h("input",{id,type:"range",min:opts.min??0,max:opts.max??1,step:opts.step??.01,value:obj[key]??0}), o=h("output",{text:obj[key]});
-      i.addEventListener("input",()=>{ o.textContent=i.value; set(+i.value,opts.theme?{theme:true}:undefined); }); wrap.append(h("div",{class:"range-row"},i,o)); break; }
+      i.addEventListener("input",()=>{ o.textContent=i.value; set(+i.value,opts.theme?{theme:true}:undefined); }); wrap.append(rangeRow(i,o,label)); break; }
     case "color": {
       /* opts.optional: the value may be empty, meaning "follow the global / site colour" (opts.fallback shows which). */
       const opt=!!opts.optional, val=()=>hexOk(obj[key])?obj[key]:"", fb=()=>{ const f=typeof opts.fallback==="function"?opts.fallback():opts.fallback; return hexOk(f)?f:"#000000"; };
@@ -161,7 +163,7 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
     case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category"}); s.id=id; wrap.append(s); break; }
     case "date": { const i=h("input",{id,type:"date",value:obj[key]||""}); i.addEventListener("change",()=>set(i.value)); wrap.append(i); break; }
-    case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v))); break;
+    case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v),opts.groupLabel?opts.groupLabel+" · "+label:label)); break;
     case "media": wrap.append(mediaPicker(obj,key,opts,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "icon": wrap.append(iconPicker(obj,key,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "action": { obj[key]=obj[key]||A(); wrap.append(actionEditor(obj[key],()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break; }
@@ -181,12 +183,45 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
   return wrap;
 }
 const blankTx=x=>x==null||x===""||(Array.isArray(x)&&!x.length);
+/* ---------- text boxes: an expand button opens the box full screen for comfortable writing ----------
+   The same textarea moves into the full-screen view, so typing, the caret and autosave carry on as they were. */
+function expandable(t,label){
+  const box=h("div",{class:"ta-box"});
+  const btn=h("button",{type:"button",class:"ta-max",title:"Expand to write comfortably","aria-label":"Expand "+label,"aria-expanded":"false",html:IC.expand});
+  const done=h("button",{type:"button",class:"btn sm primary",text:"Done"});
+  const head=h("div",{class:"ta-head"},h("span",{class:"ta-title",text:label}),done);
+  const onKey=e=>{ if (e.key==="Escape"){ e.preventDefault(); close(); } };
+  function open(){ const a=t.selectionStart, b=t.selectionEnd; box.classList.add("is-max"); document.documentElement.classList.add("ta-lock"); btn.setAttribute("aria-expanded","true");
+    addEventListener("keydown",onKey); t.focus({preventScroll:true}); try { t.setSelectionRange(a,b); } catch { /* not a text box */ } }
+  function close(){ box.classList.remove("is-max"); document.documentElement.classList.remove("ta-lock"); btn.setAttribute("aria-expanded","false");
+    removeEventListener("keydown",onKey); t.focus({preventScroll:true}); box.scrollIntoView({block:"nearest"}); }
+  btn.addEventListener("click",open); done.addEventListener("click",close);
+  box.append(head,t,btn); return box;
+}
+/* ---------- sliders: on touch screens a slider must be tapped first, so scrolling past it never changes it ----------
+   The tapped slider stays active (with − and + for fine steps) until you tap somewhere else or leave it for a while. */
+const coarse=()=>typeof matchMedia==="function"&&matchMedia("(pointer:coarse)").matches;
+let activeRange=null, rangeIdle=0;
+function releaseRange(){ clearTimeout(rangeIdle); if (activeRange) activeRange.classList.remove("on"); activeRange=null; }
+function pokeRange(){ clearTimeout(rangeIdle); rangeIdle=setTimeout(releaseRange,15000); }
+if (typeof document!=="undefined") document.addEventListener("pointerdown",e=>{ if (activeRange && !activeRange.contains(e.target)) releaseRange(); },true);
+/* a focused number box ignores the mouse wheel, so scrolling the page never changes a value */
+if (typeof document!=="undefined") document.addEventListener("wheel",e=>{ const a=document.activeElement; if (a&&a.type==="number"&&a===e.target&&a.closest(".adm")) a.blur(); },{passive:true});
+function rangeRow(i,o,label){
+  const row=h("div",{class:"range-row"});
+  const step=k=>{ const st=+i.step||1, v=Math.min(+i.max,Math.max(+i.min,+i.value+k*st)); i.value=String(+v.toFixed(4)); i.dispatchEvent(new Event("input",{bubbles:true})); pokeRange(); };
+  const minus=h("button",{type:"button",class:"rg-step",text:"−","aria-label":"Lower "+label,onclick:()=>step(-1)}), plus=h("button",{type:"button",class:"rg-step",text:"+","aria-label":"Raise "+label,onclick:()=>step(1)});
+  row.append(minus,i,plus,o,h("span",{class:"rg-tap","aria-hidden":"true",text:"Tap to adjust"}));
+  row.addEventListener("click",e=>{ if (!coarse() || row.classList.contains("on")) return; e.preventDefault(); releaseRange(); activeRange=row; row.classList.add("on"); pokeRange(); });
+  i.addEventListener("input",pokeRange);
+  return row;
+}
 function biField(obj,key,kind,label,opts,onChange){
   const v=obj[key], cur={en:isTx(v)?(v.en??(kind==="strings"?[]:"")):(v??(kind==="strings"?[]:"")), ar:isTx(v)?(v.ar??(kind==="strings"?[]:"")):(kind==="strings"?[]:"")};
   const wrap=h("div",{class:"field bi wide"},h("span",{class:"bi-label",text:label}));
   const row=h("div",{class:"bi-row"});
   ["en","ar"].forEach(l=>{ const tmp={x:cur[l]};
-    const f=F(tmp,"x",kind,l==="en"?"English":"العربية",{...opts,wide:false,hint:l==="en"?opts.hint:"",lang:l},nv=>{ cur[l]=nv; obj[key]={en:cur.en,ar:cur.ar}; onChange(obj[key],key); });
+    const f=F(tmp,"x",kind,l==="en"?"English":"العربية",{...opts,wide:false,hint:l==="en"?opts.hint:"",lang:l,groupLabel:label},nv=>{ cur[l]=nv; obj[key]={en:cur.en,ar:cur.ar}; onChange(obj[key],key); });
     f.classList.add("bi-"+l); if (l==="ar") $$("input,textarea",f).forEach(i=>{ i.dir="rtl"; i.lang="ar"; });
     row.append(f); });
   wrap.append(row); return wrap;
@@ -247,7 +282,8 @@ function iconPicker(obj,key,onChange){
 function listEditor(obj,key,opts,onChange){
   const arr=obj[key]=obj[key]||[], box=h("div",{class:"sub-list"});
   const draw=()=>{ box.textContent="";
-    arr.forEach((it,i)=>box.append(subCard(it,{title:()=>it[opts.title]||"Item "+(i+1),kind:opts.kindLabel?opts.kindLabel(it):"",open:false,
+    arr.forEach((it,i)=>box.append(subCard(it,{title:()=>plain(it[opts.title])||"Item "+(i+1),kind:opts.kindLabel?opts.kindLabel(it):"",open:false,
+      onToggleHidden:opts.hideable?()=>{ it.hidden=!it.hidden; onChange(); touch(); }:null,
       body:()=>fieldsFor(it,opts.fields,onChange),onRemove:()=>{ arr.splice(i,1); draw(); onChange(); touch(); },
       onDuplicate:()=>{ arr.splice(i+1,0,clone(it)); draw(); box.children[i+1]?._open?.(); onChange(); touch(); }})));
     box.append(h("button",{class:"btn sm",type:"button",html:IC.plus+"Add",onclick:()=>{ arr.push(opts.blank?opts.blank():{}); draw(); const last=box.children[box.children.length-2]; last&&last.classList.remove("closed"); onChange(); touch(); }}));
@@ -256,12 +292,12 @@ function listEditor(obj,key,opts,onChange){
 }
 function subCard(item,{title,kind,body,onRemove,open,onDuplicate,onToggleHidden}){
   const card=h("div",{class:"sub-item"+(open?"":" closed")+(item&&item.hidden?" is-hidden":"")}), t=h("span",{class:"t",text:title()});
-  const hideBtn=onToggleHidden?h("button",{class:"x",type:"button"}):null;
-  const syncHide=()=>{ if (!hideBtn) return; const hid=!!item.hidden; card.classList.toggle("is-hidden",hid); hideBtn.innerHTML=hid?IC.eyeOff:IC.eye;
-    hideBtn.setAttribute("aria-label",hid?"Hidden from visitors. Show it":"Shown to visitors. Hide it"); hideBtn.title=hid?"Hidden. Click to show":"Shown. Click to hide"; hideBtn.setAttribute("aria-pressed",hid?"true":"false"); };
-  if (hideBtn){ hideBtn.addEventListener("click",e=>{ e.stopPropagation(); onToggleHidden(); syncHide(); }); syncHide(); }
+  /* Shown / Hidden switch: one tap, and the state is written on it */
+  const hideBtn=onToggleHidden?h("button",{class:"vis-pill",type:"button"}):null;
+  const syncHide=()=>{ if (!hideBtn) return; const hid=!!item.hidden; card.classList.toggle("is-hidden",hid); hideBtn.innerHTML=(hid?IC.eyeOff:IC.eye)+"<span>"+(hid?"Hidden":"Shown")+"</span>";
+    hideBtn.setAttribute("aria-label",hid?"Hidden from visitors. Tap to show it":"Shown to visitors. Tap to hide it"); hideBtn.title=hid?"Hidden from visitors. Tap to show":"Shown to visitors. Tap to hide"; hideBtn.setAttribute("aria-pressed",hid?"true":"false"); };
+  if (hideBtn){ hideBtn.addEventListener("click",e=>{ e.stopPropagation(); onToggleHidden(); syncHide(); }); syncHide(); card._syncHide=syncHide; }
   const head=h("div",{class:"sub-head"},h("span",{class:"handle",html:IC.grip,"aria-hidden":"true"}),kind?h("span",{class:"k",text:kind}):null,t,
-    onToggleHidden?h("span",{class:"k hid-tag",text:"Hidden"}):null,
     hideBtn,
     onDuplicate?h("button",{class:"x",type:"button","aria-label":"Duplicate",title:"Duplicate",html:IC.copy,onclick:e=>{ e.stopPropagation(); onDuplicate(); }}):null,
     h("button",{class:"x",type:"button","aria-label":"Remove",title:"Remove",html:IC.x,onclick:e=>{ e.stopPropagation(); confirmInline(card,"Remove this item?",onRemove); }}));
@@ -283,11 +319,15 @@ function sortable(box,arr,onMove){
 function card(title,...kids){ return h("section",{class:"card-a"},h("h2",{},title),...kids); }
 function masterDetail(body,{items,selKey,label,kind,onAdd,addLabel,detail}){
   const list=h("div",{class:"list",role:"list"}), det=h("div",{style:"display:flex;flex-direction:column;gap:20px;min-width:0"});
-  const draw=()=>{ list.textContent="";
-    if (!items().some(x=>x.id===Admin.sel[selKey])) Admin.sel[selKey]=items()[0]?.id;
+  /* Editing a name only redraws the list on the left. The detail is built once per selection,
+     so a text box being typed in is never replaced (that is what used to drop the focus). */
+  const drawList=()=>{ list.textContent="";
     items().forEach(x=>list.append(h("button",{class:"li"+(x.id===Admin.sel[selKey]?" on":""),type:"button",onclick:()=>{ Admin.sel[selKey]=x.id; draw(); }},label(x),kind?h("small",{text:kind(x)}):null)));
     if (onAdd) list.append(h("button",{class:"btn sm",type:"button",style:"margin-top:6px",html:IC.plus+esc(addLabel),onclick:()=>{ const n=onAdd(); Admin.sel[selKey]=n.id; touch(); draw(); }}));
-    det.textContent=""; const cur=items().find(x=>x.id===Admin.sel[selKey]); if (cur) det.append(...[].concat(detail(cur,draw)));
+  };
+  const draw=()=>{
+    if (!items().some(x=>x.id===Admin.sel[selKey])) Admin.sel[selKey]=items()[0]?.id;
+    drawList(); det.textContent=""; const cur=items().find(x=>x.id===Admin.sel[selKey]); if (cur) det.append(...[].concat(detail(cur,drawList)));
   };
   body.append(h("div",{class:"cols"},list,det)); draw(); return draw;
 }
@@ -383,7 +423,7 @@ function panelTheme(body){
     const fl=renderFlow(Store.draft,(Store.draft.flows[0]||{}).id); if (fl){ fl.setActive(0,{fill:true}); d.append(fl.el); } d.append(h("button",{class:"more",type:"button",html:"More"+ARROW_SVG})); prev.append(d,h("span",{class:"lbl-a",text:"Live preview"})); };
   Admin.refresh=drawPrev; drawPrev();
   body.append(card("Palettes",sw,savePal),
-    card("My colours",h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
+    card(h("span",{class:"grow"},"My colours"),importLink("colours","Import colours"),h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
     card("Preview",prev),
     card("Background colours",fieldsFor(T,[["ink","color","Background"],["panel","color","Panels"],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
     card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
@@ -392,12 +432,12 @@ function panelTheme(body){
 /* ---------- colour overlay editor ----------
    Edits holder[key] = {mode, c1,a1, c2,a2, angle, blend}. With allowDefault, "default" follows the site-wide overlay. */
 const OV_CUSTOM=["solid","linear","radial"];
-function overlayEditor(holder,key,{allowDefault=false,preview=false,onChange=()=>{}}={}){
+function overlayEditor(holder,key,{allowDefault=false,preview=false,onChange=()=>{},defaultLabel="Site default",defaultHint=null}={}){
   const D=Store.draft, wrap=h("div",{class:"ov-edit"});
   const pv=preview?h("div",{class:"ph ov-prev"}):null;
   const sampleId=()=>{ const ids=[]; D.pages.forEach(p=>(p.sections||[]).forEach(sec=>{ (sec.slides||[]).forEach(x=>ids.push(x.media)); ids.push(sec.media); })); ids.push(...D.media.map(m=>m.id));
     return ids.find(id=>{ const m=id&&D.media.find(x=>x.id===id); return m&&m.kind!=="article"&&!m.hidden; }); };
-  const drawPrev=()=>{ if (!pv) return; pv.textContent=""; const id=sampleId(); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) pv.append(n); const ov=id?overlayEl(D,id,holder[key]):null; if (ov) pv.append(ov); pv.append(h("span",{class:"lbl-a",text:"Preview"})); };
+  const drawPrev=()=>{ if (!pv) return; pv.textContent=""; const id=sampleId(); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) pv.append(n); const o=holder[key], ov=id?(o&&o.mode==="default"?overlayEl(D,id):overlayEl(D,id,o)):null; if (ov) pv.append(ov); pv.append(h("span",{class:"lbl-a",text:"Preview"})); };
   const swatch=(label,o,onclick,on)=>{ const css=overlayCss(o,{rtl:false});
     return h("button",{type:"button",class:on?"on":"",onclick},h("i",{style:`background:${css?css.background+",":""}linear-gradient(135deg,#3a4a66,#c9b48a)`}),label); };
   const same=(a,b)=>!!a&&!!b&&["mode","c1","a1","c2","a2","angle","blend"].every(k=>a.mode==="solid"&&(k==="c2"||k==="a2"||k==="angle")?true:String(a[k])===String(b[k]));
@@ -405,10 +445,10 @@ function overlayEditor(holder,key,{allowDefault=false,preview=false,onChange=()=
     if (!holder[key]||typeof holder[key]!=="object"||!holder[key].mode) holder[key]={mode:allowDefault?"default":"none"};
     const o=holder[key], set=v=>{ holder[key]=v; touch(); onChange(); draw(); };
     const sw=h("div",{class:"swatches ov-presets"});
-    if (allowDefault) sw.append(swatch("Site default",overlayOn(D.theme.imageOverlay),()=>set({mode:"default"}),o.mode==="default"));
+    if (allowDefault) sw.append(swatch(defaultLabel,overlayOn(D.theme.imageOverlay),()=>set({mode:"default"}),o.mode==="default"));
     sw.append(swatch("None",null,()=>set({...o,mode:"none"}),o.mode==="none"));
     OV_PRESETS.forEach(([n,p])=>sw.append(swatch(n,p,()=>set(clone(p)),same(o,p))));
-    const modes=(allowDefault?[["default","Use the site default"]]:[]).concat(OPT.overlayModes);
+    const modes=(allowDefault?[["default",defaultLabel==="Site default"?"Use the site default":defaultLabel]]:[]).concat(OPT.overlayModes);
     wrap.append(h("p",{class:"hint",text:"Dorma presets"}),sw,fieldsFor(o,[["mode","select","Overlay",{options:modes}]],()=>{
       if (OV_CUSTOM.includes(o.mode)){ const b=D.theme.imageOverlay||{}; [["c1","#0072bc"],["a1",.55],["c2","#ffcb08"],["a2",.35],["angle",135],["blend","normal"]].forEach(([k,d])=>{ if (o[k]==null) o[k]=b[k]??d; }); }
       onChange(); draw(); }));
@@ -421,7 +461,7 @@ function overlayEditor(holder,key,{allowDefault=false,preview=false,onChange=()=
       if (o.mode==="linear") wrap.append(h("p",{class:"hint",text:"On Arabic pages the direction flips left to right, so a fade behind the text stays behind the text."}));
     } else if (o.mode==="default"){
       const site=overlayOn(D.theme.imageOverlay);
-      wrap.append(h("p",{class:"hint",text:site?"Follows the site overlay set under Colours and type.":"The site overlay is off, so this item shows no overlay. Set one under Colours and type, or pick a preset here."}));
+      wrap.append(h("p",{class:"hint",text:defaultHint||(site?"Follows the image filter in Global style.":"The global image filter is off, so this item shows no overlay. Set one in Global style, or pick a preset here.")}));
     }
     if (pv) wrap.append(pv);
     drawPrev();
@@ -536,7 +576,8 @@ function lookEditor(obj,key,opts={},onChange=()=>{}){
       ["accent","color","Accent (flow and glow)",{optional:true,placeholder:ph,fallback:fb("accent",()=>T.accent)}],["headerText","color","Header text while this shows",{optional:true,placeholder:ph,fallback:fb("headerText",()=>(T.header&&T.header.text)||T.fg)}],
       ["intensity","number","Colour filter strength (0 to 1.5, empty follows global)",{min:0,step:.05,optional:true,placeholder:String(T.overlayIntensity??1)}],
       ["shade","number","Dark shade (0 to 1.4, empty follows global)",{min:0,step:.05,optional:true,placeholder:String(T.overlay??1)}]],onChange);
-    return [colours,h("p",{class:"hint",style:"margin:4px 0 0",text:"Colour filter: \"Site default\" follows the "+(slide?"carousel, then the ":"")+"image's own filter and the global one."}),overlayEditor(L,"overlay",{allowDefault:true,onChange})];
+    return [colours,h("p",{class:"hint",style:"margin:4px 0 0",text:"Image filter for this "+(slide?"slide":"carousel")+". Pick a preset or your own colours; \"Use the carousel filter\" follows "+(slide?"the carousel, then ":"")+"the filter for every carousel."}),
+      overlayEditor(L,"overlay",{allowDefault:true,onChange,defaultLabel:"Use the carousel filter",defaultHint:"Follows "+(slide?"this carousel's filter when it has one, then ":"")+"the filter for every carousel (Global style or the top of Carousels)."})];
   }});
 }
 function styleCounts(D){
@@ -548,7 +589,7 @@ function stylePreview(D){
   const box=h("div",{class:"style-prev"});
   const draw=()=>{ box.textContent=""; const T=D.theme, S=T.slide||{};
     const id=(()=>{ for (const p of D.pages) for (const s of p.sections||[]) for (const x of [...(s.slides||[]),s]) { const m=x&&x.media&&D.media.find(y=>y.id===x.media); if (m&&m.kind!=="article") return m.id; } return (D.media.find(m=>m.kind!=="article")||{}).id; })();
-    const bg=h("div",{class:"sp-bg"}); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) bg.append(n); const ov=id?overlayEl(D,id):null; if (ov) bg.append(ov); bg.append(h("div",{class:"shade-hero"}));
+    const bg=h("div",{class:"sp-bg"}); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) bg.append(n); const so=S.overlay&&S.overlay.mode&&S.overlay.mode!=="default"?S.overlay:null, ov=id?(so?(so.mode==="none"?null:overlayEl(D,id,so)):overlayEl(D,id)):null; if (ov) bg.append(ov); bg.append(h("div",{class:"shade-hero"}));
     const nav=h("nav",{class:"site-nav"},h("a",{href:"#",onclick:e=>e.preventDefault(),"aria-current":"page",text:"Home"}),h("a",{href:"#",onclick:e=>e.preventDefault(),text:"Agency"}),h("a",{href:"#",onclick:e=>e.preventDefault(),text:"Contact"}));
     const head=h("header",{class:"site-head"},h("div",{class:"wrap"},h("span",{class:"brand"},h("span",{class:"mark"}),plain(D.site.brand)||"Dorma"),nav));
     const content=h("div",{class:"sp-content"},h("p",{class:"eyebrow sp-eb",text:"Global style"}),h("h3",{class:"display",style:"font-size:clamp(1.8rem,3.4vw,2.8rem)",text:"Every slide, one look"}),h("p",{class:"lede",text:"Paragraph text in the slide colour. Change anything on the left and it shows here."}));
@@ -558,6 +599,16 @@ function stylePreview(D){
     if (hexOk(S.accent)){ st.setProperty("--accent",S.accent); }
     box.append(hc,h("span",{class:"lbl-a",text:"Live preview"})); };
   draw(); return {el:box,draw};
+}
+/** The image filter for every carousel (the home carousel and any other). Slides and carousels set to Custom can use their own. */
+function carouselFilterFields(){
+  const T=Store.draft.theme; T.slide=T.slide&&typeof T.slide==="object"?T.slide:{};
+  if (!T.slide.overlay||typeof T.slide.overlay!=="object") T.slide.overlay={mode:"default"};
+  const box=h("div",{class:"ov-carousel"});
+  box.append(overlayEditor(T.slide,"overlay",{allowDefault:true,preview:true,defaultLabel:"Same as every image",
+      defaultHint:"Carousel pictures use the global image filter (Global style › Image filter), or a picture's own filter from the Library. Pick a preset to give every carousel its own look."}),
+    fieldsFor(T.slide,[["intensity","number","Filter strength on carousel slides (0 to 1.5, empty follows every image)",{min:0,step:.05,optional:true,placeholder:String(T.overlayIntensity??1)}]],()=>touch({theme:true})));
+  return box;
 }
 function panelStyle(body){
   const D=Store.draft, T=D.theme, M=D.motion;
@@ -600,6 +651,7 @@ function panelStyle(body){
     card("Every carousel and slide",h("p",{class:"adm-intro",style:"margin:0",text:cnt.slides?`${cnt.slides} carousels or slides use their own colours (set under Carousels).`:"All carousels and slides follow these settings."}),
       fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","number","Seconds per slide (any length)",{min:1,step:.5}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]]),
       timingF,
+      h("p",{class:"hint",style:"margin:0",text:"Carousel image filter (the home carousel and any other)"}),carouselFilterFields(),
       h("p",{class:"hint",style:"margin:0",text:"Slide colours"}),
       fieldsFor(T.slide,[["title","color","Title",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>hexOk(T.heading)?T.heading:T.fg}],["text","color","Paragraph and eyebrow",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.fg}],
         ["accent","color","Accent (flow and glow)",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.accent}],["headerText","color","Header text over slides",{optional:true,placeholder:"Header",globalLabel:"Use header",fallback:()=>hexOk(T.header.text)?T.header.text:T.fg}]],()=>touch({theme:true})),
@@ -608,7 +660,7 @@ function panelStyle(body){
 }
 function panelIcons(body){
   const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"Icons can be used in flows, buttons and text items. Paste any SVG code; scripts, links and styles are stripped automatically. Icons draw with the current text colour."}));
+  body.append(h("p",{class:"adm-intro",text:"Icons can be used in flows, buttons and text items. Paste any SVG code; scripts, links and styles are stripped automatically. Icons draw with the current text colour."}),h("div",{class:"imp-links"},importLink("icons","Import icons from a file")));
   const grid=h("div",{class:"lib-grid",style:"grid-template-columns:repeat(auto-fill,minmax(110px,1fr))"}), det=h("div");
   const draw=()=>{ grid.textContent=""; if (!D.icons.some(i=>i.id===Admin.sel.icons)) Admin.sel.icons=D.icons[0]?.id;
     D.icons.forEach(ic=>grid.append(h("button",{class:"icon-tile"+(ic.id===Admin.sel.icons?" on":""),type:"button",onclick:()=>{ Admin.sel.icons=ic.id; draw(); },html:sanitizeSvg(ic.svg)+`<span>${esc(ic.label)}</span>`})));
@@ -633,7 +685,7 @@ function flowItemSchema(it){
 }
 function panelFlows(body){
   const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"A flow is a row of items separated by small marks. Draw it from buttons, plain text, icons or your own SVG, then choose how it animates: as one piece or item by item, with optional settings per item. Any page section or Type 3 modal can use a flow."}));
+  body.append(h("p",{class:"adm-intro",text:"A flow is a row of items separated by small marks. Draw it from buttons, plain text, icons or your own SVG, then choose how it animates: as one piece or item by item, with optional settings per item. Any page section or Type 3 modal can use a flow."}),h("div",{class:"imp-links"},importLink("flows","Import flows from a file")));
   masterDetail(body,{items:()=>D.flows,selKey:"flows",label:f=>f.name||f.id,kind:f=>f.items.length+" items",addLabel:"New flow",
     onAdd:()=>{ const f={id:uid("f"),name:"New flow",separator:"dots3",size:"m",progress:false,anim:{...D.motion.flow},custom:{anim:false,colors:false},colors:{},items:[{id:uid("x"),kind:"button",label:"First",icon:"",svg:"",showIndex:true,detail:"",action:A(),anim:null}]}; D.flows.push(f); return f; },
     detail:(f,redrawList)=>{
@@ -672,7 +724,7 @@ function panelFlows(body){
 }
 function panelModals(body){
   const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"Type 1 shows one image or video with a caption. Type 2 shows a gallery of three. Type 3 adds a flow whose items reveal detail text. Every type has a More button. Open a modal from any flow item, card or button with the action \"Open modal\"."}));
+  body.append(h("p",{class:"adm-intro",text:"Type 1 shows one image or video with a caption. Type 2 shows a gallery of three. Type 3 adds a flow whose items reveal detail text. Every type has a More button. Open a modal from any flow item, card or button with the action \"Open modal\"."}),h("div",{class:"imp-links"},importLink("modals","Import modals from a file")));
   masterDetail(body,{items:()=>D.modals,selKey:"modals",label:m=>m.name||m.title,kind:m=>"Type "+m.type,addLabel:"New modal",
     onAdd:()=>{ const m={id:uid("md"),name:"New modal",type:1,kicker:"",title:"New modal",text:"",media:[D.media[0]?.id||""],caption:[],flowId:"",more:{label:"More",action:A()}}; D.modals.push(m); return m; },
     detail:(m,redrawList)=>{
@@ -691,38 +743,76 @@ function panelModals(body){
     }});
 }
 const secTitle=s=>plain(s.title)||plain(s.eyebrow)||(s.slides&&s.slides[0]&&plain(s.slides[0].title))||(SECTION_TYPES[s.type]||{}).label||"Section";
-/* Import slides from a Markdown file: pick or paste, check the preview, then add or replace. */
-const TEMPLATE_URL=`${import.meta.env.BASE_URL}templates/carousel-slides.md`;
-function importCard(sec,done){
-  const D=Store.draft, known=()=>new Set(libIndex?libIndex.files.map(f=>f.path):[]); // only files already in the Library
-  let parsed=null;
+/* ---------- importing content from Markdown files ----------
+   Every content type has a template in public/templates/. Pick or paste a file, check the preview, then import.
+   The preview runs the import on a copy of the draft, so it shows exactly what will change. */
+const TPL=f=>`${import.meta.env.BASE_URL}templates/${f}`;
+const IMP={ type:"slides" };
+const impType=k=>IMPORTERS.find(t=>t.key===k)||IMPORTERS[0];
+const IMP_GO={ slides:"carousels", pages:"pages", posts:"blog", flows:"flows", modals:"modals", library:"media", colours:"theme", icons:"icons" };
+/** A small button that opens Import with this content type picked. */
+const importLink=(type,label="Import from a file")=>h("button",{class:"btn sm",type:"button",html:IC.upload+esc(label),title:"Import from a Markdown file, with a preview first",onclick:()=>{ IMP.type=type; if (type==="pages"&&Admin.sel.pages) IMP.page=Admin.sel.pages; openPanel("import"); }});
+const knownPaths=()=>libIndex?new Set(libIndex.files.map(f=>f.path)):null; // null: the file list couldn't be read, so every path is accepted
+/** The import box. fixed: {carousel} locks it to one carousel's slides (used under Carousels). */
+function importBox(type,{fixed=null,done=null}={}){
+  const D=Store.draft, t=impType(type), box=h("div",{class:"imp-box"});
   const file=h("input",{type:"file",accept:".md,.markdown,.txt,text/markdown,text/plain",class:"imp-file","aria-label":"Markdown file"});
-  const paste=h("textarea",{rows:8,class:"imp-paste",placeholder:"Or paste the Markdown here","aria-label":"Paste Markdown"});
-  const prev=h("div",{class:"imp-prev"}), mode=h("select",{"aria-label":"How to import",class:"imp-mode"},h("option",{value:"append",text:"Add after the current slides"}),h("option",{value:"replace",text:"Replace all slides"}));
-  const go=h("button",{class:"btn primary sm",type:"button",disabled:true,html:IC.up+"Import slides"});
-  const show=text=>{ parsed=parseSlidesMd(text); prev.textContent=""; const kp=known();
-    parsed.warnings.forEach(w=>prev.append(h("p",{class:"imp-warn",text:w})));
-    parsed.slides.forEach((x,i)=>{ const img=resolveImage(D,x.image,{knownPaths:kp}), probs=[...x.warnings];
-      if (img.missing) probs.push(`Image "${x.image}" isn't in the Library yet, so the default image is used. Add it to the Library and import again, or pick it on the slide later.`);
-      const thumb=h("div",{class:"imp-thumb"}, img.id?mediaThumb(img.id):h("span",{text:img.add?"New":"Default"}));
-      prev.append(h("div",{class:"imp-row"},thumb,h("div",{class:"imp-txt"},
-        h("small",{class:"mono",text:`Slide ${i+1}`+(x.eyebrow?" · "+x.eyebrow:"")+(x.seconds?` · ${x.seconds}s`:"")}),
-        h("b",{text:x.title||"(no title)"}), x.title_ar?h("span",{dir:"rtl",text:x.title_ar}):null,
-        x.subtitle?h("span",{class:"sub",text:x.subtitle}):null,
-        x.flow.length?h("div",{class:"imp-flow"},...x.flow.map(f=>h("span",{class:"chip"+(f.kind==="button"?" b":""),title:f.action.type==="none"?"Plain text":f.action.type+": "+f.action.target,text:plain(f.label)}))):null,
-        ...probs.map(p=>h("span",{class:"imp-warn",text:p})))));
+  const paste=h("textarea",{rows:8,class:"imp-paste",placeholder:"Or paste the Markdown here","aria-label":"Paste Markdown",spellcheck:"false"});
+  const prev=h("div",{class:"imp-prev"}), result=h("div",{class:"imp-result"});
+  const mode=h("select",{"aria-label":"How to import",class:"imp-mode"}); t.modes.forEach(([v,l])=>mode.append(h("option",{value:v,text:l})));
+  const go=h("button",{class:"btn primary sm",type:"button",disabled:true,html:IC.up+"<span>Import</span>"});
+  /* where it goes: a carousel for slides, a page for loose sections */
+  let target=null;
+  if (t.needs==="carousel" && !fixed){ const cars=D.pages.flatMap(p=>(p.sections||[]).filter(s=>s.type==="heroCarousel").map(s=>[s.id,(plain(p.title)||p.id)+" · "+secTitle(s)]));
+    target=h("select",{"aria-label":"Carousel",class:"imp-mode"}); cars.forEach(([v,l])=>target.append(h("option",{value:v,text:"Add to: "+l}))); if (IMP.carousel&&cars.some(c=>c[0]===IMP.carousel)) target.value=IMP.carousel; }
+  if (t.needs==="page"){ target=h("select",{"aria-label":"Page for loose sections",class:"imp-mode"}); D.pages.forEach(p=>target.append(h("option",{value:p.id,text:"Loose sections go to: "+(plain(p.title)||p.id)})));
+    target.value=IMP.page&&D.pages.some(p=>p.id===IMP.page)?IMP.page:(Admin.sel.pages||D.site.homePage); }
+  const opts=()=>({ mode:mode.value, knownPaths:knownPaths(), targetCarousel:fixed?fixed.carousel:(target&&t.needs==="carousel"?target.value:null), targetPage:target&&t.needs==="page"?target.value:null });
+  const run=(cfg,text)=>t.key==="icons"?buildIcons(cfg,text,opts(),sanitizeSvg):t.build(cfg,text,opts());
+  let last=null;
+  const show=()=>{ const text=paste.value; prev.textContent=""; result.textContent="";
+    if (!text.trim()){ go.disabled=true; go.lastChild.textContent="Import"; return; }
+    const copy=clone(D), r=run(copy,text); last=r;
+    r.warnings.forEach(w=>prev.append(h("p",{class:"imp-warn",text:w})));
+    r.records.forEach(x=>{
+      let thumb=null;
+      if (x.swatches) thumb=h("div",{class:"imp-thumb imp-sw"},...x.swatches.slice(0,6).map(c=>h("i",{style:"background:"+c})));
+      else if (x.svg) thumb=h("div",{class:"imp-thumb imp-svg",html:sanitizeSvg(x.svg)});
+      else if (x.image!==undefined){ const n=x.image?mediaNode(copy,x.image,{w:240,hh:180}):null; thumb=h("div",{class:"imp-thumb"},n||h("span",{text:x.image?"New":"None"})); }
+      prev.append(h("div",{class:"imp-row"+(x.sub?" sub":"")+(thumb?"":" no-thumb")},thumb,h("div",{class:"imp-txt"},
+        h("small",{class:"mono",text:x.meta||""}),h("b",{text:x.title}),x.text?h("span",{class:"sub",text:String(x.text).slice(0,220)}):null,
+        x.chips&&x.chips.length?h("div",{class:"imp-flow"},...x.chips.slice(0,12).map(c=>h("span",{class:"chip b",text:String(c)}))):null,
+        ...(x.warnings||[]).map(w=>h("span",{class:"imp-warn",text:w})))));
     });
-    go.disabled=!parsed.slides.length; go.lastChild.textContent=parsed.slides.length?`Import ${parsed.slides.length} slide${parsed.slides.length>1?"s":""}`:"Import slides"; };
-  file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; if (f.size>1e6){ prev.textContent="That file is too large for a slides file."; return; } const t=await f.text(); paste.value=t; show(t); });
-  let tm=0; paste.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(()=>show(paste.value),250); });
-  go.addEventListener("click",()=>{ if (!parsed||!parsed.slides.length) return;
-    const doIt=()=>{ const r=applySlidesImport(D,sec,parsed.slides,{mode:mode.value,knownPaths:known()});
-      toast(`Imported ${r.slides} slide${r.slides>1?"s":""}`+(r.flows?` and ${r.flows} flow${r.flows>1?"s":""}`:"")+"."); done(); };
-    if (mode.value==="replace") confirmInline(go,"Replace all slides in this carousel?",doIt); else doIt(); });
-  return card(h("span",{class:"grow"},"Import slides from Markdown"),
-    h("a",{class:"btn sm",href:TEMPLATE_URL,download:"carousel-slides.md",html:IC.down+"Download template"}),
-    h("p",{class:"adm-intro",style:"margin:0",text:"Write one block per slide in a .md file (image, title, subtitle and flow buttons), then pick the file. You'll see every slide here before anything changes. Each slide's flow becomes a new flow you can edit under Flows."}),
-    h("div",{class:"imp-in"},file,paste),prev,h("div",{class:"imp-go"},mode,go));
+    const ok=r.records.length&&r.summary;
+    go.disabled=!ok; go.lastChild.textContent=ok?"Import: "+r.summary:"Import";
+    if (ok) prev.prepend(h("p",{class:"imp-sum",text:"Preview: "+r.summary+". Nothing changes until you press Import."})); };
+  file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; if (f.size>2e6){ prev.textContent="That file is too large. Split it into smaller files."; return; } paste.value=await f.text(); show(); });
+  let tm=0; paste.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(show,250); });
+  mode.addEventListener("change",show); if (target) target.addEventListener("change",()=>{ if (t.needs==="carousel") IMP.carousel=target.value; else IMP.page=target.value; show(); });
+  go.addEventListener("click",()=>{ if (!last||!last.records.length) return;
+    const doIt=()=>{ const before=new Set(D.pages.map(p=>p.id)), r=run(D,paste.value); touch({theme:t.key==="colours"}); const newPage=D.pages.find(p=>!before.has(p.id));
+      toast("Imported: "+(r.summary||"nothing")+".");
+      if (done) { done(); return; }
+      paste.value=""; file.value=""; prev.textContent=""; go.disabled=true; go.lastChild.textContent="Import";
+      result.textContent=""; result.append(h("p",{class:"imp-sum",text:"Imported: "+r.summary+". It is in the draft; publish when you're happy with it."}),
+        h("button",{class:"btn sm",type:"button",text:"Open "+((PANELS.find(p=>p[0]===IMP_GO[t.key])||[])[1]||"it"),onclick:()=>{ if (t.key==="pages"){ const pg=newPage?newPage.id:opts().targetPage; if (pg) Admin.sel.pages=pg; } openPanel(IMP_GO[t.key]); }})); };
+    if (mode.value==="replace"||(t.key==="pages"&&mode.value==="update")) confirmInline(go,mode.value==="replace"?"Replace all slides in this carousel?":"Replace the sections of pages with the same address?",doIt,"Replace"); else doIt(); });
+  box.append(h("div",{class:"imp-head"},h("p",{class:"adm-intro",style:"margin:0",text:t.about}),h("a",{class:"btn sm",href:TPL(t.file),download:t.file,html:IC.down+"Download template"})),
+    h("div",{class:"imp-in"},file,paste),prev,h("div",{class:"imp-go"},target,mode,go),result);
+  if (!libIndex) syncLibrary(true).then(()=>{ if (paste.value.trim()) show(); });
+  return box;
+}
+function panelImport(body){
+  body.append(h("p",{class:"adm-intro",text:"Write content in a Markdown file, from a template, and bring it in all at once. Download a template, fill it in with any text editor, then pick the file here. You see everything before anything changes, and the import only changes the draft: publish when you're happy."}));
+  const grid=h("div",{class:"tpl-grid"}), slot=h("div");
+  const draw=()=>{ grid.textContent="";
+    IMPORTERS.forEach(t=>grid.append(h("div",{class:"tpl"+(t.key===IMP.type?" on":"")},
+      h("button",{type:"button",class:"tpl-pick","aria-pressed":String(t.key===IMP.type),onclick:()=>{ IMP.type=t.key; draw(); }},h("b",{text:t.label}),h("span",{text:t.about})),
+      h("a",{class:"tpl-dl",href:TPL(t.file),download:t.file,title:"Download "+t.file,"aria-label":"Download the "+t.label+" template",html:IC.down+"<span>"+esc(t.file)+"</span>"}))));
+    slot.textContent=""; slot.append(card(h("span",{class:"grow"},"Import "+impType(IMP.type).label.toLowerCase()),importBox(IMP.type))); };
+  body.append(card("Templates",h("p",{class:"adm-intro",style:"margin:0",text:"Pick what to import, or download its template. Each template explains every line and shows a filled-in example; keep the notes at the top, they are skipped."}),grid),slot);
+  draw();
 }
 /* Carousels: every hero carousel on every page, with its slides, in one place. */
 function panelCarousels(body){
@@ -730,6 +820,7 @@ function panelCarousels(body){
   const all=()=>D.pages.flatMap(p=>p.sections.filter(s=>s.type==="heroCarousel").map(s=>({id:s.id,s,p})));
   body.append(h("p",{class:"adm-intro",text:"Settings for every carousel, then each carousel and its slides. A slide can stay up as long as you like, like a page: set its seconds on screen to any number, or turn on \"Stay on this slide\"."}),
     goStyle("Transition, seconds per slide, zoom, the default slide timing and slide colours for every carousel are in Global style. Each carousel and slide below can follow them or use its own."));
+  body.append(card(h("span",{class:"grow"},"Image filter for every carousel"),h("p",{class:"adm-intro",style:"margin:0",text:"A colour or gradient over the pictures of the home carousel and any other carousel. To give one slide its own filter, open the slide below, set \"This slide's colours and filter\" to Custom and pick a preset."}),carouselFilterFields()));
   if (!all().length){ body.append(h("p",{class:"adm-intro",text:"No carousels yet. Add a Hero carousel section to a page under Pages."})); return; }
   // Timing boxes show the global slide timing in grey, so an empty box says what it will use.
   const G=M.slideTiming||{}, withGlobal=f=>f[1]!=="timing"?f:[f[0],f[1],f[2],{...f[3],parts:f[3].parts.map(([k,d])=>[k,k==="duration"?(+M.slideDuration||7):(G[k]??d)])}];
@@ -741,14 +832,14 @@ function panelCarousels(body){
         card(h("span",{class:"grow"},"Carousel on "+(plain(p.title)||p.id)),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:()=>{ Admin.sel.pages=p.id; Site.preview=true; if (location.hash.slice(1)===p.id) route(); else location.hash=p.id; }}),
           F(s,"hidden","toggle","Hide this carousel from visitors",{},()=>redraw()),fieldsFor(s,setF,()=>redraw())),
         card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw())),
-        importCard(s,()=>{ touch(); openPanel("carousels"); })
+        card(h("span",{class:"grow"},"Import slides from Markdown"),importBox("slides",{fixed:{carousel:s.id},done:()=>openPanel("carousels")}))
       ];
     }});
 }
 function panelPages(body){
   const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"Each page is a stack of sections. Pick a layout, add sections and drag them into order. Preview draft shows the page you have selected."}));
-  masterDetail(body,{items:()=>D.pages,selKey:"pages",label:p=>p.title||p.id,kind:p=>p.id===D.site.homePage?"Home":(OPT.layouts.find(l=>l[0]===p.layout)||[])[1],addLabel:"New page",
+  body.append(h("p",{class:"adm-intro",text:"Each page is a stack of sections. Pick a layout, add sections and drag them into order. Preview draft shows the page you have selected."}),h("div",{class:"imp-links"},importLink("pages","Import pages and sections from a file")));
+  masterDetail(body,{items:()=>D.pages,selKey:"pages",label:p=>plain(p.title)||p.id,kind:p=>{ const hid=(p.sections||[]).filter(s=>s.hidden).length; return (p.id===D.site.homePage?"Home":(OPT.layouts.find(l=>l[0]===p.layout)||[])[1])+(hid?" · "+hid+" hidden":""); },addLabel:"New page",
     onAdd:()=>{ let n=1; while (D.pages.some(p=>p.id==="page-"+n)) n++; const p={id:"page-"+n,title:"New page",nav:true,layout:"cinematic",sections:[{id:uid("s"),type:"hero",...SECTION_BLANK.hero()}]}; D.pages.push(p); return p; },
     detail:(p,redrawList)=>{
       const slug=h("input",{type:"text",value:p.id,id:uid("f")}), slugHint=h("span",{class:"hint",text:"Used in the address after #. Lowercase letters, numbers and hyphens."});
@@ -758,14 +849,18 @@ function panelPages(body){
         Admin.sel.pages=v; slugHint.style.color=""; slugHint.textContent="Address updated."; touch(); redrawList(); });
       const meta=fieldsFor(p,[["title","text","Title"],["layout","select","Layout",{options:OPT.layouts}],["nav","toggle","Show in menu"]],()=>redrawList());
       meta.prepend(h("div",{class:"field"},h("label",{for:slug.id,text:"Address"}),slug,slugHint));
-      const secs=h("div",{class:"sub-list"});
-      const drawSecs=()=>{ secs.textContent="";
+      const secs=h("div",{class:"sub-list"}), visBar=h("div",{class:"vis-bar",role:"status"});
+      const drawVis=()=>{ visBar.textContent=""; redrawList(); const hid=p.sections.filter(s=>s.hidden).length, all=p.sections.length;
+        visBar.append(...[h("span",{class:"vis-count"},h("b",{text:String(all-hid)})," shown",hid?h("span",{class:"warn"}," · ",h("b",{text:String(hid)})," hidden"):" · none hidden"),
+          hid?h("button",{class:"btn sm",type:"button",html:IC.eye+"Show all",onclick:()=>{ p.sections.forEach(s=>{ s.hidden=false; }); drawSecs(); touch(); toast("Every section on this page is shown."); }}):null,
+          h("span",{class:"hint",text:"Tap Shown or Hidden on a section to switch it. Hidden sections stay here and are not shown to visitors."})].filter(Boolean)); };
+      const drawSecs=()=>{ secs.textContent=""; drawVis();
         p.sections.forEach((s,i)=>{ const T=SECTION_TYPES[s.type]; if (!T) return;
           secs.append(subCard(s,{title:()=>secTitle(s),kind:T.label,open:false,
             body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
                 h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):fieldsFor(s,T.fields),
             onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); },
-            onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); },
+            onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
             onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; p.sections.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
         const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
         secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ p.sections.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
@@ -775,7 +870,7 @@ function panelPages(body){
       return [
         card(h("span",{class:"grow"},"Page"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:previewDraft}),meta),
         card("Header on this page",globalOrCustom(p,"header",{what:"global header colours",flag:"custom",body:()=>[headerFields(p.header,{optional:true})]})),
-        card("Sections · drag to reorder, hide or duplicate",secs),
+        card(h("span",{class:"grow"},"Sections · drag to reorder, hide or duplicate"),importLink("pages","Import sections"),visBar,secs),
         p.id===D.site.homePage?h("p",{class:"adm-intro",text:"This is the home page, so it can't be deleted. Pick another home page under Site and titles first."}):
           h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete page",onclick:e=>confirmInline(e.currentTarget,"Delete this page?",()=>{ D.pages.splice(D.pages.indexOf(p),1); touch(); openPanel("pages"); })}))
       ];
@@ -831,7 +926,7 @@ function panelMedia(body){
     h("button",{class:"btn primary",type:"button",html:IC.up+"Check GitHub for new files",onclick:async()=>{ await syncLibrary(false); touch(); draw(); }}),
     assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub",onclick:()=>up.click()}):null,
     h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const m={id:uid("m"),label:"New article",kind:"article",category:LIB.cat||"articles",tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
-    h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:LIB.cat||"backgrounds",tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up);
+    importLink("library","Import names and tags from a file"),h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:LIB.cat||"backgrounds",tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up);
   const kinds=h("div",{class:"lib-kinds",role:"group","aria-label":"Type"});
   const search=h("input",{type:"search",placeholder:"Search titles, tags, files","aria-label":"Search the library",value:LIB.q});
   search.addEventListener("input",()=>{ LIB.q=search.value; drawGrid(); });
@@ -901,7 +996,7 @@ const todayIso=()=>new Date().toISOString().slice(0,10);
 function panelBlog(body){
   const D=Store.draft;
   const onPage=D.pages.find(p=>p.sections.some(s=>s.type==="blog"));
-  body.append(h("p",{class:"adm-intro",text:"Write posts here. Published posts appear on every page that has a Blog posts section"+(onPage?" (now: "+plain(onPage.title)+")":"; add one under Pages")+", newest first, each at its own address. Drafts are only visible in Preview draft."}));
+  body.append(h("p",{class:"adm-intro",text:"Write posts here. Published posts appear on every page that has a Blog posts section"+(onPage?" (now: "+plain(onPage.title)+")":"; add one under Pages")+", newest first, each at its own address. Drafts are only visible in Preview draft."}),h("div",{class:"imp-links"},importLink("posts","Import posts from a file")));
   const sorted=()=>D.posts.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   masterDetail(body,{items:sorted,selKey:"blog",label:p=>p.title||"Untitled",kind:p=>(p.published?"":"Draft · ")+(fmtDate(p.date)||"No date"),addLabel:"New post",
     onAdd:()=>{ let n=1; while (D.posts.some(p=>p.slug==="new-post-"+n)) n++; const p={id:uid("p"),slug:"new-post-"+n,title:"New post",date:todayIso(),category:"",tags:[],author:D.site.brand||"",cover:"",excerpt:"",body:"",published:false}; D.posts.push(p); return p; },
@@ -919,13 +1014,13 @@ function panelBlog(body){
     }});
 }
 /* Large text editor with a formatting guide and an "insert from library" helper. */
-function proseField(obj,key,id,set){
+function proseField(obj,key,id,set,label="Text"){
   const t=h("textarea",{id,class:"prose-edit",rows:16}); t.value=obj[key]??"";
   t.addEventListener("input",()=>set(t.value));
   const pick=h("select",{"aria-label":"Insert from library"}); pick.append(h("option",{value:"",text:"Insert image or video from the library…"}));
   libFilter(Store.draft.media,{kinds:["image","video","scene"]}).forEach(m=>pick.append(h("option",{value:m.id,text:(categoryLabel(Store.draft,m.category)?categoryLabel(Store.draft,m.category)+" · ":"")+m.label})));
   pick.addEventListener("change",()=>{ if (!pick.value) return; const ins="\n\n[["+pick.value+"|]]\n\n", a=t.selectionStart??t.value.length; t.value=t.value.slice(0,a)+ins+t.value.slice(a); pick.value=""; set(t.value); t.focus(); });
-  return h("div",{class:"prose-wrap"},t,h("div",{class:"prose-tools"},pick,h("span",{class:"hint",text:"Empty line = new paragraph · ## Heading · - list item · > quote · **bold** · *italic* · [text](https://…)"})));
+  return h("div",{class:"prose-wrap"},expandable(t,label),h("div",{class:"prose-tools"},pick,h("span",{class:"hint",text:"Empty line = new paragraph · ## Heading · - list item · > quote · **bold** · *italic* · [text](https://…)"})));
 }
 
 export { overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
