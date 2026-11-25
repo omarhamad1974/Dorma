@@ -77,7 +77,7 @@ function buildSection(cfg,sec,page){
 }
 const SECTIONS={
   heroCarousel(cfg,sec){
-    const slides=(sec.slides||[]).filter(Boolean); if (!slides.length) return null;
+    const slides=(sec.slides||[]).filter(s=>s&&!s.hidden); if (!slides.length) return null; // hidden slides are skipped
     const M=cfg.motion, root=h("section",{class:"hc","aria-roledescription":"carousel","aria-label":ui("Featured")});
     const stage=h("div",{class:"stage"}), wipe=h("div",{class:"wipe"});
     root.append(stage,wipe,h("div",{class:"shade-hero"}));

@@ -679,3 +679,97 @@ a.btn{text-decoration:none}
 .style-row input[type=text],.style-save input[type=text],.cpanel input[type=text]{color-scheme:inherit;padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font-size:.88rem}
 .style-row input[type=text]:focus,.style-save input[type=text]:focus,.cpanel input[type=text]:focus{outline:none;border-color:var(--accent)}
 .goc > .hint{font-size:.8rem;color:var(--muted);line-height:1.5}
+
+/* ================= studio usability: text boxes, sliders, show/hide, import ================= */
+/* text boxes: expand to full screen */
+.ta-box{position:relative;display:flex;flex-direction:column;min-width:0}
+.ta-box textarea{padding-right:34px}
+.ta-max{position:absolute;right:5px;top:5px;width:26px;height:26px;display:grid;place-items:center;border-radius:6px;border:1px solid var(--faint);background:var(--field-bg);color:var(--muted);cursor:pointer;opacity:.75}
+.ta-max:hover,.ta-max:focus-visible{opacity:1;color:var(--fg);border-color:var(--accent)}
+.ta-max svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ta-head{display:none}
+.ta-box.is-max{position:fixed;inset:0;z-index:300;height:100vh;height:100dvh;padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));gap:10px;background:var(--ink)}
+.ta-box.is-max .ta-head{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.ta-box.is-max .ta-title{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-box.is-max textarea{flex:1;min-height:0;max-height:none;resize:none;font-size:1rem;line-height:1.65;padding:14px 16px;width:100%;max-width:860px;align-self:center}
+.ta-box.is-max .ta-max{display:none}
+html.ta-lock,html.ta-lock body{overflow:hidden}
+.prose-wrap .ta-box textarea{width:100%}
+
+/* sliders: − and + for fine steps, shown on touch screens once a slider is tapped */
+.rg-step,.rg-tap{display:none}
+.rg-step{flex:none;width:30px;height:30px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font-size:1rem;line-height:1;cursor:pointer;place-items:center;padding:0}
+@media (pointer:coarse){
+  .range-row{position:relative;border-radius:8px;padding:2px 4px;transition:background .2s,box-shadow .2s}
+  .range-row:not(.on){cursor:pointer}
+  .range-row:not(.on) input[type=range]{pointer-events:none;opacity:.5}
+  .range-row:not(.on) .rg-tap{display:inline;font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .range-row.on{background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent)}
+  .range-row.on .rg-step{display:grid}
+  .range-row.on output{color:var(--fg)}
+}
+
+/* show / hide: a labelled switch on every section and slide */
+.vis-pill{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 9px 4px 7px;border-radius:100px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent);color:var(--ok);font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.vis-pill svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7}
+.vis-pill[aria-pressed="true"]{border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.vis-pill:hover{filter:brightness(1.15)}
+.sub-item.is-hidden{border-style:dashed}
+.vis-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.82rem}
+.vis-bar .vis-count b{font-family:var(--mono)}
+.vis-bar .warn{color:var(--warn)}
+.vis-bar .hint{flex-basis:100%;font-size:.74rem;color:var(--muted)}
+
+/* import: templates and the import box */
+.imp-links{display:flex;gap:8px;flex-wrap:wrap}
+.imp-box{display:flex;flex-direction:column;gap:12px}
+.imp-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.imp-head .adm-intro{flex:1;min-width:220px}
+.imp-sum{margin:0;font-size:.84rem;color:var(--fg)}
+.imp-result{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.imp-row.no-thumb{grid-template-columns:minmax(0,1fr)}
+.imp-row.sub{margin-left:22px}
+.imp-sw{display:flex;padding:0;gap:0}
+.imp-sw i{flex:1;height:100%}
+.imp-svg svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.5;color:var(--fg)}
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
+.tpl{display:flex;flex-direction:column;border:1px solid var(--faint);border-radius:9px;background:var(--glass);overflow:hidden}
+.tpl.on{border-color:var(--accent);background:var(--accent-soft)}
+.tpl-pick{flex:1;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:0;background:none;color:var(--fg);text-align:left;cursor:pointer;font-size:.84rem}
+.tpl-pick span{color:var(--muted);font-size:.74rem;line-height:1.4}
+.tpl-dl{display:flex;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--faint);color:var(--muted);font-family:var(--mono);font-size:.64rem;text-decoration:none}
+.tpl-dl:hover{color:var(--fg)}
+.tpl-dl svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6}
+
+/* compact studio controls on phones */
+@media (max-width:640px){
+  .adm-body{padding:10px;gap:10px}
+  .card-a{padding:11px 10px;gap:9px;border-radius:9px}
+  .card-a h2{font-size:.92rem}
+  .fields{grid-template-columns:1fr 1fr;gap:8px 10px}
+  .fields>.field.wide,.fields>.field.bi,.fields>.field:has(.range-row),.fields>.field:has(.color-row),.fields>.field:has(textarea),.fields>.field:has(.media-pick-wrap),.fields>.field:has(.icon-pick){grid-column:1/-1}
+  .field{gap:3px}
+  .field > label,.lbl-a{font-size:.56rem;letter-spacing:.1em}
+  .field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{padding:6px 8px;font-size:16px}
+  .field textarea{min-height:64px}
+  .field .hint{font-size:.68rem}
+  .range-row{gap:6px}
+  .range-row output{min-width:30px;font-size:.66rem}
+  .toggle{font-size:.8rem;gap:8px}
+  .color-row{gap:5px;flex-wrap:wrap}
+  .color-row input[type=color]{width:34px;height:30px}
+  .timing-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .timing-cell{font-size:.54rem;gap:3px}
+  .sub-head{padding:6px 8px;gap:7px}
+  .sub-head .t{font-size:.8rem}
+  .sub-head .k{display:none}
+  .sub-body{padding:2px 8px 8px}
+  .adm-intro{font-size:.82rem;line-height:1.5}
+  .btn{padding:8px 12px;font-size:.8rem}
+  .btn.sm{padding:5px 9px;font-size:.74rem}
+  .adm-top{padding:8px 10px;gap:8px}
+  .adm-subtabs{padding:6px 10px}
+  .adm-subtabs button{padding:6px 10px;font-size:.8rem}
+  .imp-row{grid-template-columns:64px minmax(0,1fr);gap:8px;padding:8px}
+  .imp-thumb{width:64px;height:44px}
+}
