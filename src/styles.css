@@ -376,7 +376,10 @@ figure{margin:0;min-width:0}
 .sub-body{padding:4px 12px 14px;border-top:1px solid var(--faint)}
 .sub-item.closed .sub-body{display:none}
 .sortable-ghost{opacity:.35}
-.media-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.media-pick-scroll{max-height:min(46vh,340px);overflow:auto;padding:2px;overscroll-behavior:contain}
+.media-pick{--pick:56px;display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--pick),1fr));gap:6px}
+.media-pick[data-size=s] button span{display:none}
+.media-pick-empty{grid-column:1/-1;margin:6px 0;font-size:.8rem;color:var(--muted)}
 .media-pick button{position:relative;aspect-ratio:4/3;border-radius:6px;border:1px solid var(--faint);overflow:hidden;cursor:pointer;padding:0;background:#0a0b12}
 .media-pick button.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-line)}
 .media-pick button > *{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -474,7 +477,13 @@ figure{margin:0;min-width:0}
 .gh-row .btn{text-decoration:none}
 @media (max-width:640px){.gh-row{grid-template-columns:1fr auto}.gh-row code{grid-column:1/-1;grid-row:2}}
 .media-pick-wrap{display:flex;flex-direction:column;gap:10px;min-width:0}
-.media-pick-filters{display:flex;gap:8px;flex-wrap:wrap}
+.media-pick-wrap{display:flex;flex-direction:column;gap:8px}
+.media-pick-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.media-pick-filters select{flex:1 1 140px;min-width:0}
+.media-pick-size{display:flex;border:1px solid var(--faint);border-radius:7px;overflow:hidden}
+.media-pick-size button{border:0;background:none;color:var(--muted);font-family:var(--mono);font-size:.68rem;padding:7px 9px;cursor:pointer}
+.media-pick-size button.on{background:var(--accent-line);color:var(--fg)}
+.media-pick-count{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
 .media-pick-filters input{flex:1;min-width:120px}
 .prose-wrap{display:flex;flex-direction:column;gap:8px}
 .prose-edit{min-height:320px;line-height:1.6}
