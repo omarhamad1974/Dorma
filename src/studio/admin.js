@@ -26,9 +26,19 @@ const IC={
   carousels:'<svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="14" rx="2"/><path d="M3 8v8M21 8v8"/></svg>',
   copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
   eyeOff:'<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>',
+  sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
 const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
+/* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
+const GROUPS=[["content","Content","pages",["pages","carousels","blog"]],["design","Design","theme",["theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
+const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
+const lastSub={};
+/* Studio light or dark mode: a per-person preference kept in this browser. */
+const studioMode=()=>{ try { return localStorage.getItem("dorma.studioMode")==="light"?"light":"dark"; } catch { return "dark"; } };
+function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } catch { /* storage blocked */ }
+  const a=$(".adm"); if (a) a.classList.toggle("light",m==="light"); document.documentElement.style.colorScheme=m; const b=$("#admMode"); if (b) b.innerHTML=(m==="light"?IC.moon+"Dark mode":IC.sun+"Light mode"); }
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 
@@ -48,15 +58,18 @@ async function renderAdmin(){
   applyTheme(Store.draft); document.title="Studio · "+(plain(Store.draft.site.brand)||"Site");
   const side=h("nav",{class:"adm-side","aria-label":"Studio sections"},h("a",{class:"brand",href:"#"+Store.draft.site.homePage},h("span",{class:"mark"}),"Studio"));
   const mnav=h("div",{class:"adm-mobile-nav"});
-  PANELS.forEach(([k,l])=>{
-    side.append(h("button",{type:"button","data-p":k,class:Admin.panel===k?"on":"",html:IC[k]+esc(l),onclick:()=>openPanel(k)}));
-    mnav.append(h("button",{type:"button","data-p":k,class:Admin.panel===k?"on":"",text:l,onclick:()=>openPanel(k)}));
+  GROUPS.forEach(([g,l,icon,subs])=>{
+    const go=()=>openPanel(lastSub[g]||subs[0]);
+    side.append(h("button",{type:"button","data-g":g,html:IC[icon]+esc(l),onclick:go}));
+    mnav.append(h("button",{type:"button","data-g":g,text:l,onclick:go}));
   });
   side.append(h("div",{class:"grow"}),h("p",{class:"mono",style:"padding:0 10px;line-height:1.6;overflow-wrap:anywhere",html:Store.mode==="db"?"Signed in as<br>"+esc(signedInEmail()):"Saved in this<br>browser only"}),
+    h("button",{type:"button",id:"admMode",onclick:()=>setStudioMode(studioMode()==="light"?"dark":"light")}),
     Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):"");
   const top=h("div",{class:"adm-top",id:"admTop"});
-  const body=h("div",{class:"adm-body",id:"admBody"});
-  app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},top,mnav,body)));
+  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub",role:"tablist"});
+  app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},h("div",{class:"adm-head"},top,mnav,sub),body)));
+  setStudioMode(studioMode());
   Store.listeners=[updateTop];
   openPanel(Admin.panel);
 }
@@ -65,7 +78,7 @@ function updateTop(){
   const st=Store.status, label={saved:"Draft saved",pending:"Unsaved changes",saving:"Saving…",error:Store.statusMsg||"Couldn't save",published:"Published"}[st]||"Draft saved";
   const diff=draftDiffers();
   top.textContent="";
-  top.append(h("h1",{text:(PANELS.find(p=>p[0]===Admin.panel)||[])[1]||"Studio"}),
+  top.append(h("h1",{},h("span",{class:"crumb",text:groupOf(Admin.panel)[1]}),(PANELS.find(p=>p[0]===Admin.panel)||[])[1]||"Studio"),
     h("span",{class:"status "+(st==="saving"||st==="pending"?"saving":st==="error"?"err":Store.mode==="local"?"local":""),role:"status"},h("i"),label),
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
@@ -77,9 +90,12 @@ function previewDraft(){
   if (location.hash.slice(1)===target) route(); else location.hash=target;
 }
 function openPanel(k){
-  Admin.panel=k; Admin.refresh=null;
-  $$(".adm-side button[data-p],.adm-mobile-nav button[data-p]").forEach(b=>b.classList.toggle("on",b.dataset.p===k));
-  const body=$("#admBody"); if (!body) return; body.textContent=""; disposePage();
+  if (!PANELS.some(p=>p[0]===k)) k="pages";
+  Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
+  $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
+  const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
+    G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
+  const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
   updateTop(); scrollTo(0,0);
 }
@@ -177,7 +193,7 @@ function actionEditor(a,onChange){
   type.addEventListener("change",()=>{ a.type=type.value; a.target=""; drawTarget(); onChange(); });
   $$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25)");
   row.append(type,tgt); drawTarget();
-  setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg)"));
+  setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"));
   return row;
 }
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
@@ -272,7 +288,7 @@ function panelSite(body){
       h("button",{class:"btn",type:"button",text:"Replace draft with pasted settings",onclick:()=>{ try { const c=JSON.parse(area.value); Store.draft=normalize(c); touch({theme:true}); toast("Draft replaced"); openPanel("site"); } catch(e){ toast("That text isn't a valid settings backup."); } }}),
       h("button",{class:"btn",type:"button",text:"Discard draft changes",onclick:e=>confirmInline(e.currentTarget.parentNode,"Go back to the live version?",()=>{ Store.draft=clone(Store.live); touch({theme:true}); openPanel("site"); })}),
       h("button",{class:"btn danger",type:"button",text:"Reset to starter template",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with the starter template?",()=>{ Store.draft=clone(STARTER); touch({theme:true}); openPanel("site"); })})),
-    (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);font-family:var(--mono);font-size:.74rem"}))));
+    (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);font-family:var(--mono);font-size:.74rem"}))));
   var area;
   if (Store.mode==="db") body.append(versionsCard());
 }
@@ -526,7 +542,7 @@ function panelPages(body){
             onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); },
             onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); },
             onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; p.sections.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
-        const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
+        const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
         secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ p.sections.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
         sortable(secs,p.sections,()=>{ drawSecs(); touch(); });
       };

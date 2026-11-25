@@ -52,6 +52,10 @@ The key in `src/config.ts` is the public "publishable" key, which is safe in the
 | `src/studio/scenes.js` | Generated placeholder images used until real photos are uploaded. |
 | `scripts/library-index.mjs` | Lists the files in `public/library/` for the studio (runs before dev and build). |
 
+## Studio layout
+
+The studio has four main tabs, each with sub-tabs: **Content** (Pages, Carousels, Blog), **Design** (Colours and type, Animation, Site and titles), **Flows and modals** (Flows, Modals, Icons) and **Library**. The button at the bottom of the sidebar switches the studio between light and dark mode. This only changes the studio, is remembered in that browser, and previews keep the site's own colours. Under Colours and type, **My colours** holds named swatches that appear next to every colour picker, and you can save the current colours as a palette.
+
 ## Media library
 
 The studio's **Library** holds every image, video, background and article, sorted into categories
