@@ -278,7 +278,7 @@ const OPT = {
 const ACTION_FIELDS = [["action","action","Action"]];
 const SECTION_TYPES = {
   heroCarousel: { label:"Hero carousel", fields:[
-    ["flowId","flow","Default flow (for slides without their own)"],
+    ["flowId","flow","Default flow (for slides without their own)"],["defaultMedia","media","Default image (for slides without their own)",{wide:true}],
     ["autoplay","toggle","Move to next slide automatically",{hint:"Off: each slide stays until the visitor uses the arrows, dots or swipe."}],
     ["hud","toggle","Show counter and timecode"],
     ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. By default the title comes first, the short paragraph 0.5s later, then the flow buttons 1s after that, one by one (Gap between flow items). Each slide can override these below."}],

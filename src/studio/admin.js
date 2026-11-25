@@ -3,6 +3,7 @@ import { LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTh
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
+import { parseSlidesMd, applySlidesImport, resolveImage } from './mdslides';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
@@ -28,6 +29,7 @@ const IC={
   eyeOff:'<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>',
   sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+  down:'<svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
 const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
@@ -502,6 +504,39 @@ function panelModals(body){
     }});
 }
 const secTitle=s=>plain(s.title)||plain(s.eyebrow)||(s.slides&&s.slides[0]&&plain(s.slides[0].title))||(SECTION_TYPES[s.type]||{}).label||"Section";
+/* Import slides from a Markdown file: pick or paste, check the preview, then add or replace. */
+const TEMPLATE_URL=`${import.meta.env.BASE_URL}templates/carousel-slides.md`;
+function importCard(sec,done){
+  const D=Store.draft, known=()=>new Set(libIndex?libIndex.files.map(f=>f.path):[]); // only files already in the Library
+  let parsed=null;
+  const file=h("input",{type:"file",accept:".md,.markdown,.txt,text/markdown,text/plain",class:"imp-file","aria-label":"Markdown file"});
+  const paste=h("textarea",{rows:8,class:"imp-paste",placeholder:"Or paste the Markdown here","aria-label":"Paste Markdown"});
+  const prev=h("div",{class:"imp-prev"}), mode=h("select",{"aria-label":"How to import",class:"imp-mode"},h("option",{value:"append",text:"Add after the current slides"}),h("option",{value:"replace",text:"Replace all slides"}));
+  const go=h("button",{class:"btn primary sm",type:"button",disabled:true,html:IC.up+"Import slides"});
+  const show=text=>{ parsed=parseSlidesMd(text); prev.textContent=""; const kp=known();
+    parsed.warnings.forEach(w=>prev.append(h("p",{class:"imp-warn",text:w})));
+    parsed.slides.forEach((x,i)=>{ const img=resolveImage(D,x.image,{knownPaths:kp}), probs=[...x.warnings];
+      if (img.missing) probs.push(`Image "${x.image}" isn't in the Library yet, so the default image is used. Add it to the Library and import again, or pick it on the slide later.`);
+      const thumb=h("div",{class:"imp-thumb"}, img.id?mediaThumb(img.id):h("span",{text:img.add?"New":"Default"}));
+      prev.append(h("div",{class:"imp-row"},thumb,h("div",{class:"imp-txt"},
+        h("small",{class:"mono",text:`Slide ${i+1}`+(x.eyebrow?" · "+x.eyebrow:"")+(x.seconds?` · ${x.seconds}s`:"")}),
+        h("b",{text:x.title||"(no title)"}), x.title_ar?h("span",{dir:"rtl",text:x.title_ar}):null,
+        x.subtitle?h("span",{class:"sub",text:x.subtitle}):null,
+        x.flow.length?h("div",{class:"imp-flow"},...x.flow.map(f=>h("span",{class:"chip"+(f.kind==="button"?" b":""),title:f.action.type==="none"?"Plain text":f.action.type+": "+f.action.target,text:plain(f.label)}))):null,
+        ...probs.map(p=>h("span",{class:"imp-warn",text:p})))));
+    });
+    go.disabled=!parsed.slides.length; go.lastChild.textContent=parsed.slides.length?`Import ${parsed.slides.length} slide${parsed.slides.length>1?"s":""}`:"Import slides"; };
+  file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; if (f.size>1e6){ prev.textContent="That file is too large for a slides file."; return; } const t=await f.text(); paste.value=t; show(t); });
+  let tm=0; paste.addEventListener("input",()=>{ clearTimeout(tm); tm=setTimeout(()=>show(paste.value),250); });
+  go.addEventListener("click",()=>{ if (!parsed||!parsed.slides.length) return;
+    const doIt=()=>{ const r=applySlidesImport(D,sec,parsed.slides,{mode:mode.value,knownPaths:known()});
+      toast(`Imported ${r.slides} slide${r.slides>1?"s":""}`+(r.flows?` and ${r.flows} flow${r.flows>1?"s":""}`:"")+"."); done(); };
+    if (mode.value==="replace") confirmInline(go,"Replace all slides in this carousel?",doIt); else doIt(); });
+  return card(h("span",{class:"grow"},"Import slides from Markdown"),
+    h("a",{class:"btn sm",href:TEMPLATE_URL,download:"carousel-slides.md",html:IC.down+"Download template"}),
+    h("p",{class:"adm-intro",style:"margin:0",text:"Write one block per slide in a .md file (image, title, subtitle and flow buttons), then pick the file. You'll see every slide here before anything changes. Each slide's flow becomes a new flow you can edit under Flows."}),
+    h("div",{class:"imp-in"},file,paste),prev,h("div",{class:"imp-go"},mode,go));
+}
 /* Carousels: every hero carousel on every page, with its slides, in one place. */
 function panelCarousels(body){
   const D=Store.draft, M=D.motion;
@@ -516,7 +551,8 @@ function panelCarousels(body){
       return [
         card(h("span",{class:"grow"},"Carousel on "+(plain(p.title)||p.id)),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:()=>{ Admin.sel.pages=p.id; Site.preview=true; if (location.hash.slice(1)===p.id) route(); else location.hash=p.id; }}),
           F(s,"hidden","toggle","Hide this carousel from visitors",{},()=>redraw()),fieldsFor(s,setF,()=>redraw())),
-        card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw()))
+        card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw())),
+        importCard(s,()=>{ touch(); openPanel("carousels"); })
       ];
     }});
 }
