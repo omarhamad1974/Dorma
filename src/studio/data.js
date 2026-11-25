@@ -276,10 +276,11 @@ const ACTION_FIELDS = [["action","action","Action"]];
 const SECTION_TYPES = {
   heroCarousel: { label:"Hero carousel", fields:[
     ["flowId","flow","Default flow (for slides without their own)"],
+    ["autoplay","toggle","Move to next slide automatically",{hint:"Off: each slide stays until the visitor uses the arrows, dots or swipe."}],
     ["hud","toggle","Show counter and timecode"],
     ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. By default the title comes first, the short paragraph 0.5s later, then the flow buttons 1s after that, one by one (Gap between flow items). Each slide can override these below."}],
     ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
-    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen, and when each piece starts. Empty follows the section timing and Animation → Seconds per slide."}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
+    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on"],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing and Seconds per slide."}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
   hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
   chapters: { label:"Chapters", fields:[["items","list","Chapters",{ title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
@@ -296,7 +297,7 @@ const SECTION_TYPES = {
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
 const SECTION_BLANK = {
-  heroCarousel:()=>({flowId:"",hud:true,timing:{},replayFlow:false,slides:[{eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}]}),
+  heroCarousel:()=>({flowId:"",autoplay:true,hud:true,timing:{},replayFlow:false,slides:[{eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}]}),
   hero:()=>({num:"",eyebrow:"Eyebrow",title:"New hero",lede:"",media:"m-nebula",height:"tall",flowId:""}),
   chapters:()=>({items:[]}), stats:()=>({num:"",eyebrow:"",style:"band",items:[]}),
   about:()=>({num:"",eyebrow:"About",text:"A short statement.",media:"",link:{label:"",action:A()}}),

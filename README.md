@@ -92,6 +92,8 @@ The same card has **Show numbering**, which is off by default. It controls the 0
 
 ## Hero carousel slides
 
+Carousels have their own **Carousels** tab in the studio: settings for all carousels (transition, seconds per slide, zoom), then each carousel and its slides. Seconds on screen has no upper limit, a slide can be set to **Stay on this slide until the visitor moves on**, and a carousel can turn off **Move to next slide automatically**. Slides and sections can be duplicated, and any section can be hidden from visitors with the eye button under Pages.
+
 Each slide has its own **flow**: the buttons under its text, which open modals, pages or links. A slide without one uses the section's default flow. Flows never move the slides. Visitors change slides with the arrows, the dots, swiping or the keyboard, and slides also advance on their own after their seconds on screen. Buttons have a soft pulsing glow instead of a progress line. Set its strength, or turn it off, under Animation → Button glow.
 
 ## Timing (storytelling)
