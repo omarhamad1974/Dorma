@@ -28,13 +28,23 @@ const STARTER = {
     /* "My colours": named swatches offered in every colour picker, and palettes saved from the studio. */
     swatches: [ { name: "Dorma blue", hex: "#0072bc" }, { name: "Dorma yellow", hex: "#ffcb08" }, { name: "Dorma magenta", hex: "#ed0677" } ],
     myPalettes: [],
-    imageOverlay: { mode: "none", c1: "#0072bc", a1: 0.55, c2: "#ffcb08", a2: 0.35, angle: 135, blend: "normal" }
+    imageOverlay: { mode: "none", c1: "#0072bc", a1: 0.55, c2: "#ffcb08", a2: 0.35, angle: 135, blend: "normal" },
+    /* Global style (Design → Global style). An empty colour ("") follows the site colours above. */
+    heading: "",                  // headings and titles; empty = Text colour
+    overlayIntensity: 1,          // multiplies every colour overlay on images (0 = off)
+    header: { bg: "#040915", bgAlpha: 0, text: "", link: "", accent: "" },
+    flow: { text: "", accent: "", sep: "" },        // every flow unless the flow has its own colours
+    slide: { title: "", text: "", accent: "", headerText: "" } // every carousel slide unless the carousel or slide has its own
   },
   motion: {
     speed: 1, ease: "expo",
     kenBurns: true, kbZoom: 1.18, kbDuration: 10,
     slideDuration: 7, buttonGlow: 0.45, transition: "wipe", titleReveal: "chars",
-    modalOpen: "line", scrollReveal: "rise", parallax: true, counters: true
+    modalOpen: "line", scrollReveal: "rise", parallax: true, counters: true,
+    /* Global flow animation: every flow follows it unless that flow is set to its own animation. */
+    flow: { mode: "items", preset: "rise", duration: 0.8, stagger: 0.06, delay: 0 },
+    /* Global slide timing (seconds from when a slide's text starts). Carousels and slides can override each part. */
+    slideTiming: { eyebrow: 0.05, title: 0, text: 0.5, flow: 1.5, stagger: 0.2 }
   },
   /* Generated placeholder scenes. Replace them with real project photos in the studio (Images). */
   media: [
@@ -281,9 +291,10 @@ const SECTION_TYPES = {
     ["flowId","flow","Default flow (for slides without their own)"],["defaultMedia","media","Default image (for slides without their own)",{wide:true}],
     ["autoplay","toggle","Move to next slide automatically",{hint:"Off: each slide stays until the visitor uses the arrows, dots or swipe."}],
     ["hud","toggle","Show counter and timecode"],
-    ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. By default the title comes first, the short paragraph 0.5s later, then the flow buttons 1s after that, one by one (Gap between flow items). Each slide can override these below."}],
+    ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. Empty follows the global slide timing (Design → Global style), shown in grey. Each slide can override these below."}],
+    ["look","look","Colours and filter for this carousel",{level:"carousel"}],
     ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
-    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on"],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing and Seconds per slide."}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
+    ["slides","list","Slides",{ title:"title", fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on"],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
   hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
   chapters: { label:"Chapters", fields:[["items","list","Chapters",{ title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
@@ -322,7 +333,40 @@ function normalize(c){
     else if (typeof out[k]==="object") out[k]={...out[k],...c[k]};
     else out[k]=c[k];
   }
+  (out.flows||[]).forEach(f=>migrateFlow(f,out.motion.flow));
   return out;
 }
+/* Flows made before global styles keep their look: a flow whose animation differs from the global one becomes "custom". */
+function migrateFlow(f,g={}){
+  if (!f || typeof f!=="object") return;
+  if (!f.custom || typeof f.custom!=="object") f.custom={ anim:!!f.anim && ["mode","preset","duration","stagger","delay"].some(k=>String(f.anim[k])!==String(g[k])), colors:false };
+  if (!f.colors || typeof f.colors!=="object") f.colors={};
+  if (!f.anim) f.anim={...g};
+}
 
-export { normalize, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+/* ================= SAVED STYLES =================
+   A saved style is a snapshot of the global layer (colours, type, header, image filter, flow and slide defaults, animation).
+   Per-item custom settings are not part of it, so applying a style never wipes a flow or slide that has its own look. */
+const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide"];
+const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming"];
+const pickKeys=(o,ks)=>JSON.parse(JSON.stringify(Object.fromEntries(ks.filter(k=>o&&o[k]!==undefined).map(k=>[k,o[k]]))));
+function snapshotStyle(cfg,name){ return { id:"st-"+Math.random().toString(36).slice(2,8), name:name||"My style", savedAt:new Date().toISOString(), theme:pickKeys(cfg.theme,STYLE_THEME), motion:pickKeys(cfg.motion,STYLE_MOTION) }; }
+function applyStyle(cfg,st){
+  if (!st) return; const th=pickKeys(st.theme,STYLE_THEME), mo=pickKeys(st.motion,STYLE_MOTION);
+  // nested groups merge over the current ones so a style saved before a setting existed still leaves a full object
+  for (const [k,v] of Object.entries(th)) cfg.theme[k]=v&&typeof v==="object"&&!Array.isArray(v)?{...(cfg.theme[k]||{}),...v}:v;
+  for (const [k,v] of Object.entries(mo)) cfg.motion[k]=v&&typeof v==="object"&&!Array.isArray(v)?{...(cfg.motion[k]||{}),...v}:v;
+}
+/** Every flow and carousel slide back on the global style (their own custom values are kept, just switched off). */
+function resetOverrides(cfg,{flows=true,slides=true}={}){
+  let n=0;
+  if (flows) (cfg.flows||[]).forEach(f=>{ f.custom=f.custom||{}; if (f.custom.anim||f.custom.colors) n++; f.custom.anim=false; f.custom.colors=false; });
+  if (slides) (cfg.pages||[]).forEach(p=>(p.sections||[]).forEach(s=>{ if (s.type!=="heroCarousel") return;
+    if (s.look&&s.look.custom){ s.look.custom=false; n++; }
+    (s.slides||[]).forEach(x=>{ if (x&&x.look&&x.look.custom){ x.look.custom=false; n++; } }); }));
+  return n;
+}
+STARTER.flows.forEach(f=>migrateFlow(f,STARTER.motion.flow));
+STARTER.styles=[{ ...snapshotStyle(STARTER,"Dorma starter"), id:"st-starter", savedAt:"" }];
+
+export { normalize, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };

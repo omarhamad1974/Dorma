@@ -1,10 +1,10 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { parseSlidesMd, applySlidesImport, resolveImage } from './mdslides';
-import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER } from './data';
+import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
 
@@ -32,9 +32,9 @@ const IC={
   down:'<svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog"]],["design","Design","theme",["theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser. */
@@ -93,12 +93,12 @@ function previewDraft(){
 }
 function openPanel(k){
   if (!PANELS.some(p=>p[0]===k)) k="pages";
-  Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
+  if (cpClose) cpClose(); Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
   $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
+  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -135,12 +135,20 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       const i=h("input",{id,type:"range",min:opts.min??0,max:opts.max??1,step:opts.step??.01,value:obj[key]??0}), o=h("output",{text:obj[key]});
       i.addEventListener("input",()=>{ o.textContent=i.value; set(+i.value,opts.theme?{theme:true}:undefined); }); wrap.append(h("div",{class:"range-row"},i,o)); break; }
     case "color": {
-      const c=h("input",{id,type:"color",value:obj[key]||"#000000"}), t=h("input",{type:"text",value:obj[key]||"","aria-label":label+" hex"});
-      c.addEventListener("input",()=>{ t.value=c.value; set(c.value,{theme:true}); });
-      t.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(t.value)){ c.value=t.value; set(t.value,{theme:true}); } else t.value=obj[key]; });
-      const mine=h("div",{class:"my-sw"}); (D.theme.swatches||[]).filter(s=>/^#[\da-f]{6}$/i.test(s.hex||"")).forEach(s=>mine.append(h("button",{type:"button",title:(s.name||s.hex)+" "+s.hex,"aria-label":"Use "+(s.name||s.hex),style:"background:"+s.hex,
-        onclick:()=>{ c.value=t.value=s.hex.toLowerCase(); set(s.hex.toLowerCase(),{theme:true}); }})));
-      wrap.append(h("div",{class:"color-row"},c,t,mine.children.length?mine:null)); break; }
+      /* opts.optional: the value may be empty, meaning "follow the global / site colour" (opts.fallback shows which). */
+      const opt=!!opts.optional, val=()=>hexOk(obj[key])?obj[key]:"", fb=()=>{ const f=typeof opts.fallback==="function"?opts.fallback():opts.fallback; return hexOk(f)?f:"#000000"; };
+      const c=h("input",{id,type:"color"}), t=h("input",{type:"text",placeholder:opt?(opts.placeholder||"Global"):"","aria-label":label+" hex",style:"width:96px"});
+      let row=null;
+      const sync=()=>{ c.value=val()||fb(); t.value=val(); if (row) row.classList.toggle("inherit",opt&&!val()); };
+      const put=v=>{ set(v,{theme:true}); sync(); };
+      c.addEventListener("input",()=>{ t.value=c.value; set(c.value,{theme:true}); row.classList.remove("inherit"); });
+      t.addEventListener("change",()=>{ const v=t.value.trim(); if (opt&&v==="") put(""); else if (hexOk(v)) put(v.toLowerCase()); else sync(); });
+      const pick=h("button",{type:"button",class:"cp-btn",title:"Open the colour panel","aria-label":"Colour panel for "+label,html:IC.theme,onclick:e=>colorPanel(e.currentTarget,{value:val()||fb(),onPick:put})});
+      const mine=h("div",{class:"my-sw"}); (D.theme.swatches||[]).filter(s=>hexOk(s.hex)).forEach(s=>mine.append(h("button",{type:"button",title:(s.name||s.hex)+" "+s.hex,"aria-label":"Use "+(s.name||s.hex),style:"background:"+s.hex,
+        onclick:()=>put(s.hex.toLowerCase())})));
+      const reset=opt?h("button",{type:"button",class:"cp-global",text:opts.globalLabel||"Use global",title:"Clear this colour so it follows the global style",onclick:()=>put("")}):null;
+      row=h("div",{class:"color-row"},c,t,pick,mine.children.length?mine:null,reset); sync();
+      wrap.append(row); break; }
     case "select": {
       const s=h("select",{id}); (opts.options||[]).forEach(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; const op=h("option",{value:v,text:l}); if (String(obj[key])===String(v)) op.selected=true; s.append(op); });
       s.addEventListener("change",()=>{ const v=(opts.options||[]).map(o=>Array.isArray(o)?o[0]:o).find(v=>String(v)===s.value); set(v,opts.theme?{theme:true}:undefined); }); wrap.append(s); break; }
@@ -167,6 +175,7 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
         g.append(h("label",{class:"timing-cell"},h("span",{text:TIMING_PARTS[k]}),i)); });
       wrap.append(g); if (!opts.hint) wrap.append(h("span",{class:"hint",text:"Seconds from when this comes into view. Empty uses the default shown. Lower numbers come first, so you can change the order."})); break; }
     case "list": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(listEditor(obj,key,opts,onChange)); break; }
+    case "look": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(lookEditor(obj,key,opts,onChange)); break; }
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
   return wrap;
@@ -249,8 +258,8 @@ function subCard(item,{title,kind,body,onRemove,open,onDuplicate,onToggleHidden}
   card.append(head,b); card._open=()=>{ card.classList.remove("closed"); build(); };
   return card;
 }
-function confirmInline(anchor,msg,yes){
-  const c=h("div",{class:"confirm"},h("span",{text:msg}),h("button",{class:"btn sm danger",type:"button",text:"Remove",onclick:()=>{ c.remove(); yes(); }}),h("button",{class:"btn sm",type:"button",text:"Keep",onclick:()=>c.remove()}));
+function confirmInline(anchor,msg,yes,yesLabel="Remove"){
+  const c=h("div",{class:"confirm"},h("span",{text:msg}),h("button",{class:"btn sm"+(yesLabel==="Remove"||yesLabel==="Delete"?" danger":" primary"),type:"button",text:yesLabel,onclick:()=>{ c.remove(); yes(); }}),h("button",{class:"btn sm",type:"button",text:"Keep",onclick:()=>c.remove()}));
   anchor.after(c);
 }
 function sortable(box,arr,onMove){
@@ -353,7 +362,8 @@ function panelTheme(body){
     T.swatches.forEach((s,i)=>{ const c=h("input",{type:"color",value:/^#[\da-f]{6}$/i.test(s.hex||"")?s.hex:"#000000","aria-label":"Colour"}), x=h("input",{type:"text",value:s.hex||"","aria-label":"Hex code",style:"width:96px"}), n=h("input",{type:"text",value:s.name||"",placeholder:"Name","aria-label":"Colour name"});
       c.addEventListener("input",()=>{ s.hex=x.value=c.value; touch(); }); x.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(x.value.trim())){ s.hex=c.value=x.value.trim().toLowerCase(); touch(); } else x.value=s.hex; }); n.addEventListener("input",()=>{ s.name=n.value; touch(); });
       myBox.append(h("div",{class:"my-row"},c,x,n,h("button",{class:"x",type:"button","aria-label":"Remove colour",title:"Remove",html:IC.x,onclick:()=>{ T.swatches.splice(i,1); touch(); drawMine(); }}))); });
-    myBox.append(h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.plus+"Add colour",onclick:()=>{ T.swatches.push({name:"",hex:T.accent||"#ffffff"}); touch(); drawMine(); myBox.querySelectorAll(".my-row")[T.swatches.length-1]?.querySelector("input:nth-of-type(3)")?.focus(); }})); };
+    myBox.append(h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.plus+"Add colour",title:"Pick a colour from the panel to add it",onclick:e=>colorPanel(e.currentTarget,{value:T.accent,title:"Add a colour",addMode:true,onPick:hex=>{
+      if (!T.swatches.some(s=>(s.hex||"").toLowerCase()===hex)){ T.swatches.push({name:"",hex}); touch(); } drawMine(); }})})); };
   drawMine();
   const prev=h("div",{class:"preview-box"}); const drawPrev=()=>{ prev.textContent=""; const d=h("div",{class:"txt",style:"gap:14px"},h("p",{class:"eyebrow",html:"<b>01</b> Preview"}),h("h3",{class:"display",style:"font-size:clamp(2rem,4vw,3.4rem)",text:"See further than the map"}),h("p",{class:"lede",text:"Body text in the chosen font and muted colour."}));
     const fl=renderFlow(Store.draft,(Store.draft.flows[0]||{}).id); if (fl){ fl.setActive(0,{fill:true}); d.append(fl.el); } d.append(h("button",{class:"more",type:"button",html:"More"+ARROW_SVG})); prev.append(d,h("span",{class:"lbl-a",text:"Live preview"})); };
@@ -361,11 +371,9 @@ function panelTheme(body){
   body.append(card("Palettes",sw,savePal),
     card("My colours",h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
     card("Preview",prev),
-    card("Colours",fieldsFor(T,[["accent","color","Accent"],["ink","color","Background"],["panel","color","Panels"],["fg","color","Text"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
+    card("Background colours",fieldsFor(T,[["ink","color","Background"],["panel","color","Panels"],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
     card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
-    card("Image treatment",fieldsFor(T,[["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["overlay","range","Dark overlay on heroes",{min:0,max:1.4,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),
-    card("Colour overlay on images",h("p",{class:"adm-intro",text:"A colour or gradient laid over every image and video on the site: hero slides, sections, cards, modals and the blog. Any item in the Library can turn it off or use its own overlay instead."}),
-      overlayEditor(T,"imageOverlay",{preview:true})));
+    goStyle("Text, accent, header colours, the image filter and the defaults for every flow and slide are in Global style."));
 }
 /* ---------- colour overlay editor ----------
    Edits holder[key] = {mode, c1,a1, c2,a2, angle, blend}. With allowDefault, "default" follows the site-wide overlay. */
@@ -420,6 +428,170 @@ function panelMotion(body){
     card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]])),
     h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows. Carousel transitions and slide times are under Carousels."}));
 }
+/* ---------- colour panel ----------
+   A popover grid of colours: My colours, the Dorma brand colours, a full spectrum and greys, plus any custom colour.
+   Picking applies the colour; "Add to My colours" keeps it in the palette shown next to every colour picker. */
+function hslHex(hh,s,l){ s/=100; l/=100; const k=n=>(n+hh/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1));
+  return "#"+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join(""); }
+const CP_BRAND=[["Dorma blue","#0072bc"],["Dorma yellow","#ffcb08"],["Dorma magenta","#ed0677"],["Dorma cyan","#00aeef"],["Ink","#040915"],["Night panel","#0b1630"],["White","#ffffff"],["Black","#000000"]];
+const CP_GRID=(()=>{ const hues=[0,15,30,45,55,75,120,155,180,195,210,235,265,290,320,340];
+  const rows=[[92,70],[80,75],[66,78],[52,80],[40,78],[28,70],[16,60]].map(([l,s])=>hues.map(x=>hslHex(x,s,l)));
+  rows.push(hues.map((_,i)=>hslHex(0,0,Math.round(100-i*100/(hues.length-1)))));
+  return rows; })();
+let cpClose=null;
+function colorPanel(anchor,{value="#ffffff",onPick=()=>{},title="Pick a colour",addMode=false}={}){
+  if (cpClose) cpClose();
+  const D=Store.draft, T=D.theme; T.swatches=Array.isArray(T.swatches)?T.swatches:[];
+  let cur=hexOk(value)?value.toLowerCase():"#ffffff";
+  const panel=h("div",{class:"cpanel",role:"dialog","aria-label":title});
+  const nat=h("input",{type:"color",value:cur,"aria-label":"Any colour"}), hx=h("input",{type:"text",value:cur,"aria-label":"Hex code",style:"width:96px"});
+  const marks=()=>$$(".cp-sw",panel).forEach(b=>b.classList.toggle("on",b.dataset.hex===cur));
+  const added=()=>{ onPick(cur); close(); toast("Added to My colours."); };
+  const choose=hex=>{ cur=hex.toLowerCase(); nat.value=hx.value=cur; marks(); if (addMode) added(); else onPick(cur); };
+  const sw=(hex,name)=>h("button",{type:"button",class:"cp-sw","data-hex":hex.toLowerCase(),style:"background:"+hex,title:(name?name+" · ":"")+hex,"aria-label":name||hex,onclick:()=>choose(hex)});
+  nat.addEventListener("input",()=>{ cur=nat.value; hx.value=cur; marks(); if (!addMode) onPick(cur); });
+  hx.addEventListener("change",()=>{ const v=hx.value.trim().toLowerCase(); if (hexOk(v)){ cur=v; nat.value=v; marks(); if (!addMode) onPick(cur); } else hx.value=cur; });
+  const mineRow=h("div",{class:"cp-row"});
+  const drawMine=()=>{ mineRow.textContent=""; const ok=T.swatches.filter(s=>hexOk(s.hex));
+    if (!ok.length) mineRow.append(h("span",{class:"hint",text:"None yet. Pick a colour and add it."})); ok.forEach(s=>mineRow.append(sw(s.hex,s.name))); marks(); };
+  const grid=h("div",{class:"cp-grid"}); CP_GRID.forEach(r=>r.forEach(c=>grid.append(sw(c))));
+  const brand=h("div",{class:"cp-row"}); CP_BRAND.forEach(([n,c])=>brand.append(sw(c,n)));
+  const addBtn=h("button",{class:"btn sm"+(addMode?" primary":""),type:"button",html:IC.plus+"Add to My colours",onclick:()=>{
+    if (addMode){ added(); return; }
+    if (!T.swatches.some(s=>(s.hex||"").toLowerCase()===cur)){ T.swatches.push({name:"",hex:cur}); touch(); toast("Added to My colours."); } drawMine(); }});
+  panel.append(h("div",{class:"cp-head"},h("strong",{text:title}),h("button",{class:"x",type:"button","aria-label":"Close",html:IC.x,onclick:()=>close()})),
+    h("p",{class:"hint",text:"My colours"}),mineRow,h("p",{class:"hint",text:"Dorma"}),brand,h("p",{class:"hint",text:addMode?"Click a colour to add it":"All colours"}),grid,
+    h("div",{class:"cp-custom"},nat,hx,addBtn));
+  drawMine();
+  const host=$(".adm")||document.body; host.append(panel);
+  const place=()=>{ const r=anchor.getBoundingClientRect(), w=panel.offsetWidth, ph=panel.offsetHeight;
+    const left=Math.min(Math.max(8,r.left),innerWidth-w-8); let top=r.bottom+6; if (top+ph>innerHeight-8) top=Math.max(8,r.top-ph-6);
+    panel.style.left=left+"px"; panel.style.top=top+"px"; };
+  place();
+  const outside=e=>{ if (!panel.contains(e.target) && !anchor.contains(e.target)) close(); };
+  const onKey=e=>{ if (e.key==="Escape"){ close(); anchor.focus(); } };
+  function close(){ panel.parentNode&&panel.parentNode.removeChild(panel); removeEventListener("pointerdown",outside,true); removeEventListener("keydown",onKey); removeEventListener("resize",place); removeEventListener("scroll",place,true); if (cpClose===close) cpClose=null; }
+  addEventListener("pointerdown",outside,true); addEventListener("keydown",onKey); addEventListener("resize",place); addEventListener("scroll",place,true);
+  cpClose=close; (panel.querySelector(".cp-sw.on")||panel.querySelector(".cp-sw"))?.focus();
+}
+/* ================= GLOBAL STYLE =================
+   One layer for the look of the whole site: text and accent colours, header colours, the image filter, and the defaults
+   every flow and carousel slide follows. Flows, carousels, slides and pages can switch to "Custom" where they are edited.
+   The whole layer can be saved as a named style and applied again later. */
+const goStyle=text=>h("div",{class:"go-style"},h("p",{class:"adm-intro",style:"margin:0",text}),h("button",{class:"btn sm",type:"button",html:IC.theme+"Open Global style",onclick:()=>openPanel("style")}));
+/** "Use global" / "Custom" switch. The flag lives in holder.custom[key], or in holder[key][flag] when flag is given. */
+function globalOrCustom(holder,key,{what="settings",flag=null,body,onChange=()=>{}}){
+  const get=()=>flag?!!(holder[key]&&holder[key][flag]):!!(holder.custom&&holder.custom[key]);
+  const put=v=>{ if (flag){ if (!holder[key]||typeof holder[key]!=="object") holder[key]={}; holder[key][flag]=v; } else { if (!holder.custom||typeof holder.custom!=="object") holder.custom={}; holder.custom[key]=v; } };
+  const wrap=h("div",{class:"goc"});
+  const draw=()=>{ wrap.textContent=""; const on=get(), opt=(v,l)=>h("button",{type:"button",role:"radio","aria-checked":String(on===v),class:on===v?"on":"",text:l,onclick:()=>{ if (on===v) return; put(v); onChange(); touch({theme:true}); draw(); }});
+    wrap.append(h("div",{class:"seg",role:"radiogroup","aria-label":what},opt(false,"Use global"),opt(true,"Custom")));
+    if (on) wrap.append(...[].concat(body()));
+    else wrap.append(h("p",{class:"hint",style:"margin:0"},`Follows the ${what}. `,h("button",{type:"button",class:"linkish",text:"Edit the global style",onclick:()=>openPanel("style")})));
+  };
+  draw(); return wrap;
+}
+const ANIM_FIELDS=[["mode","select","Animate",{options:[["group","The whole flow at once"],["items","Each item in turn"]]}],["preset","select","Animation",{options:OPT.presets}],["duration","range","Duration (s)",{min:.1,max:3,step:.05}],["stagger","range","Gap between items (s)",{min:0,max:.6,step:.01}],["delay","range","Start delay (s)",{min:0,max:3,step:.05}]];
+const flowAnimFields=(anim,onChange)=>fieldsFor(anim,ANIM_FIELDS,onChange);
+/** Flow colours. Global flow colours fall back to the site colours; a flow's own fall back to the global ones. */
+function flowColorFields(c,onChange,{global=false}={}){
+  const T=Store.draft.theme, g=global?{}:(T.flow||{}), ph=global?"Site":"Global";
+  const fb=(k,site)=>()=>hexOk(g[k])?g[k]:site();
+  return fieldsFor(c,[["text","color","Item text",{optional:true,placeholder:ph,globalLabel:global?"Use site":"Use global",fallback:fb("text",()=>T.fg)}],
+    ["accent","color","Accent (active item and glow)",{optional:true,placeholder:ph,globalLabel:global?"Use site":"Use global",fallback:fb("accent",()=>T.accent)}],
+    ["sep","color","Separators (the small dots)",{optional:true,placeholder:ph,globalLabel:global?"Use site":"Use global",fallback:fb("sep",()=>hexOk(c.text)?c.text:T.fg)}]],onChange);
+}
+/** Header colours. On a page, every value is optional and an empty one follows the global header. */
+function headerFields(hd,{optional=false}={}){
+  const T=Store.draft.theme, G=T.header||{}, ph=optional?"Global":"Site", gl=optional?"Use global":"Use site";
+  const fb=(k,site)=>()=>optional&&hexOk(G[k])?G[k]:site();
+  const f=[["bg","color","Background",{optional,placeholder:ph,globalLabel:gl,fallback:fb("bg",()=>T.ink)}],
+    optional?["bgAlpha","number","Background strength (0 to 1, empty follows global)",{min:0,step:.05,optional:true,placeholder:String(G.bgAlpha??0)}]:["bgAlpha","range","Background strength (0 = see-through)",{min:0,max:1,step:.05,theme:true}],
+    ["text","color","Logo and text",{optional:true,placeholder:ph,globalLabel:gl,fallback:fb("text",()=>T.fg)}],
+    ["link","color","Menu links",{optional:true,placeholder:ph,globalLabel:gl,fallback:fb("link",()=>T.fg)}],
+    ["accent","color","Current page underline",{optional:true,placeholder:ph,globalLabel:gl,fallback:fb("accent",()=>T.accent)}]];
+  return fieldsFor(hd,f,()=>touch({theme:true}));
+}
+/** A carousel's or slide's own colours and image filter (holder[key] = {custom, title, text, accent, headerText, overlay, intensity, shade}). */
+function lookEditor(obj,key,opts={},onChange=()=>{}){
+  const slide=opts.level==="slide";
+  return globalOrCustom(obj,key,{flag:"custom",what:slide?"carousel's colours, then the global slide style":"global slide style",onChange:()=>onChange(obj[key],key),body:()=>{
+    const L=obj[key], T=Store.draft.theme, S=T.slide||{}, ph="Global";
+    const fb=(k,site)=>()=>hexOk(S[k])?S[k]:site();
+    const colours=fieldsFor(L,[["title","color","Title",{optional:true,placeholder:ph,fallback:fb("title",()=>hexOk(T.heading)?T.heading:T.fg)}],["text","color","Paragraph and eyebrow",{optional:true,placeholder:ph,fallback:fb("text",()=>T.fg)}],
+      ["accent","color","Accent (flow and glow)",{optional:true,placeholder:ph,fallback:fb("accent",()=>T.accent)}],["headerText","color","Header text while this shows",{optional:true,placeholder:ph,fallback:fb("headerText",()=>(T.header&&T.header.text)||T.fg)}],
+      ["intensity","number","Colour filter strength (0 to 1.5, empty follows global)",{min:0,step:.05,optional:true,placeholder:String(T.overlayIntensity??1)}],
+      ["shade","number","Dark shade (0 to 1.4, empty follows global)",{min:0,step:.05,optional:true,placeholder:String(T.overlay??1)}]],onChange);
+    return [colours,h("p",{class:"hint",style:"margin:4px 0 0",text:"Colour filter: \"Site default\" follows the "+(slide?"carousel, then the ":"")+"image's own filter and the global one."}),overlayEditor(L,"overlay",{allowDefault:true,onChange})];
+  }});
+}
+function styleCounts(D){
+  const flows=(D.flows||[]).filter(f=>f.custom&&(f.custom.anim||f.custom.colors)).length;
+  let slides=0; (D.pages||[]).forEach(p=>(p.sections||[]).forEach(s=>{ if (s.type!=="heroCarousel") return; if (s.look&&s.look.custom) slides++; (s.slides||[]).forEach(x=>{ if (x&&x.look&&x.look.custom) slides++; }); }));
+  return {flows,slides};
+}
+function stylePreview(D){
+  const box=h("div",{class:"style-prev"});
+  const draw=()=>{ box.textContent=""; const T=D.theme, S=T.slide||{};
+    const id=(()=>{ for (const p of D.pages) for (const s of p.sections||[]) for (const x of [...(s.slides||[]),s]) { const m=x&&x.media&&D.media.find(y=>y.id===x.media); if (m&&m.kind!=="article") return m.id; } return (D.media.find(m=>m.kind!=="article")||{}).id; })();
+    const bg=h("div",{class:"sp-bg"}); const n=id?mediaNode(D,id,{w:960,hh:540}):null; if (n) bg.append(n); const ov=id?overlayEl(D,id):null; if (ov) bg.append(ov); bg.append(h("div",{class:"shade-hero"}));
+    const nav=h("nav",{class:"site-nav"},h("a",{href:"#",onclick:e=>e.preventDefault(),"aria-current":"page",text:"Home"}),h("a",{href:"#",onclick:e=>e.preventDefault(),text:"Agency"}),h("a",{href:"#",onclick:e=>e.preventDefault(),text:"Contact"}));
+    const head=h("header",{class:"site-head"},h("div",{class:"wrap"},h("span",{class:"brand"},h("span",{class:"mark"}),plain(D.site.brand)||"Dorma"),nav));
+    const content=h("div",{class:"sp-content"},h("p",{class:"eyebrow sp-eb",text:"Global style"}),h("h3",{class:"display",style:"font-size:clamp(1.8rem,3.4vw,2.8rem)",text:"Every slide, one look"}),h("p",{class:"lede",text:"Paragraph text in the slide colour. Change anything on the left and it shows here."}));
+    const fl=renderFlow(D,(D.flows.find(f=>!(f.custom&&f.custom.colors))||D.flows[0]||{}).id); if (fl){ fl.setActive(0,{fill:true}); content.append(fl.el); }
+    const hc=h("div",{class:"sp-hc"},bg,head,content);
+    const st=hc.style; if (hexOk(S.title)) st.setProperty("--heading",S.title); if (hexOk(S.text)) st.setProperty("--slide-text",S.text);
+    if (hexOk(S.accent)){ st.setProperty("--accent",S.accent); }
+    box.append(hc,h("span",{class:"lbl-a",text:"Live preview"})); };
+  draw(); return {el:box,draw};
+}
+function panelStyle(body){
+  const D=Store.draft, T=D.theme, M=D.motion;
+  T.header={bg:"#040915",bgAlpha:0,text:"",link:"",accent:"",...(T.header||{})}; T.flow={...(T.flow||{})}; T.slide={...(T.slide||{})};
+  M.flow={mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0,...(M.flow||{})}; M.slideTiming={...(M.slideTiming||{})}; D.styles=Array.isArray(D.styles)?D.styles:[];
+  const pv=stylePreview(D); Admin.refresh=pv.draw;
+  const cnt=styleCounts(D);
+  /* saved styles */
+  const list=h("div",{class:"styles-list"});
+  const drawList=()=>{ list.textContent="";
+    if (!D.styles.length) list.append(h("p",{class:"hint",style:"margin:0",text:"No saved styles yet."}));
+    D.styles.forEach((st,i)=>{ const t=st.theme||{}, chips=[t.ink,t.panel,t.accent,t.fg,t.heading,(t.header||{}).bg,(t.imageOverlay||{}).c1].filter(hexOk);
+      const nm=h("input",{type:"text",value:st.name||"","aria-label":"Style name"}); nm.addEventListener("input",()=>{ st.name=nm.value; scheduleSave(); });
+      const row=h("div",{class:"style-row"},h("span",{class:"chips","aria-hidden":"true"},...chips.map(c=>h("i",{style:"background:"+c}))),nm,
+        h("small",{class:"mono",text:st.savedAt?fmtDate(st.savedAt.slice(0,10)):"Starter"}),
+        h("button",{class:"btn sm primary",type:"button",text:"Apply",onclick:e=>confirmInline(row,"Apply \""+(st.name||"this style")+"\"? It replaces the global style. Flows and slides set to Custom keep their own look.",()=>{ applyStyle(D,st); touch({theme:true}); openPanel("style"); toast("Style applied. Publish to show it to visitors."); },"Apply")}),
+        h("button",{class:"btn sm",type:"button",text:"Update",title:"Save the current global style into this one",onclick:()=>confirmInline(row,"Overwrite \""+(st.name||"this style")+"\" with the current global style?",()=>{ Object.assign(st,snapshotStyle(D,st.name),{id:st.id}); scheduleSave(); drawList(); toast("Style updated."); },"Overwrite")}),
+        h("button",{class:"x",type:"button","aria-label":"Delete style "+(st.name||""),title:"Delete",html:IC.x,onclick:()=>confirmInline(row,"Delete this saved style?",()=>{ D.styles.splice(i,1); scheduleSave(); drawList(); },"Delete")}));
+      list.append(row); }); };
+  drawList();
+  const nmNew=h("input",{type:"text",placeholder:"Style name, e.g. Dorma night","aria-label":"Name for the new style",style:"max-width:260px"});
+  const saveRow=h("div",{class:"style-save",style:"display:flex;gap:8px;flex-wrap:wrap"},nmNew,h("button",{class:"btn sm",type:"button",html:IC.plus+"Save current style",onclick:()=>{
+    D.styles.push(snapshotStyle(D,nmNew.value.trim()||"My style "+(D.styles.length+1))); nmNew.value=""; scheduleSave(); drawList(); toast("Style saved."); }}));
+  /* slide timing as a timing field over motion.slideTiming */
+  const timingF=F(M,"slideTiming","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. A carousel or a slide can override any of these where you edit it."});
+  const resetBtn=(label,opts)=>h("button",{class:"btn sm",type:"button",text:label,onclick:e=>confirmInline(e.currentTarget,"Switch them all to Use global? Their custom values are kept, so you can switch one back.",()=>{ const n=resetOverrides(D,opts); touch({theme:true}); openPanel("style"); toast(n?n+" switched to the global style.":"Everything already follows the global style."); },"Switch")});
+  body.append(
+    h("p",{class:"adm-intro",text:"One place for the look of the whole site. Every flow, carousel, slide and page header follows these settings unless it is set to Custom where you edit it. Save the whole set as a style to switch back to it later."}),
+    card("Preview",pv.el),
+    card("Saved styles",h("p",{class:"adm-intro",style:"margin:0",text:"A style keeps every setting on this page plus the fonts, background colours and animation. Applying one never changes items set to Custom."}),list,saveRow),
+    card("Text and accent",fieldsFor(T,[["fg","color","Text"],["heading","color","Headings and titles",{optional:true,placeholder:"Text",globalLabel:"Same as text",fallback:()=>T.fg}],["accent","color","Accent (buttons, glow, highlights)"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}]])),
+    card("Header",h("p",{class:"adm-intro",style:"margin:0",text:"The bar with the logo and menu. Each page can use its own colours (Pages → Header on this page), and each carousel slide can change the header text while it shows."}),headerFields(T.header)),
+    card("Image filter",h("p",{class:"adm-intro",style:"margin:0",text:"A colour or gradient over every image and video. Any Library item, carousel or slide can turn it off or use its own."}),
+      overlayEditor(T,"imageOverlay",{preview:true}),
+      fieldsFor(T,[["overlayIntensity","range","Filter strength on every image (0 = off)",{min:0,max:1.5,step:.05,theme:true}],["overlay","range","Dark shade on heroes",{min:0,max:1.4,step:.01,theme:true}],["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),
+    card("Every flow",h("p",{class:"adm-intro",style:"margin:0",text:cnt.flows?`${cnt.flows} of ${D.flows.length} flows use their own colours or animation (set under Flows).`:`All ${D.flows.length} flows follow these settings.`}),
+      h("p",{class:"hint",style:"margin:0",text:"Colours"}),flowColorFields(T.flow,()=>touch({theme:true}),{global:true}),
+      h("p",{class:"hint",style:"margin:0",text:"Animation and timing"}),flowAnimFields(M.flow),
+      cnt.flows?resetBtn("Make every flow use the global style",{flows:true,slides:false}):null),
+    card("Every carousel and slide",h("p",{class:"adm-intro",style:"margin:0",text:cnt.slides?`${cnt.slides} carousels or slides use their own colours (set under Carousels).`:"All carousels and slides follow these settings."}),
+      fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","number","Seconds per slide (any length)",{min:1,step:.5}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]]),
+      timingF,
+      h("p",{class:"hint",style:"margin:0",text:"Slide colours"}),
+      fieldsFor(T.slide,[["title","color","Title",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>hexOk(T.heading)?T.heading:T.fg}],["text","color","Paragraph and eyebrow",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.fg}],
+        ["accent","color","Accent (flow and glow)",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.accent}],["headerText","color","Header text over slides",{optional:true,placeholder:"Header",globalLabel:"Use header",fallback:()=>hexOk(T.header.text)?T.header.text:T.fg}]],()=>touch({theme:true})),
+      cnt.slides?resetBtn("Make every carousel and slide use the global style",{flows:false,slides:true}):null)
+  );
+}
 function panelIcons(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Icons can be used in flows, buttons and text items. Paste any SVG code; scripts, links and styles are stripped automatically. Icons draw with the current text colour."}));
@@ -449,7 +621,7 @@ function panelFlows(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"A flow is a row of items separated by small marks. Draw it from buttons, plain text, icons or your own SVG, then choose how it animates: as one piece or item by item, with optional settings per item. Any page section or Type 3 modal can use a flow."}));
   masterDetail(body,{items:()=>D.flows,selKey:"flows",label:f=>f.name||f.id,kind:f=>f.items.length+" items",addLabel:"New flow",
-    onAdd:()=>{ const f={id:uid("f"),name:"New flow",separator:"dots3",size:"m",progress:false,anim:{mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0},items:[{id:uid("x"),kind:"button",label:"First",icon:"",svg:"",showIndex:true,detail:"",action:A(),anim:null}]}; D.flows.push(f); return f; },
+    onAdd:()=>{ const f={id:uid("f"),name:"New flow",separator:"dots3",size:"m",progress:false,anim:{...D.motion.flow},custom:{anim:false,colors:false},colors:{},items:[{id:uid("x"),kind:"button",label:"First",icon:"",svg:"",showIndex:true,detail:"",action:A(),anim:null}]}; D.flows.push(f); return f; },
     detail:(f,redrawList)=>{
       const prev=h("div",{class:"preview-box"}); const drawPrev=()=>{ prev.textContent=""; const fl=renderFlow(D,f.id,{onItem:(i)=>fl.setActive(i,{fill:true})}); if (fl){ fl.setActive(0,{fill:true}); prev.append(fl.el); fl.play(0); } prev.append(h("span",{class:"lbl-a",text:"Preview · click items"})); };
       Admin.refresh=drawPrev; drawPrev();
@@ -476,8 +648,9 @@ function panelFlows(body){
       return [
         card(h("span",{class:"grow"},"Preview"),prev,h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.replay+"Replay animation",onclick:drawPrev})),
         card("Flow settings",fieldsFor(f,[["name","text","Name"],["separator","select","Separator",{options:OPT.separators}],["size","select","Size",{options:OPT.sizes}]],()=>redrawList())),
-        card("Animation",fieldsFor(f.anim,[["mode","select","Animate",{options:[["group","The whole flow at once"],["items","Each item in turn"]]}],["preset","select","Animation",{options:OPT.presets}],["duration","range","Duration (s)",{min:.1,max:3,step:.05}],["stagger","range","Gap between items (s)",{min:0,max:.6,step:.01}],["delay","range","Start delay (s)",{min:0,max:3,step:.05}]]),
+        card("Animation and timing",globalOrCustom(f,"anim",{what:"global flow animation (Design → Global style)",onChange:drawPrev,body:()=>[flowAnimFields(f.anim=f.anim||{...D.motion.flow})]}),
           h("p",{class:"adm-intro",style:"font-size:.8rem",text:"Items with their own animation keep their settings in either mode when animating item by item."})),
+        card("Colours",globalOrCustom(f,"colors",{what:"global flow colours (Design → Global style)",onChange:drawPrev,body:()=>[flowColorFields(f.colors=f.colors||{},drawPrev)]})),
         card("Items · drag to reorder",items),
         h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete flow",onclick:e=>confirmInline(e.currentTarget,"Delete this flow? Sections using it will show no flow.",()=>{ D.flows.splice(D.flows.indexOf(f),1); touch(); openPanel("flows"); })}))
       ];
@@ -542,9 +715,11 @@ function panelCarousels(body){
   const D=Store.draft, M=D.motion;
   const all=()=>D.pages.flatMap(p=>p.sections.filter(s=>s.type==="heroCarousel").map(s=>({id:s.id,s,p})));
   body.append(h("p",{class:"adm-intro",text:"Settings for every carousel, then each carousel and its slides. A slide can stay up as long as you like, like a page: set its seconds on screen to any number, or turn on \"Stay on this slide\"."}),
-    card("All carousels",fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","number","Seconds per slide (any length)",{min:1,step:.5}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]])));
+    goStyle("Transition, seconds per slide, zoom, the default slide timing and slide colours for every carousel are in Global style. Each carousel and slide below can follow them or use its own."));
   if (!all().length){ body.append(h("p",{class:"adm-intro",text:"No carousels yet. Add a Hero carousel section to a page under Pages."})); return; }
-  const T=SECTION_TYPES.heroCarousel, setF=T.fields.filter(f=>f[0]!=="slides"), slidesF=T.fields.find(f=>f[0]==="slides");
+  // Timing boxes show the global slide timing in grey, so an empty box says what it will use.
+  const G=M.slideTiming||{}, withGlobal=f=>f[1]!=="timing"?f:[f[0],f[1],f[2],{...f[3],parts:f[3].parts.map(([k,d])=>[k,k==="duration"?(+M.slideDuration||7):(G[k]??d)])}];
+  const T=SECTION_TYPES.heroCarousel, setF=T.fields.filter(f=>f[0]!=="slides").map(withGlobal), sf=T.fields.find(f=>f[0]==="slides"), slidesF=[sf[0],sf[1],sf[2],{...sf[3],fields:sf[3].fields.map(withGlobal)}];
   masterDetail(body,{items:all,selKey:"carousels",label:x=>secTitle(x.s),kind:x=>(x.p.title||x.p.id)+(x.s.hidden?" · hidden":""),
     detail:({s,p},redraw)=>{
       if (s.autoplay===undefined) s.autoplay=true;
@@ -585,6 +760,7 @@ function panelPages(body){
       drawSecs();
       return [
         card(h("span",{class:"grow"},"Page"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:previewDraft}),meta),
+        card("Header on this page",globalOrCustom(p,"header",{what:"global header colours",flag:"custom",body:()=>[headerFields(p.header,{optional:true})]})),
         card("Sections · drag to reorder, hide or duplicate",secs),
         p.id===D.site.homePage?h("p",{class:"adm-intro",text:"This is the home page, so it can't be deleted. Pick another home page under Site and titles first."}):
           h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete page",onclick:e=>confirmInline(e.currentTarget,"Delete this page?",()=>{ D.pages.splice(D.pages.indexOf(p),1); touch(); openPanel("pages"); })}))
