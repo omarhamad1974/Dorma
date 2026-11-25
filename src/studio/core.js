@@ -84,6 +84,8 @@ const rgba=(hex,a)=>`rgba(${hexRgb(hex).join(",")},${a})`;
 function applyTheme(cfg){
   const t=cfg.theme, r=document.documentElement.style, fb='"IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif';
   r.setProperty("--ink",t.ink); r.setProperty("--panel",t.panel); r.setProperty("--fg",t.fg); r.setProperty("--accent",t.accent);
+  r.setProperty("--site-ink",t.ink); r.setProperty("--site-panel",t.panel); r.setProperty("--site-fg",t.fg); r.setProperty("--site-accent",t.accent);
+  r.setProperty("--site-muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--site-faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--site-glass",rgba(t.fg,.05));
   r.setProperty("--muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--glass",rgba(t.fg,.05));
   r.setProperty("--accent-soft",rgba(t.accent,.12)); r.setProperty("--accent-line",rgba(t.accent,.55)); r.setProperty("--accent-glow",rgba(t.accent,.5));
   r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--btn-glow",rgba(t.accent,Math.max(0,Math.min(1,cfg.motion.buttonGlow??.45))*.75)); r.setProperty("--btn-glow-on",(+(cfg.motion.buttonGlow??.45))>0?"1":"0");

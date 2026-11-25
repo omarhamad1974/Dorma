@@ -26,9 +26,19 @@ const IC={
   carousels:'<svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="14" rx="2"/><path d="M3 8v8M21 8v8"/></svg>',
   copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
   eyeOff:'<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>',
+  sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  moon:'<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
 const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
+/* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
+const GROUPS=[["content","Content","pages",["pages","carousels","blog"]],["design","Design","theme",["theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
+const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
+const lastSub={};
+/* Studio light or dark mode: a per-person preference kept in this browser. */
+const studioMode=()=>{ try { return localStorage.getItem("dorma.studioMode")==="light"?"light":"dark"; } catch { return "dark"; } };
+function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } catch { /* storage blocked */ }
+  const a=$(".adm"); if (a) a.classList.toggle("light",m==="light"); document.documentElement.style.colorScheme=m; const b=$("#admMode"); if (b) b.innerHTML=(m==="light"?IC.moon+"Dark mode":IC.sun+"Light mode"); }
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 
@@ -48,15 +58,18 @@ async function renderAdmin(){
   applyTheme(Store.draft); document.title="Studio · "+(plain(Store.draft.site.brand)||"Site");
   const side=h("nav",{class:"adm-side","aria-label":"Studio sections"},h("a",{class:"brand",href:"#"+Store.draft.site.homePage},h("span",{class:"mark"}),"Studio"));
   const mnav=h("div",{class:"adm-mobile-nav"});
-  PANELS.forEach(([k,l])=>{
-    side.append(h("button",{type:"button","data-p":k,class:Admin.panel===k?"on":"",html:IC[k]+esc(l),onclick:()=>openPanel(k)}));
-    mnav.append(h("button",{type:"button","data-p":k,class:Admin.panel===k?"on":"",text:l,onclick:()=>openPanel(k)}));
+  GROUPS.forEach(([g,l,icon,subs])=>{
+    const go=()=>openPanel(lastSub[g]||subs[0]);
+    side.append(h("button",{type:"button","data-g":g,html:IC[icon]+esc(l),onclick:go}));
+    mnav.append(h("button",{type:"button","data-g":g,text:l,onclick:go}));
   });
   side.append(h("div",{class:"grow"}),h("p",{class:"mono",style:"padding:0 10px;line-height:1.6;overflow-wrap:anywhere",html:Store.mode==="db"?"Signed in as<br>"+esc(signedInEmail()):"Saved in this<br>browser only"}),
+    h("button",{type:"button",id:"admMode",onclick:()=>setStudioMode(studioMode()==="light"?"dark":"light")}),
     Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):"");
   const top=h("div",{class:"adm-top",id:"admTop"});
-  const body=h("div",{class:"adm-body",id:"admBody"});
-  app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},top,mnav,body)));
+  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub",role:"tablist"});
+  app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},h("div",{class:"adm-head"},top,mnav,sub),body)));
+  setStudioMode(studioMode());
   Store.listeners=[updateTop];
   openPanel(Admin.panel);
 }
@@ -65,7 +78,7 @@ function updateTop(){
   const st=Store.status, label={saved:"Draft saved",pending:"Unsaved changes",saving:"Saving…",error:Store.statusMsg||"Couldn't save",published:"Published"}[st]||"Draft saved";
   const diff=draftDiffers();
   top.textContent="";
-  top.append(h("h1",{text:(PANELS.find(p=>p[0]===Admin.panel)||[])[1]||"Studio"}),
+  top.append(h("h1",{},h("span",{class:"crumb",text:groupOf(Admin.panel)[1]}),(PANELS.find(p=>p[0]===Admin.panel)||[])[1]||"Studio"),
     h("span",{class:"status "+(st==="saving"||st==="pending"?"saving":st==="error"?"err":Store.mode==="local"?"local":""),role:"status"},h("i"),label),
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
@@ -77,9 +90,12 @@ function previewDraft(){
   if (location.hash.slice(1)===target) route(); else location.hash=target;
 }
 function openPanel(k){
-  Admin.panel=k; Admin.refresh=null;
-  $$(".adm-side button[data-p],.adm-mobile-nav button[data-p]").forEach(b=>b.classList.toggle("on",b.dataset.p===k));
-  const body=$("#admBody"); if (!body) return; body.textContent=""; disposePage();
+  if (!PANELS.some(p=>p[0]===k)) k="pages";
+  Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
+  $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
+  const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
+    G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
+  const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
   updateTop(); scrollTo(0,0);
 }
@@ -120,7 +136,9 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       const c=h("input",{id,type:"color",value:obj[key]||"#000000"}), t=h("input",{type:"text",value:obj[key]||"","aria-label":label+" hex"});
       c.addEventListener("input",()=>{ t.value=c.value; set(c.value,{theme:true}); });
       t.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(t.value)){ c.value=t.value; set(t.value,{theme:true}); } else t.value=obj[key]; });
-      wrap.append(h("div",{class:"color-row"},c,t)); break; }
+      const mine=h("div",{class:"my-sw"}); (D.theme.swatches||[]).filter(s=>/^#[\da-f]{6}$/i.test(s.hex||"")).forEach(s=>mine.append(h("button",{type:"button",title:(s.name||s.hex)+" "+s.hex,"aria-label":"Use "+(s.name||s.hex),style:"background:"+s.hex,
+        onclick:()=>{ c.value=t.value=s.hex.toLowerCase(); set(s.hex.toLowerCase(),{theme:true}); }})));
+      wrap.append(h("div",{class:"color-row"},c,t,mine.children.length?mine:null)); break; }
     case "select": {
       const s=h("select",{id}); (opts.options||[]).forEach(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; const op=h("option",{value:v,text:l}); if (String(obj[key])===String(v)) op.selected=true; s.append(op); });
       s.addEventListener("change",()=>{ const v=(opts.options||[]).map(o=>Array.isArray(o)?o[0]:o).find(v=>String(v)===s.value); set(v,opts.theme?{theme:true}:undefined); }); wrap.append(s); break; }
@@ -175,7 +193,7 @@ function actionEditor(a,onChange){
   type.addEventListener("change",()=>{ a.type=type.value; a.target=""; drawTarget(); onChange(); });
   $$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25)");
   row.append(type,tgt); drawTarget();
-  setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg)"));
+  setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"));
   return row;
 }
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
@@ -270,7 +288,7 @@ function panelSite(body){
       h("button",{class:"btn",type:"button",text:"Replace draft with pasted settings",onclick:()=>{ try { const c=JSON.parse(area.value); Store.draft=normalize(c); touch({theme:true}); toast("Draft replaced"); openPanel("site"); } catch(e){ toast("That text isn't a valid settings backup."); } }}),
       h("button",{class:"btn",type:"button",text:"Discard draft changes",onclick:e=>confirmInline(e.currentTarget.parentNode,"Go back to the live version?",()=>{ Store.draft=clone(Store.live); touch({theme:true}); openPanel("site"); })}),
       h("button",{class:"btn danger",type:"button",text:"Reset to starter template",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with the starter template?",()=>{ Store.draft=clone(STARTER); touch({theme:true}); openPanel("site"); })})),
-    (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);font-family:var(--mono);font-size:.74rem"}))));
+    (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);font-family:var(--mono);font-size:.74rem"}))));
   var area;
   if (Store.mode==="db") body.append(versionsCard());
 }
@@ -321,10 +339,26 @@ const PALETTES=[["Dorma","#ffc93c","#040915","#0b1630","#eef2fa"],["Ember","#ff9
 function panelTheme(body){
   const T=Store.draft.theme;
   const sw=h("div",{class:"swatches"}); PALETTES.forEach(([n,a,ink,panel,fg])=>sw.append(h("button",{type:"button",onclick:()=>{ Object.assign(T,{accent:a,ink,panel,fg}); touch({theme:true}); openPanel("theme"); }},h("i",{style:`background:linear-gradient(135deg,${ink} 50%,${a} 50%)`}),n)));
+  T.myPalettes=Array.isArray(T.myPalettes)?T.myPalettes:[]; T.swatches=Array.isArray(T.swatches)?T.swatches:[];
+  T.myPalettes.forEach((pl,i)=>sw.append(h("span",{class:"saved-pal"},h("button",{type:"button",title:"Use this palette",onclick:()=>{ Object.assign(T,{accent:pl.accent,ink:pl.ink,panel:pl.panel,fg:pl.fg}); touch({theme:true}); openPanel("theme"); }},h("i",{style:`background:linear-gradient(135deg,${pl.ink} 50%,${pl.accent} 50%)`}),pl.name||"My palette"),
+    h("button",{type:"button",class:"rm","aria-label":"Remove palette "+(pl.name||""),html:IC.x,onclick:()=>{ T.myPalettes.splice(i,1); touch({theme:true}); openPanel("theme"); }}))));
+  const palName=h("input",{type:"text",placeholder:"Palette name","aria-label":"Name for the saved palette",class:"adm-pal-name",style:"max-width:220px"});
+  const savePal=h("div",{style:"display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"},palName,h("button",{class:"btn sm",type:"button",html:IC.plus+"Save current colours as a palette",onclick:()=>{
+    T.myPalettes.push({name:palName.value.trim()||"My palette "+(T.myPalettes.length+1),accent:T.accent,ink:T.ink,panel:T.panel,fg:T.fg}); touch({theme:true}); toast("Palette saved."); openPanel("theme"); }}));
+  /* My colours: named swatches shown next to every colour picker in the studio */
+  const myBox=h("div",{class:"my-colours"});
+  const drawMine=()=>{ myBox.textContent="";
+    T.swatches.forEach((s,i)=>{ const c=h("input",{type:"color",value:/^#[\da-f]{6}$/i.test(s.hex||"")?s.hex:"#000000","aria-label":"Colour"}), x=h("input",{type:"text",value:s.hex||"","aria-label":"Hex code",style:"width:96px"}), n=h("input",{type:"text",value:s.name||"",placeholder:"Name","aria-label":"Colour name"});
+      c.addEventListener("input",()=>{ s.hex=x.value=c.value; touch(); }); x.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(x.value.trim())){ s.hex=c.value=x.value.trim().toLowerCase(); touch(); } else x.value=s.hex; }); n.addEventListener("input",()=>{ s.name=n.value; touch(); });
+      myBox.append(h("div",{class:"my-row"},c,x,n,h("button",{class:"x",type:"button","aria-label":"Remove colour",title:"Remove",html:IC.x,onclick:()=>{ T.swatches.splice(i,1); touch(); drawMine(); }}))); });
+    myBox.append(h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.plus+"Add colour",onclick:()=>{ T.swatches.push({name:"",hex:T.accent||"#ffffff"}); touch(); drawMine(); myBox.querySelectorAll(".my-row")[T.swatches.length-1]?.querySelector("input:nth-of-type(3)")?.focus(); }})); };
+  drawMine();
   const prev=h("div",{class:"preview-box"}); const drawPrev=()=>{ prev.textContent=""; const d=h("div",{class:"txt",style:"gap:14px"},h("p",{class:"eyebrow",html:"<b>01</b> Preview"}),h("h3",{class:"display",style:"font-size:clamp(2rem,4vw,3.4rem)",text:"See further than the map"}),h("p",{class:"lede",text:"Body text in the chosen font and muted colour."}));
     const fl=renderFlow(Store.draft,(Store.draft.flows[0]||{}).id); if (fl){ fl.setActive(0,{fill:true}); d.append(fl.el); } d.append(h("button",{class:"more",type:"button",html:"More"+ARROW_SVG})); prev.append(d,h("span",{class:"lbl-a",text:"Live preview"})); };
   Admin.refresh=drawPrev; drawPrev();
-  body.append(card("Preset palettes",sw),card("Preview",prev),
+  body.append(card("Palettes",sw,savePal),
+    card("My colours",h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
+    card("Preview",prev),
     card("Colours",fieldsFor(T,[["accent","color","Accent"],["ink","color","Background"],["panel","color","Panels"],["fg","color","Text"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
     card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
     card("Image treatment",fieldsFor(T,[["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["overlay","range","Dark overlay on heroes",{min:0,max:1.4,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),
@@ -508,7 +542,7 @@ function panelPages(body){
             onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); },
             onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); },
             onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; p.sections.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
-        const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
+        const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
         secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ p.sections.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
         sortable(secs,p.sections,()=>{ drawSecs(); touch(); });
       };

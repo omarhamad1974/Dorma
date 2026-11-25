@@ -17,6 +17,7 @@
   --ok:#6fd49b;
   --warn:#f2c35b;
   --bad:#ff6b6b;
+  --field-bg:rgba(0,0,0,.25);
   color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -347,7 +348,7 @@ figure{margin:0;min-width:0}
 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .field.wide{grid-column:1/-1}
 .field > label,.lbl-a{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{color-scheme:dark;width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg);font-size:.88rem}
+.field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{color-scheme:inherit;width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font-size:.88rem}
 .field textarea{min-height:84px;resize:vertical;line-height:1.5}
 .field textarea.code{font-family:var(--mono);font-size:.76rem;min-height:110px}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
@@ -527,3 +528,60 @@ figure{margin:0;min-width:0}
 .sub-head .hid-tag{display:none;color:var(--muted)}
 .sub-item.is-hidden>.sub-head .hid-tag{display:inline}
 .sub-head .x[aria-pressed="true"]{color:var(--warn)}
+
+/* studio: My colours */
+.my-sw{display:flex;gap:5px;flex-wrap:wrap;margin-left:4px}
+.my-sw button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.25);padding:0;cursor:pointer}
+.my-sw button:hover{transform:scale(1.15)}
+.color-row{flex-wrap:wrap}
+.my-colours{display:flex;flex-direction:column;gap:8px}
+.my-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.my-row input[type=color]{width:40px;height:36px;padding:0;border:1px solid var(--faint);border-radius:7px;background:none;cursor:pointer}
+.my-row input[type=text]{flex:1;min-width:120px}
+.my-row input[type=text]:nth-of-type(2){flex:0 0 96px;min-width:0}
+.my-row .x,.saved-pal .rm{width:28px;height:28px;border-radius:6px;border:0;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.my-row .x svg,.saved-pal .rm svg{width:13px;height:13px;stroke:currentColor;stroke-width:1.6;fill:none}
+.my-row .x:hover,.saved-pal .rm:hover{color:var(--bad)}
+.saved-pal{display:inline-flex;align-items:center;gap:2px}
+.my-row input[type=text],.adm-pal-name{color-scheme:inherit;padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font-size:.88rem}
+.my-row input[type=text]:focus,.adm-pal-name:focus{outline:none;border-color:var(--accent)}
+
+/* ================= studio layout: groups, sub-tabs, denser cards, light mode ================= */
+.adm{grid-template-columns:208px minmax(0,1fr)}
+.adm-side{padding:18px 12px;gap:4px}
+.adm-side #admMode{margin-top:4px}
+.adm-top{padding:10px clamp(14px,2vw,24px)}
+.adm-top h1{font-size:1.05rem;display:flex;align-items:baseline;gap:10px}
+.adm-top h1 .crumb{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:400}
+.adm-head{position:sticky;top:0;z-index:20}
+.adm-head .adm-top{position:static}
+.adm-subtabs{display:flex;gap:4px;padding:8px clamp(14px,2vw,24px);border-bottom:1px solid var(--faint);background:color-mix(in srgb,var(--ink) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);overflow-x:auto}
+.adm-subtabs button{flex:none;padding:7px 14px;border-radius:7px;border:1px solid transparent;background:none;color:var(--muted);font-size:.84rem;cursor:pointer}
+.adm-subtabs button:hover{color:var(--fg);background:var(--glass)}
+.adm-subtabs button.on{color:var(--fg);background:var(--accent-soft);border-color:var(--accent-line)}
+.adm-body{padding:clamp(14px,2vw,24px);gap:16px;max-width:1560px}
+.card-a{padding:clamp(14px,1.6vw,18px);gap:12px}
+.fields{grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:12px 14px}
+.cols{grid-template-columns:240px minmax(0,1fr);gap:16px}
+.cols .list{position:sticky;top:112px;max-height:calc(100vh - 130px);overflow:auto}
+/* settings panels: cards side by side on wide screens */
+@media (min-width:1180px){
+  .adm-body.p-site,.adm-body.p-theme,.adm-body.p-motion{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .adm-body.p-site>.adm-intro,.adm-body.p-theme>.adm-intro,.adm-body.p-motion>.adm-intro,.adm-body.p-theme>.card-a:has(.preview-box),.adm-body.p-motion>.card-a:has(.preview-box){grid-column:1/-1}
+}
+@media (max-width:900px){ .adm{grid-template-columns:1fr} .cols{grid-template-columns:1fr} .cols .list{position:static;max-height:none} .adm-head{position:static} .adm-subtabs{position:sticky;top:0;z-index:19} }
+
+/* light mode for the studio only (previews keep the site's own colours) */
+.adm.light{--ink:#f3f4f7;--panel:#ffffff;--fg:#151a26;--muted:rgba(21,26,38,.62);--faint:rgba(21,26,38,.14);--glass:rgba(21,26,38,.05);--field-bg:#ffffff;
+  --accent:color-mix(in srgb,var(--site-accent) 70%,#151a26);--accent-soft:color-mix(in srgb,var(--site-accent) 18%,transparent);--accent-line:color-mix(in srgb,var(--site-accent) 70%,#151a26);
+  color-scheme:light;background:var(--ink);color:var(--fg)}
+.adm.light .adm-side{background:#e9ebf0}
+.adm.light .adm-top{background:rgba(255,255,255,.88)}
+.adm.light .sub-item,.adm.light .lib-card,.adm.light .icon-tile,.adm.light .icon-pick button{background:rgba(21,26,38,.03)}
+.adm.light .toggle input{background:rgba(21,26,38,.18)}
+.adm.light .toggle input:checked{background:var(--site-accent)}
+.adm.light .btn:hover{border-color:rgba(21,26,38,.4)}
+.adm.light .btn.primary{background:var(--site-accent);border-color:var(--site-accent)}
+.adm.light .my-sw button,.adm.light .swatches button i{border-color:rgba(21,26,38,.25)}
+.adm.light .preview-box{--ink:var(--site-ink);--panel:var(--site-panel);--fg:var(--site-fg);--muted:var(--site-muted);--faint:var(--site-faint);--glass:var(--site-glass);--accent:var(--site-accent);
+  background-color:var(--site-ink);color:var(--fg);color-scheme:dark}
