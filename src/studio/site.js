@@ -23,18 +23,19 @@ function renderSite(cfg,pageId){
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
   app.append(siteHeader(cfg,page));
   const main=h("main",{id:"main"});
-  const first=page.sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
+  const sections=page.sections.filter(s=>!s.hidden); // hidden in the studio = not shown to visitors
+  const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
   if (page.layout==="console"){
     const wrap=h("div",{class:"wrap console"}), rail=h("aside",{class:"rail","aria-label":ui("On this page")}), ol=h("ol"), body=h("div",{class:"console-main"});
     let n=0;
-    page.sections.forEach(sec=>{
+    sections.forEach(sec=>{
       const el=buildSection(cfg,sec,page); if (!el) return; el.id="sec-"+sec.id; body.append(el);
       if (sec.eyebrow && sec.type!=="hero" && sec.type!=="heroCarousel"){ n++; const a=h("a",{href:"#"+page.id,"data-sec":sec.id,html:`${NUM.on?`<span>${pad(n)}</span>`:""}${esc(sec.eyebrow)}`});
         a.addEventListener("click",e=>{ e.preventDefault(); el.scrollIntoView({behavior:reduce?"auto":"smooth"}); }); ol.append(h("li",{},a)); }
     });
     rail.append(ol); wrap.append(rail,body); main.append(wrap);
   } else {
-    page.sections.forEach(sec=>{ const el=buildSection(cfg,sec,page); if (el){ el.id="sec-"+sec.id; main.append(el); } });
+    sections.forEach(sec=>{ const el=buildSection(cfg,sec,page); if (el){ el.id="sec-"+sec.id; main.append(el); } });
   }
   if (!heroFirst && page.layout!=="console") main.style.paddingTop="110px";
   app.append(main, h("footer",{class:"wrap site-foot"},h("span",{class:"mono",text:cfg.site.footer||""}),h("span",{class:"mono",html:`<b>${esc(page.title||"")}</b>`})));
@@ -106,7 +107,9 @@ const SECTIONS={
     const kb=i=>{ const n=S[i].node; if (!n || reduce || !M.kenBurns) return; const z=+M.kbZoom||1.18, dirs=[[-1.5,1],[1.5,0],[1,-1],[0,1]][i%4];
       gsap.fromTo(n,{scale:i%2?1.03:z,xPercent:dirs[0],yPercent:dirs[1]},{scale:i%2?z:1.03,xPercent:-dirs[0],yPercent:-dirs[1],duration:+M.kbDuration||10,ease:"sine.inOut",overwrite:true}); };
     const setActive=i=>{ curEl.textContent=pad(i+1); scn.textContent=NUM.on?"SC "+pad(i+1):"SC"; [...dots.children].forEach((d,j)=>{ d.classList.toggle("on",j===i); d.setAttribute("aria-selected",j===i?"true":"false"); }); };
-    const startProg=i=>{ prog&&prog.kill(); const dur=timing(i).duration*(reduce?1.6:1);
+    // A slide stays until the visitor moves on when the carousel does not autoplay or the slide is set to stay.
+    const holds=i=>sec.autoplay===false || !!(slides[i]||{}).hold;
+    const startProg=i=>{ prog&&prog.kill(); prog=null; if (holds(i)) return; const dur=timing(i).duration*(reduce?1.6:1);
       prog=gsap.fromTo({p:0},{p:0},{p:1,duration:dur,ease:"none",onComplete:()=>go((cur+1)%S.length,1)});
       if (modalIsOpen()) prog.pause(); };
     Site.pauseHero=()=>prog&&prog.pause(); Site.resumeHero=()=>prog&&prog.resume();

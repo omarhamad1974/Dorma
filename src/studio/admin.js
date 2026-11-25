@@ -23,9 +23,12 @@ const IC={
   up:'<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
   x:'<svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3 3 13"/></svg>',
   grip:'<svg viewBox="0 0 16 16"><circle cx="5" cy="4" r="1.3"/><circle cx="11" cy="4" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="11" cy="12" r="1.3"/></svg>',
+  carousels:'<svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="14" rx="2"/><path d="M3 8v8M21 8v8"/></svg>',
+  copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+  eyeOff:'<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["blog","Blog"]];
+const PANELS=[["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"]];
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 
@@ -77,7 +80,7 @@ function openPanel(k){
   Admin.panel=k; Admin.refresh=null;
   $$(".adm-side button[data-p],.adm-mobile-nav button[data-p]").forEach(b=>b.classList.toggle("on",b.dataset.p===k));
   const body=$("#admBody"); if (!body) return; body.textContent=""; disposePage();
-  ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,blog:panelBlog})[k](body);
+  ({site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -202,15 +205,23 @@ function listEditor(obj,key,opts,onChange){
   const arr=obj[key]=obj[key]||[], box=h("div",{class:"sub-list"});
   const draw=()=>{ box.textContent="";
     arr.forEach((it,i)=>box.append(subCard(it,{title:()=>it[opts.title]||"Item "+(i+1),kind:opts.kindLabel?opts.kindLabel(it):"",open:false,
-      body:()=>fieldsFor(it,opts.fields,onChange),onRemove:()=>{ arr.splice(i,1); draw(); onChange(); touch(); }})));
+      body:()=>fieldsFor(it,opts.fields,onChange),onRemove:()=>{ arr.splice(i,1); draw(); onChange(); touch(); },
+      onDuplicate:()=>{ arr.splice(i+1,0,clone(it)); draw(); box.children[i+1]?._open?.(); onChange(); touch(); }})));
     box.append(h("button",{class:"btn sm",type:"button",html:IC.plus+"Add",onclick:()=>{ arr.push(opts.blank?opts.blank():{}); draw(); const last=box.children[box.children.length-2]; last&&last.classList.remove("closed"); onChange(); touch(); }}));
     sortable(box,arr,()=>{ draw(); onChange(); touch(); }); };
   draw(); return box;
 }
-function subCard(item,{title,kind,body,onRemove,open}){
-  const card=h("div",{class:"sub-item"+(open?"":" closed")}), t=h("span",{class:"t",text:title()});
+function subCard(item,{title,kind,body,onRemove,open,onDuplicate,onToggleHidden}){
+  const card=h("div",{class:"sub-item"+(open?"":" closed")+(item&&item.hidden?" is-hidden":"")}), t=h("span",{class:"t",text:title()});
+  const hideBtn=onToggleHidden?h("button",{class:"x",type:"button"}):null;
+  const syncHide=()=>{ if (!hideBtn) return; const hid=!!item.hidden; card.classList.toggle("is-hidden",hid); hideBtn.innerHTML=hid?IC.eyeOff:IC.eye;
+    hideBtn.setAttribute("aria-label",hid?"Hidden from visitors. Show it":"Shown to visitors. Hide it"); hideBtn.title=hid?"Hidden. Click to show":"Shown. Click to hide"; hideBtn.setAttribute("aria-pressed",hid?"true":"false"); };
+  if (hideBtn){ hideBtn.addEventListener("click",e=>{ e.stopPropagation(); onToggleHidden(); syncHide(); }); syncHide(); }
   const head=h("div",{class:"sub-head"},h("span",{class:"handle",html:IC.grip,"aria-hidden":"true"}),kind?h("span",{class:"k",text:kind}):null,t,
-    h("button",{class:"x",type:"button","aria-label":"Remove",html:IC.x,onclick:e=>{ e.stopPropagation(); confirmInline(card,"Remove this item?",onRemove); }}));
+    onToggleHidden?h("span",{class:"k hid-tag",text:"Hidden"}):null,
+    hideBtn,
+    onDuplicate?h("button",{class:"x",type:"button","aria-label":"Duplicate",title:"Duplicate",html:IC.copy,onclick:e=>{ e.stopPropagation(); onDuplicate(); }}):null,
+    h("button",{class:"x",type:"button","aria-label":"Remove",title:"Remove",html:IC.x,onclick:e=>{ e.stopPropagation(); confirmInline(card,"Remove this item?",onRemove); }}));
   let built=false; const b=h("div",{class:"sub-body"});
   const build=()=>{ if (built) return; built=true; b.append(body()); b.addEventListener("input",()=>{ t.textContent=title(); }); b.addEventListener("change",()=>{ t.textContent=title(); }); };
   head.addEventListener("click",e=>{ if (e.target.closest(".handle")) return; card.classList.toggle("closed"); if (!card.classList.contains("closed")) build(); });
@@ -369,9 +380,9 @@ function panelMotion(body){
   Admin.refresh=play; play();
   body.append(card(h("span",{},"Preview"),prev,h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.replay+"Replay",onclick:play})),
     card("Global",fieldsFor(M,[["speed","range","Overall speed",{min:.4,max:2,step:.05}],["ease","select","Easing",{options:OPT.ease}],["titleReveal","select","Title reveal",{options:OPT.titleReveal}],["scrollReveal","select","Sections on scroll",{options:OPT.scrollReveal}],["counters","toggle","Count numbers up"],["parallax","toggle","Mouse parallax on heroes"]])),
-    card("Hero carousel",fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","range","Seconds per slide",{min:3,max:15,step:.5}],["buttonGlow","range","Button glow (0 = off)",{min:0,max:1,step:.05,theme:true}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]])),
+    card("Buttons",fieldsFor(M,[["buttonGlow","range","Button glow (0 = off)",{min:0,max:1,step:.05,theme:true}]])),
     card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]])),
-    h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows."}));
+    h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows. Carousel transitions and slide times are under Carousels."}));
 }
 function panelIcons(body){
   const D=Store.draft;
@@ -456,6 +467,25 @@ function panelModals(body){
       ];
     }});
 }
+const secTitle=s=>plain(s.title)||plain(s.eyebrow)||(s.slides&&s.slides[0]&&plain(s.slides[0].title))||(SECTION_TYPES[s.type]||{}).label||"Section";
+/* Carousels: every hero carousel on every page, with its slides, in one place. */
+function panelCarousels(body){
+  const D=Store.draft, M=D.motion;
+  const all=()=>D.pages.flatMap(p=>p.sections.filter(s=>s.type==="heroCarousel").map(s=>({id:s.id,s,p})));
+  body.append(h("p",{class:"adm-intro",text:"Settings for every carousel, then each carousel and its slides. A slide can stay up as long as you like, like a page: set its seconds on screen to any number, or turn on \"Stay on this slide\"."}),
+    card("All carousels",fieldsFor(M,[["transition","select","Slide transition",{options:OPT.transition}],["slideDuration","number","Seconds per slide (any length)",{min:1,step:.5}],["kenBurns","toggle","Slow cinematic zoom"],["kbZoom","range","Zoom amount",{min:1,max:1.4,step:.01}],["kbDuration","range","Zoom duration (s)",{min:4,max:24,step:1}]])));
+  if (!all().length){ body.append(h("p",{class:"adm-intro",text:"No carousels yet. Add a Hero carousel section to a page under Pages."})); return; }
+  const T=SECTION_TYPES.heroCarousel, setF=T.fields.filter(f=>f[0]!=="slides"), slidesF=T.fields.find(f=>f[0]==="slides");
+  masterDetail(body,{items:all,selKey:"carousels",label:x=>secTitle(x.s),kind:x=>(x.p.title||x.p.id)+(x.s.hidden?" · hidden":""),
+    detail:({s,p},redraw)=>{
+      if (s.autoplay===undefined) s.autoplay=true;
+      return [
+        card(h("span",{class:"grow"},"Carousel on "+(plain(p.title)||p.id)),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:()=>{ Admin.sel.pages=p.id; Site.preview=true; if (location.hash.slice(1)===p.id) route(); else location.hash=p.id; }}),
+          F(s,"hidden","toggle","Hide this carousel from visitors",{},()=>redraw()),fieldsFor(s,setF,()=>redraw())),
+        card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw()))
+      ];
+    }});
+}
 function panelPages(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Each page is a stack of sections. Pick a layout, add sections and drag them into order. Preview draft shows the page you have selected."}));
@@ -472,7 +502,12 @@ function panelPages(body){
       const secs=h("div",{class:"sub-list"});
       const drawSecs=()=>{ secs.textContent="";
         p.sections.forEach((s,i)=>{ const T=SECTION_TYPES[s.type]; if (!T) return;
-          secs.append(subCard(s,{title:()=>s.title||s.eyebrow||(s.slides&&s.slides[0]&&s.slides[0].title)||T.label,kind:T.label,open:false,body:()=>fieldsFor(s,T.fields),onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); }})); });
+          secs.append(subCard(s,{title:()=>secTitle(s),kind:T.label,open:false,
+            body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
+                h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):fieldsFor(s,T.fields),
+            onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); },
+            onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); },
+            onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; p.sections.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
         const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
         secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ p.sections.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
         sortable(secs,p.sections,()=>{ drawSecs(); touch(); });
@@ -480,7 +515,7 @@ function panelPages(body){
       drawSecs();
       return [
         card(h("span",{class:"grow"},"Page"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:previewDraft}),meta),
-        card("Sections · drag to reorder",secs),
+        card("Sections · drag to reorder, hide or duplicate",secs),
         p.id===D.site.homePage?h("p",{class:"adm-intro",text:"This is the home page, so it can't be deleted. Pick another home page under Site and titles first."}):
           h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete page",onclick:e=>confirmInline(e.currentTarget,"Delete this page?",()=>{ D.pages.splice(D.pages.indexOf(p),1); touch(); openPanel("pages"); })}))
       ];

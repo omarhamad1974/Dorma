@@ -355,7 +355,7 @@ figure{margin:0;min-width:0}
 .color-row{display:flex;align-items:center;gap:8px}
 .color-row input[type=color]{width:40px;height:36px;padding:0;border:1px solid var(--faint);border-radius:7px;background:none;cursor:pointer}
 .toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.86rem;color:var(--fg)}
-.toggle input{appearance:none;width:34px;height:20px;border-radius:20px;background:rgba(238,241,246,.15);position:relative;cursor:pointer;margin:0;transition:background .2s}
+.toggle input{appearance:none;flex:none;width:34px;height:20px;border-radius:20px;background:rgba(238,241,246,.15);position:relative;cursor:pointer;margin:0;transition:background .2s}
 .toggle input::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--fg);transition:transform .2s}
 .toggle input:checked{background:var(--accent)}
 .toggle input:checked::after{transform:translateX(14px);background:#16100b}
@@ -521,3 +521,9 @@ figure{margin:0;min-width:0}
 .hc-dots button{width:8px;height:8px;padding:0;border-radius:50%;border:1px solid var(--faint);background:transparent;cursor:pointer;transition:background .3s,transform .3s,border-color .3s}
 .hc-dots button.on{background:var(--accent);border-color:var(--accent);transform:scale(1.25)}
 .hc-dots button:hover{border-color:var(--accent-line)}
+
+/* studio: hidden sections and the row actions (hide, duplicate, remove) */
+.sub-item.is-hidden>.sub-head .t{opacity:.5;text-decoration:line-through}
+.sub-head .hid-tag{display:none;color:var(--muted)}
+.sub-item.is-hidden>.sub-head .hid-tag{display:inline}
+.sub-head .x[aria-pressed="true"]{color:var(--warn)}
