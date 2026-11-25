@@ -25,6 +25,9 @@ const STARTER = {
     display: "Sora", body: "Sora", mono: "JetBrains Mono",
     radius: 4, grain: true, overlay: 1, imageBrightness: 0.8,
     /* Colour or gradient laid over every image. Each library item can follow this, turn it off, or use its own. */
+    /* "My colours": named swatches offered in every colour picker, and palettes saved from the studio. */
+    swatches: [ { name: "Dorma blue", hex: "#0072bc" }, { name: "Dorma yellow", hex: "#ffcb08" }, { name: "Dorma magenta", hex: "#ed0677" } ],
+    myPalettes: [],
     imageOverlay: { mode: "none", c1: "#0072bc", a1: 0.55, c2: "#ffcb08", a2: 0.35, angle: 135, blend: "normal" }
   },
   motion: {

@@ -120,7 +120,9 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       const c=h("input",{id,type:"color",value:obj[key]||"#000000"}), t=h("input",{type:"text",value:obj[key]||"","aria-label":label+" hex"});
       c.addEventListener("input",()=>{ t.value=c.value; set(c.value,{theme:true}); });
       t.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(t.value)){ c.value=t.value; set(t.value,{theme:true}); } else t.value=obj[key]; });
-      wrap.append(h("div",{class:"color-row"},c,t)); break; }
+      const mine=h("div",{class:"my-sw"}); (D.theme.swatches||[]).filter(s=>/^#[\da-f]{6}$/i.test(s.hex||"")).forEach(s=>mine.append(h("button",{type:"button",title:(s.name||s.hex)+" "+s.hex,"aria-label":"Use "+(s.name||s.hex),style:"background:"+s.hex,
+        onclick:()=>{ c.value=t.value=s.hex.toLowerCase(); set(s.hex.toLowerCase(),{theme:true}); }})));
+      wrap.append(h("div",{class:"color-row"},c,t,mine.children.length?mine:null)); break; }
     case "select": {
       const s=h("select",{id}); (opts.options||[]).forEach(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; const op=h("option",{value:v,text:l}); if (String(obj[key])===String(v)) op.selected=true; s.append(op); });
       s.addEventListener("change",()=>{ const v=(opts.options||[]).map(o=>Array.isArray(o)?o[0]:o).find(v=>String(v)===s.value); set(v,opts.theme?{theme:true}:undefined); }); wrap.append(s); break; }
@@ -321,10 +323,26 @@ const PALETTES=[["Dorma","#ffc93c","#040915","#0b1630","#eef2fa"],["Ember","#ff9
 function panelTheme(body){
   const T=Store.draft.theme;
   const sw=h("div",{class:"swatches"}); PALETTES.forEach(([n,a,ink,panel,fg])=>sw.append(h("button",{type:"button",onclick:()=>{ Object.assign(T,{accent:a,ink,panel,fg}); touch({theme:true}); openPanel("theme"); }},h("i",{style:`background:linear-gradient(135deg,${ink} 50%,${a} 50%)`}),n)));
+  T.myPalettes=Array.isArray(T.myPalettes)?T.myPalettes:[]; T.swatches=Array.isArray(T.swatches)?T.swatches:[];
+  T.myPalettes.forEach((pl,i)=>sw.append(h("span",{class:"saved-pal"},h("button",{type:"button",title:"Use this palette",onclick:()=>{ Object.assign(T,{accent:pl.accent,ink:pl.ink,panel:pl.panel,fg:pl.fg}); touch({theme:true}); openPanel("theme"); }},h("i",{style:`background:linear-gradient(135deg,${pl.ink} 50%,${pl.accent} 50%)`}),pl.name||"My palette"),
+    h("button",{type:"button",class:"rm","aria-label":"Remove palette "+(pl.name||""),html:IC.x,onclick:()=>{ T.myPalettes.splice(i,1); touch({theme:true}); openPanel("theme"); }}))));
+  const palName=h("input",{type:"text",placeholder:"Palette name","aria-label":"Name for the saved palette",class:"adm-pal-name",style:"max-width:220px"});
+  const savePal=h("div",{style:"display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"},palName,h("button",{class:"btn sm",type:"button",html:IC.plus+"Save current colours as a palette",onclick:()=>{
+    T.myPalettes.push({name:palName.value.trim()||"My palette "+(T.myPalettes.length+1),accent:T.accent,ink:T.ink,panel:T.panel,fg:T.fg}); touch({theme:true}); toast("Palette saved."); openPanel("theme"); }}));
+  /* My colours: named swatches shown next to every colour picker in the studio */
+  const myBox=h("div",{class:"my-colours"});
+  const drawMine=()=>{ myBox.textContent="";
+    T.swatches.forEach((s,i)=>{ const c=h("input",{type:"color",value:/^#[\da-f]{6}$/i.test(s.hex||"")?s.hex:"#000000","aria-label":"Colour"}), x=h("input",{type:"text",value:s.hex||"","aria-label":"Hex code",style:"width:96px"}), n=h("input",{type:"text",value:s.name||"",placeholder:"Name","aria-label":"Colour name"});
+      c.addEventListener("input",()=>{ s.hex=x.value=c.value; touch(); }); x.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(x.value.trim())){ s.hex=c.value=x.value.trim().toLowerCase(); touch(); } else x.value=s.hex; }); n.addEventListener("input",()=>{ s.name=n.value; touch(); });
+      myBox.append(h("div",{class:"my-row"},c,x,n,h("button",{class:"x",type:"button","aria-label":"Remove colour",title:"Remove",html:IC.x,onclick:()=>{ T.swatches.splice(i,1); touch(); drawMine(); }}))); });
+    myBox.append(h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.plus+"Add colour",onclick:()=>{ T.swatches.push({name:"",hex:T.accent||"#ffffff"}); touch(); drawMine(); myBox.querySelectorAll(".my-row")[T.swatches.length-1]?.querySelector("input:nth-of-type(3)")?.focus(); }})); };
+  drawMine();
   const prev=h("div",{class:"preview-box"}); const drawPrev=()=>{ prev.textContent=""; const d=h("div",{class:"txt",style:"gap:14px"},h("p",{class:"eyebrow",html:"<b>01</b> Preview"}),h("h3",{class:"display",style:"font-size:clamp(2rem,4vw,3.4rem)",text:"See further than the map"}),h("p",{class:"lede",text:"Body text in the chosen font and muted colour."}));
     const fl=renderFlow(Store.draft,(Store.draft.flows[0]||{}).id); if (fl){ fl.setActive(0,{fill:true}); d.append(fl.el); } d.append(h("button",{class:"more",type:"button",html:"More"+ARROW_SVG})); prev.append(d,h("span",{class:"lbl-a",text:"Live preview"})); };
   Admin.refresh=drawPrev; drawPrev();
-  body.append(card("Preset palettes",sw),card("Preview",prev),
+  body.append(card("Palettes",sw,savePal),
+    card("My colours",h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
+    card("Preview",prev),
     card("Colours",fieldsFor(T,[["accent","color","Accent"],["ink","color","Background"],["panel","color","Panels"],["fg","color","Text"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
     card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
     card("Image treatment",fieldsFor(T,[["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["overlay","range","Dark overlay on heroes",{min:0,max:1.4,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),

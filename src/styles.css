@@ -527,3 +527,20 @@ figure{margin:0;min-width:0}
 .sub-head .hid-tag{display:none;color:var(--muted)}
 .sub-item.is-hidden>.sub-head .hid-tag{display:inline}
 .sub-head .x[aria-pressed="true"]{color:var(--warn)}
+
+/* studio: My colours */
+.my-sw{display:flex;gap:5px;flex-wrap:wrap;margin-left:4px}
+.my-sw button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.25);padding:0;cursor:pointer}
+.my-sw button:hover{transform:scale(1.15)}
+.color-row{flex-wrap:wrap}
+.my-colours{display:flex;flex-direction:column;gap:8px}
+.my-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.my-row input[type=color]{width:40px;height:36px;padding:0;border:1px solid var(--faint);border-radius:7px;background:none;cursor:pointer}
+.my-row input[type=text]{flex:1;min-width:120px}
+.my-row input[type=text]:nth-of-type(2){flex:0 0 96px;min-width:0}
+.my-row .x,.saved-pal .rm{width:28px;height:28px;border-radius:6px;border:0;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.my-row .x svg,.saved-pal .rm svg{width:13px;height:13px;stroke:currentColor;stroke-width:1.6;fill:none}
+.my-row .x:hover,.saved-pal .rm:hover{color:var(--bad)}
+.saved-pal{display:inline-flex;align-items:center;gap:2px}
+.my-row input[type=text],.adm-pal-name{color-scheme:dark;padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25);color:var(--fg);font-size:.88rem}
+.my-row input[type=text]:focus,.adm-pal-name:focus{outline:none;border-color:var(--accent)}
