@@ -100,6 +100,10 @@ Carousels have their own **Carousels** tab in the studio: settings for all carou
 
 Each slide has its own **flow**: the buttons under its text, which open modals, pages or links. A slide without one uses the section's default flow. Flows never move the slides. Visitors change slides with the arrows, the dots, swiping or the keyboard, and slides also advance on their own after their seconds on screen. Buttons have a soft pulsing glow instead of a progress line. Set its strength, or turn it off, under Animation → Button glow.
 
+### Import slides from Markdown
+
+Under Content › Carousels, **Import slides from Markdown** adds slides from a `.md` file. **Download template** gives you [`public/templates/carousel-slides.md`](public/templates/carousel-slides.md), which explains the format. Each slide has an image (a Library file path, a Library name or an https link; empty uses the carousel's **Default image**), an eyebrow, a title, a subtitle, optional Arabic title and subtitle, seconds on screen, and a flow written as a list of `[Label](modal:id)`, `[Label](page:id)`, `[Label](https://…)` or plain text items. The studio shows a preview first. You can then add the slides after the existing ones or replace them all. Each slide's flow becomes a new flow you can edit under Flows. The parser is `src/studio/mdslides.js`, with tests in `tests/mdslides.test.ts`.
+
 ## Timing (storytelling)
 
 Every hero, hero carousel, timeline, flow strip and modal has a **Timing** row in the studio. It gives the second each piece starts (eyebrow, title, text, image, flow, flow detail, button), counted from when the section scrolls into view, the modal opens, or the slide's text starts. Leave a box empty for the default shown, and use lower numbers to bring a piece forward. Hero carousel slides can also set their own **seconds on screen** and override the section timing. In the hero carousel the default order is title at 0s, short paragraph at 0.5s, then the flow at 1.5s with its buttons appearing one by one (**Gap between flow items**, 0.2s). Elsewhere the flow's item-by-item animation comes from the Flows panel.
