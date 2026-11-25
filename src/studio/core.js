@@ -91,7 +91,49 @@ function applyTheme(cfg){
   r.setProperty("--display",`"${t.display}",${fb}`); r.setProperty("--body",`"${t.body}",${fb}`); r.setProperty("--btn-glow",rgba(t.accent,Math.max(0,Math.min(1,cfg.motion.buttonGlow??.45))*.75)); r.setProperty("--btn-glow-on",(+(cfg.motion.buttonGlow??.45))>0?"1":"0");
   r.setProperty("--mono",`"${t.mono}","IBM Plex Sans Arabic",ui-monospace,Menlo,monospace`);
   r.setProperty("--radius",(+t.radius||0)+"px"); r.setProperty("--ov",t.overlay); r.setProperty("--img-bright",t.imageBrightness);
+  r.setProperty("--heading",hexOk(t.heading)?t.heading:t.fg); r.setProperty("--ov-int",String(num(t.overlayIntensity,1)));
+  headerVars(r,t.header||{});
   document.body.style.background=t.ink;
+}
+/* ---------- global style helpers ----------
+   Colours left empty ("") follow the level above: item → carousel → global → site colours. */
+const hexOk=v=>typeof v==="string"&&/^#[\da-f]{6}$/i.test(v);
+const num=(v,d)=>v===""||v==null||isNaN(+v)?d:+v;
+const setVar=(st,k,v)=>v==null||v===""?st.removeProperty(k):st.setProperty(k,v);
+/** Accent colour and its tints, on one element (a flow, a slide) so it only changes there. */
+function accentVars(st,hex){
+  for (const k of ["--accent","--accent-soft","--accent-line","--accent-glow"]) st.removeProperty(k);
+  if (!hexOk(hex)) return;
+  st.setProperty("--accent",hex); st.setProperty("--accent-soft",rgba(hex,.12)); st.setProperty("--accent-line",rgba(hex,.55)); st.setProperty("--accent-glow",rgba(hex,.5));
+}
+/** Header colours: background (with its strength), text, menu links, active underline. */
+function headerVars(st,hd){
+  const a=Math.max(0,Math.min(1,num(hd.bgAlpha,0)));
+  setVar(st,"--head-bg",hexOk(hd.bg)&&a>0?rgba(hd.bg,a):null);
+  setVar(st,"--head-fg",hexOk(hd.text)?hd.text:null);
+  setVar(st,"--head-link",hexOk(hd.link)?hd.link:hexOk(hd.text)?rgba(hd.text,.72):null);
+  setVar(st,"--head-accent",hexOk(hd.accent)?hd.accent:null);
+}
+/** The colours a flow uses: its own when set to custom, else the global flow colours. */
+function flowColors(cfg,flow){
+  const g=(cfg.theme&&cfg.theme.flow)||{}, own=flow&&flow.custom&&flow.custom.colors?(flow.colors||{}):{};
+  const pick=k=>hexOk(own[k])?own[k]:hexOk(g[k])?g[k]:"";
+  return { text:pick("text"), accent:pick("accent"), sep:pick("sep") };
+}
+/** The animation a flow uses: its own when set to custom (or a flow made outside the studio), else the global one. */
+function flowAnim(cfg,flow){
+  const own=flow&&flow.anim, g=cfg.motion&&cfg.motion.flow;
+  const useOwn=flow&&flow.custom?!!flow.custom.anim:!!own;
+  return {...((useOwn?own:g)||own||g||{mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0})};
+}
+const look=x=>x&&x.look&&x.look.custom?x.look:null;
+/** A carousel slide's look: the slide's own (if custom), then the carousel's (if custom), then the global slide style. */
+function slideLook(cfg,sec,slide){
+  const g=(cfg.theme&&cfg.theme.slide)||{}, c=look(sec), s=look(slide);
+  const col=k=>[s,c,g].map(o=>o&&o[k]).find(hexOk)||"";
+  const n=k=>[s,c].map(o=>o&&o[k]).find(v=>v!==""&&v!=null&&!isNaN(+v));
+  const ov=[s,c].map(o=>o&&o.overlay).find(o=>o&&typeof o==="object"&&o.mode&&o.mode!=="default");
+  return { title:col("title"), text:col("text"), accent:col("accent"), headerText:col("headerText"), overlay:ov||null, intensity:n("intensity"), shade:n("shade") };
 }
 const EASES={expo:"expo",power3:"power3",sine:"sine",back:"back",elastic:"elastic"};
 function ease(cfg,dir="out"){ const e=EASES[cfg.motion.ease]||"expo"; if (e==="back") return `back.${dir}(1.6)`; if (e==="elastic") return dir==="out"?"elastic.out(1,.55)":"power3.in"; return `${e}.${dir}`; }
@@ -200,6 +242,7 @@ function renderFlow(cfg,flowId,opts={}){
   const flow=(cfg.flows||[]).find(f=>f.id===flowId);
   if (!flow) return null;
   const el=h("div",{class:"flow sz-"+(flow.size||"m"),role:"group","aria-label":flow.name||"Flow"});
+  const fc=flowColors(cfg,flow); setVar(el.style,"--flow-fg",fc.text||null); setVar(el.style,"--flow-sep",fc.sep||null); accentVars(el.style,fc.accent);
   const pairs=[], btns=[], seps=[];
   flow.items.forEach((it,i)=>{
     const pr=h("span",{class:"pair"}), b=flowItemEl(cfg,flow,it,i);
@@ -220,7 +263,7 @@ function renderFlow(cfg,flowId,opts={}){
 const TIMING_PARTS = { eyebrow:"Eyebrow", title:"Title", text:"Text", media:"Image or video", flow:"Flow", stagger:"Gap between flow items", detail:"Flow detail", more:"Button", duration:"Seconds on screen" };
 function cue(t,key,def){ const v=t&&t[key]; return v===""||v==null||isNaN(+v)?def:Math.max(0,+v); }
 function animateFlow(cfg,ctl,extraDelay=0,at=null,stagger=null){
-  const a={...(ctl.flow.anim||{mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0})};
+  const a=flowAnim(cfg,ctl.flow);
   if (at!=null){ a.delay=at; extraDelay=0; }
   if (stagger!=null) a.stagger=stagger;
   if (reduce) return;
@@ -307,4 +350,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

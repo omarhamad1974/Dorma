@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, pn, LANGS, siteLangs, setLang, localize, ui } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui } from './core';
 import { Store } from './store';
 import { A } from './data';
 
@@ -53,7 +53,12 @@ function siteHeader(cfg,page){
   const sp=Site.preview?null:studioPill(cfg);
   const langs=siteLangs(cfg), other=langs.find(l=>l!==cfg.__lang);
   const lang=langs.length>1&&other?h("button",{class:"pill lang-pill",type:"button",lang:other,"aria-label":other==="ar"?"عرض الموقع بالعربية":"View the site in English",text:LANGS[other],onclick:()=>{ setLang(other); dispatchEvent(new HashChangeEvent("hashchange")); }}):null;
-  return h("header",{class:"site-head"},h("div",{class:"wrap"},home,nav,h("div",{style:"display:flex;gap:10px;align-items:center"},lang,sp,cta,menu)));
+  const head=h("header",{class:"site-head"},h("div",{class:"wrap"},home,nav,h("div",{style:"display:flex;gap:10px;align-items:center"},lang,sp,cta,menu)));
+  // A page can have its own header colours (Pages → Header on this page); empty values follow the global header.
+  const ph=page&&page.header&&page.header.custom?page.header:null;
+  if (ph){ const g=cfg.theme.header||{}, m={}; ["bg","bgAlpha","text","link","accent"].forEach(k=>{ m[k]=(k==="bgAlpha"?(ph[k]!==""&&ph[k]!=null):hexOk(ph[k]))?ph[k]:g[k]; }); headerVars(head.style,m); }
+  head._base=head.style.getPropertyValue("--head-fg"); head._baseLink=head.style.getPropertyValue("--head-link");
+  return head;
 }
 function studioPill(cfg){
   const box=h("div",{class:"studio-pill"+(Site.preview?" floating":"")});
@@ -77,15 +82,23 @@ const SECTIONS={
     const stage=h("div",{class:"stage"}), wipe=h("div",{class:"wipe"});
     root.append(stage,wipe,h("div",{class:"shade-hero"}));
     if (cfg.theme.grain) root.append(h("div",{class:"grain"}));
-    const S=slides.map((s,i)=>{ const el=h("div",{class:"slide","aria-hidden":"true"}), par=h("div",{class:"par"}); const mid=s.media||sec.defaultMedia||""; const node=mediaNode(cfg,mid,{w:1920,hh:1080}); if (node) par.append(node); el.append(par); if (node){ const ov=overlayEl(cfg,mid); if (ov) el.append(ov); } stage.append(el); return {el,par,node}; });
+    // Colours and filter: slide → carousel → global slide style.
+    const LK=slides.map(s=>slideLook(cfg,sec,s));
+    const S=slides.map((s,i)=>{ const el=h("div",{class:"slide","aria-hidden":"true"}), par=h("div",{class:"par"}); const mid=s.media||sec.defaultMedia||""; const node=mediaNode(cfg,mid,{w:1920,hh:1080}); if (node) par.append(node); el.append(par);
+      const L=LK[i]; if (L.intensity!=null) el.style.setProperty("--ov-int",String(L.intensity));
+      if (node){ const ov=L.overlay?(L.overlay.mode==="none"?null:overlayEl(cfg,mid,L.overlay)):overlayEl(cfg,mid); if (ov) el.append(ov); } stage.append(el); return {el,par,node}; });
+    const head=()=>$(".site-head");
+    const applyLook=i=>{ const L=LK[i], st=root.style;
+      setVar(st,"--heading",L.title||null); setVar(st,"--slide-text",L.text||null); accentVars(st,L.accent); setVar(st,"--ov",L.shade!=null?String(L.shade):null);
+      const hd=head(); if (hd){ setVar(hd.style,"--head-fg",L.headerText||hd._base||null); setVar(hd.style,"--head-link",L.headerText?L.headerText:(hd._baseLink||null)); } };
     const eyeIdx=h("span",{text:"01",style:"color:var(--accent)"}), eyeTxt=h("span",{class:"txt"}), rule=h("span",{style:"width:56px;height:1px;background:var(--faint);transform-origin:left;display:inline-block"});
     const eyebrow=h("p",{class:"eyebrow",style:"--x:0"},eyeIdx,rule,eyeTxt); eyebrow.classList.add("no-after"); eyebrow.style.setProperty("gap","14px");
     const title=h("h1",{class:"title"}), lede=h("p",{class:"lede"});
     const content=h("div",{class:"content","aria-live":"polite"},eyebrow,title,lede);
     let cur=0, busy=false, prog=null, t0=performance.now();
     // Timing: each slide can override the section's reveal times (seconds after the slide's text starts) and its duration.
-    const timing=i=>{ const st=(slides[i]||{}).timing, T=sec.timing, c=(k,d)=>cue(st,k,cue(T,k,d));
-      // Default story order: title, then the short paragraph 0.5s later, then the flow 1s after that, item by item.
+    const timing=i=>{ const st=(slides[i]||{}).timing, T=sec.timing, G=M.slideTiming||{}, c=(k,d)=>cue(st,k,cue(T,k,cue(G,k,d)));
+      // Slide → carousel → global slide timing (Design → Global style). Default story order: title, paragraph 0.5s later, then the flow item by item.
       return { eyebrow:c("eyebrow",.05), title:c("title",0), text:c("text",.5), flow:c("flow",1.5), stagger:c("stagger",.2), duration:cue(st,"duration",0)||(+M.slideDuration||7) }; };
     // Each slide has its own flow (or the section's default flow). Flows open modals, pages or links; they never move the slides.
     const byId={}, FL=slides.map(s=>{ const id=s.flowId||sec.flowId||""; if (!id) return null; if (byId[id]!==undefined) return byId[id];
@@ -138,7 +151,7 @@ const SECTIONS={
             .fromTo(b.par,{xPercent:12*dir},{xPercent:0,duration:D,ease:E},0).to(a.par,{xPercent:-8*dir,duration:D,ease:E},0)
             .fromTo(wipe,{left:dir>0?"100%":"0%",opacity:1},{left:dir>0?"0%":"100%",duration:D,ease:E},0).to(wipe,{opacity:0,duration:.3},1.25);
       if (FL[from]!==FL[n] && !reduce) tl.to(flowBox,{autoAlpha:0,y:-8,duration:.35,ease:"power2.in"},0);
-      tl.add(()=>{ const changed=FL[from]!==FL[n]; showFlow(n); gsap.set(flowBox,{autoAlpha:1,y:0}); textIn(); t0=performance.now(); if (changed||sec.replayFlow) playFlow(n,0); },.75);
+      tl.add(()=>{ const changed=FL[from]!==FL[n]; applyLook(n); showFlow(n); gsap.set(flowBox,{autoAlpha:1,y:0}); textIn(); t0=performance.now(); if (changed||sec.replayFlow) playFlow(n,0); },.75);
     }
     prev.addEventListener("click",()=>go((cur-1+S.length)%S.length,-1));
     next.addEventListener("click",()=>go((cur+1)%S.length,1));
@@ -152,7 +165,7 @@ const SECTIONS={
       onWin("pointermove",e=>{ qx((e.clientX/innerWidth-.5)*-18); qy((e.clientY/innerHeight-.5)*-12); });
     }
     root._after=()=>{
-      gsap.set(S[0].el,{visibility:"visible"}); S[0].el.setAttribute("aria-hidden","false"); setActive(0); kb(0);
+      gsap.set(S[0].el,{visibility:"visible"}); S[0].el.setAttribute("aria-hidden","false"); setActive(0); kb(0); applyLook(0);
       if (!reduce) gsap.from(S[0].el,{opacity:0,duration:1.6,ease:"power2.out"});
       showFlow(0); playFlow(0,.35);
       textIn(.35).eventCallback("onComplete",()=>startProg(0));

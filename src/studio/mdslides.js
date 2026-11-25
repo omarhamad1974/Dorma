@@ -108,7 +108,7 @@ function applySlidesImport(cfg,sec,slides,{mode="append",knownPaths=null}={}){
     if (s.flow.length){
       const fid="f-"+(slug(s.title)||"slide")+"-"+rid();
       cfg.flows.push({ id:fid, name:"Slide: "+(s.title||"Slide "+(i+1)), separator:"dots3", size:"m", progress:false,
-        anim:{ mode:"items", preset:"rise", duration:.8, stagger:.06, delay:0 },
+        anim:{ mode:"items", preset:"rise", duration:.8, stagger:.06, delay:0 }, custom:{ anim:false, colors:false }, colors:{},
         items:s.flow.map((it,j)=>({ id:"i"+(j+1)+rid().slice(0,3), kind:it.kind, label:it.label, icon:"", svg:"", showIndex:false, detail:"", action:it.action, anim:null })) });
       slide.flowId=fid; flows++;
     }
