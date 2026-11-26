@@ -298,6 +298,37 @@ function mediaSlots(cfg,{all=false}={}){
   if (cfg.site&&cfg.site.logo) add(cfg.site,"logo",["Site header","Logo image"],{panel:"site"},{optional:true});
   return out;
 }
+/* ================= IMAGE USAGE =================
+   Where each library item is used, for the "not used yet" filter in the image pickers and the Library.
+   Starts from the image slots above (named places), then sweeps the rest of the site settings for any field that holds a
+   library id (menu logo, loader, backgrounds…) and for [[id|caption]] written in text, so nothing that shows a picture is missed.
+   Returns Map id → list of places (words). Hidden sections and draft posts count as used: the picture is still assigned there. */
+const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type" };
+function mediaUsage(cfg){
+  const ids=new Set((cfg.media||[]).map(m=>m&&m.id).filter(Boolean)), use=new Map(), seen=new WeakMap();
+  const P=v=>v&&typeof v==="object"?(v.en||v.ar||""):String(v??"");
+  const put=(id,where)=>{ if (!ids.has(id)) return; const a=use.get(id)||[]; if (!a.includes(where)) a.push(where); use.set(id,a); };
+  mediaSlots(cfg,{all:true}).forEach(x=>{ const id=x.obj[x.key]; if (!id) return; put(id,x.where.join(" › "));
+    let k=seen.get(x.obj); if (!k) seen.set(x.obj,k=new Set()); k.add(String(x.key)); });
+  const pretty=k=>String(k).replace(/([a-z])([A-Z])/g,"$1 $2").replace(/^./,c=>c.toUpperCase());
+  const label=path=>{ const [top,...rest]=path; let head;
+    if (["pages","modals","flows","posts"].includes(top.k) && rest.length){ const it=rest[0].v||{}, t=P(it.title)||it.name||it.slug||it.id||"";
+      head={pages:"Page: ",modals:"Modal: ",flows:"Flow: ",posts:"Blog: "}[top.k]+t; rest.shift(); }
+    else head=USE_TOP[top.k]||pretty(top.k);
+    return [head,...rest.filter(x=>!/^\d+$/.test(String(x.k))).map(x=>pretty(x.k))].join(" › "); };
+  const walk=(v,path,parent,key)=>{
+    if (typeof v==="string"){
+      if (ids.has(v) && !(seen.get(parent)&&seen.get(parent).has(String(key)))) put(v,label(path));
+      if (v.includes("[[")) for (const m of v.matchAll(/\[\[([^\]|\s]+)/g)) put(m[1],label(path)+" (in the text)");
+      return; }
+    if (!v || typeof v!=="object") return;
+    if (Array.isArray(v)) v.forEach((x,i)=>walk(x,[...path,{k:i,v:x}],v,i));
+    else Object.keys(v).forEach(k=>walk(v[k],[...path,{k,v:v[k]}],v,k)); };
+  Object.keys(cfg).forEach(k=>{ if (k==="media"||k==="categories"||k==="icons") return; walk(cfg[k],[{k,v:cfg[k]}],cfg,k); });
+  /* Articles in the library can carry a cover picture, and their summaries can hold [[id]] too */
+  (cfg.media||[]).forEach(m=>{ if (m&&m.kind==="article"&&typeof m.summary==="string") for (const x of m.summary.matchAll(/\[\[([^\]|\s]+)/g)) put(x[1],"Library article: "+P(m.label)); });
+  return use;
+}
 /** The category a slot's picker opens on: the current image's, else the category most used by its neighbours. */
 function slotCategory(cfg,id){ const m=(cfg.media||[]).find(x=>x&&x.id===id); return m&&m.kind!=="scene"?m.category||"":""; }
 /* Content updates for sites saved before a new starter structure. Nothing is deleted.
@@ -360,4 +391,4 @@ function resetOverrides(cfg,{flows=true,slides=true}={}){
 STARTER.flows.forEach(f=>migrateFlow(f,STARTER.motion.flow));
 STARTER.styles=[{ ...snapshotStyle(STARTER,"Dorma starter"), id:"st-starter", savedAt:"" }];
 
-export { SITE_MAP, normalize, defaultCategory, ensureCategory, migrateMedia, mediaSlots, slotCategory, KIND_CATEGORY, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+export { SITE_MAP, normalize, defaultCategory, ensureCategory, migrateMedia, mediaSlots, mediaUsage, slotCategory, KIND_CATEGORY, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };

@@ -4,7 +4,7 @@ import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
-import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, slotCategory } from './data';
+import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
 import { labelKey } from './jump';
@@ -270,7 +270,10 @@ function actionEditor(a,onChange){
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
 /* Image picker. The field shows the current image large and clear, with a + that opens the library on the same category
    as that image (filters and search still work). Thumbnail size is remembered per browser; filters are shared by every picker. */
-const PICK={ cat:"", q:"" };
+/* Every picker opens on "Not used yet" so each library picture tends to be used once; the admin can switch to Used or All. */
+const PICK={ cat:"", q:"", use:"unused" };
+const PICK_USE=[["unused","Not used yet"],["used","Already used"],["all","All images"]];
+const usedText=places=>"Used in "+places.length+(places.length===1?" place":" places")+":\n"+places.slice(0,8).join("\n")+(places.length>8?"\n…":"");
 const PICK_SIZES=[["s","Small",56],["m","Medium",84],["l","Large",130]];
 const pickSize=()=>{ try { const v=localStorage.getItem("dorma.pickSize"); return PICK_SIZES.some(z=>z[0]===v)?v:"m"; } catch { return "m"; } };
 function setPickSize(v){ try { localStorage.setItem("dorma.pickSize",v); } catch { /* storage blocked */ } }
@@ -281,7 +284,13 @@ const STATE_TEXT={ empty:"No image yet", missing:"Picked image was removed from 
 /** Library browser: filters, thumbnails, and either one pick (onPick) or several (multi, onAdd). */
 function libBrowser({ current="", multi=false, onPick, onAdd, onClose, addLabel="Add" }={}){
   const D=Store.draft, outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), countEl=h("span",{class:"media-pick-count"}), chosen=[];
-  const pool=()=>libFilter(D.media,{kinds:["image","video","scene"]});
+  let usage=mediaUsage(D);
+  const byUse=list=>PICK.use==="all"?list:list.filter(m=>(PICK.use==="used")===usage.has(m.id)||(multi?false:m.id===current)); // the current picture always stays in view
+  const pool=()=>byUse(libFilter(D.media,{kinds:["image","video","scene"]}));
+  const use=h("div",{class:"media-pick-use",role:"group","aria-label":"Show"});
+  const drawUse=()=>{ use.textContent=""; const all=libFilter(D.media,{kinds:["image","video","scene"]}), nUsed=all.filter(m=>usage.has(m.id)).length;
+    const n={unused:all.length-nUsed,used:nUsed,all:all.length};
+    PICK_USE.forEach(([v,l])=>use.append(h("button",{type:"button",class:PICK.use===v?"on":"","aria-pressed":String(PICK.use===v),title:{unused:"Pictures not on any page, section, carousel, flow, modal or post yet",used:"Pictures already placed somewhere on the site",all:"Everything in the library"}[v],onclick:()=>{ PICK.use=v; draw(); }},l+" ",h("b",{text:String(n[v])})))); };
   const applySize=v=>{ const z=PICK_SIZES.find(x=>x[0]===v)||PICK_SIZES[0]; g.style.setProperty("--pick",z[2]+"px"); g.dataset.size=z[0]; };
   const cats=h("select",{"aria-label":"Category"});
   const fillCats=()=>{ cats.textContent=""; const all=pool(); cats.append(h("option",{value:"",text:"All categories ("+all.length+")"}));
@@ -293,14 +302,16 @@ function libBrowser({ current="", multi=false, onPick, onAdd, onClose, addLabel=
   const drawSizes=()=>{ sizes.textContent=""; const cur=pickSize(); PICK_SIZES.forEach(([v,l])=>sizes.append(h("button",{type:"button",class:cur===v?"on":"",text:v.toUpperCase(),title:l+" thumbnails","aria-label":l+" thumbnails","aria-pressed":String(cur===v),onclick:()=>{ setPickSize(v); applySize(v); drawSizes(); }}))); };
   const addBtn=multi?h("button",{class:"btn sm primary",type:"button",disabled:true,onclick:()=>{ if (chosen.length) onAdd(chosen.slice()); }}):null;
   const syncAdd=()=>{ if (!addBtn) return; addBtn.disabled=!chosen.length; addBtn.innerHTML=IC.plus+(chosen.length?addLabel+" ("+chosen.length+")":"Pick one or more images"); };
-  outer.append(h("div",{class:"media-pick-filters"},cats,q,sizes,countEl));
-  const draw=()=>{ g.textContent=""; fillCats();
+  outer.append(use,h("div",{class:"media-pick-filters"},cats,q,sizes,countEl));
+  const draw=()=>{ g.textContent=""; usage=mediaUsage(D); drawUse(); fillCats();
     const all=pool(), found=libFilter(all,{cat:PICK.cat,q:PICK.q}), list=[...found.filter(m=>m.kind!=="scene"),...found.filter(m=>m.kind==="scene")]; // real photos first, placeholders last
     countEl.textContent=list.length===all.length?all.length+" items":list.length+" of "+all.length;
-    list.forEach(m=>{ const n=chosen.indexOf(m.id), on=multi?n>=0:current===m.id;
-      const b=h("button",{type:"button",class:(on?"on":"")+(m.kind==="scene"?" is-ph":""),title:plain(m.label)+(m.kind==="scene"?" (placeholder)":""),"aria-label":plain(m.label),"aria-pressed":String(on)},mediaThumb(m.id),h("span",{text:plain(m.label)}),multi&&on?h("i",{class:"pick-n",text:String(n+1)}):null);
+    list.forEach(m=>{ const n=chosen.indexOf(m.id), on=multi?n>=0:current===m.id, places=usage.get(m.id)||[];
+      const b=h("button",{type:"button",class:(on?"on":"")+(m.kind==="scene"?" is-ph":"")+(places.length?" is-used":" is-free"),title:plain(m.label)+(m.kind==="scene"?" (placeholder)":"")+"\n"+(places.length?usedText(places):"Not used anywhere yet"),"aria-label":plain(m.label)+(places.length?", used in "+places.length+(places.length===1?" place":" places"):", not used yet"),"aria-pressed":String(on)},mediaThumb(m.id),h("span",{text:plain(m.label)}),
+        places.length?h("em",{class:"pick-used",text:places.length>1?"Used ×"+places.length:"Used"}):h("em",{class:"pick-free",text:"New"}),multi&&on?h("i",{class:"pick-n",text:String(n+1)}):null);
       b.addEventListener("click",()=>{ if (!multi){ onPick(m); return; } const k=chosen.indexOf(m.id); if (k>=0) chosen.splice(k,1); else chosen.push(m.id); syncAdd(); draw(); }); g.append(b); });
-    if (!list.length) g.append(h("p",{class:"media-pick-empty",text:"Nothing matches. Try another category or clear the search."})); };
+    if (!list.filter(m=>m.id!==current).length) g.append(h("p",{class:"media-pick-empty"},PICK.use==="unused"?"Every picture here is already used somewhere. ":"Nothing matches. Try another category or clear the search. ",
+      PICK.use!=="all"?h("button",{class:"btn sm",type:"button",text:"Show all images",onclick:()=>{ PICK.use="all"; draw(); }}):null)); };
   applySize(pickSize()); drawSizes(); syncAdd(); draw(); outer.append(h("div",{class:"media-pick-scroll"},g));
   outer.append(h("div",{class:"mp-foot"},addBtn,onClose?h("button",{class:"btn sm",type:"button",text:multi?"Cancel":"Close",onclick:onClose}):null));
   return outer;
@@ -310,7 +321,7 @@ function mediaPicker(obj,key,opts,onChange){
   let open=false;
   const close=()=>{ open=false; drawer.hidden=true; drawer.textContent=""; drawCur(); };
   const toggle=()=>{ if (open){ close(); return; } open=true;
-    const c=slotCategory(D,obj[key]); if (c) PICK.cat=c; else if (opts.cat) PICK.cat=opts.cat; PICK.q="";
+    const c=slotCategory(D,obj[key]); if (c) PICK.cat=c; else if (opts.cat) PICK.cat=opts.cat; PICK.q=""; PICK.use="unused";
     drawer.textContent=""; drawer.append(libBrowser({ current:obj[key], onPick:m=>{ obj[key]=m.id; onChange(); close(); }, onClose:close })); drawer.hidden=false; drawCur(); };
   const drawCur=()=>{ cur.textContent=""; const id=obj[key], m=id?D.media.find(x=>x.id===id):null, st=mediaState(id);
     const pv=h("button",{type:"button",class:"mp-pv"+(m?"":" empty")+(st?" st-"+st:""),title:"Choose from the library","aria-label":(m?"Change "+plain(m.label):"Choose an image")+" from the library","aria-expanded":String(open)});
@@ -343,7 +354,7 @@ function listEditor(obj,key,opts,onChange){
   const mf=(opts.fields||[]).find(f=>f[1]==="media"), mk=mf&&mf[0];
   const thumb=mk?it=>{ const st=mediaState(it[mk]); return it[mk]&&st!=="missing"?h("span",{class:"sub-thumb"+(st?" st-"+st:""),title:st?STATE_TEXT[st]:""},mediaThumb(it[mk])):h("span",{class:"sub-thumb st-"+(st||"empty"),title:STATE_TEXT[st||"empty"],html:IC.plus}); }:null;
   const addFromLib=()=>{ const tray=h("div",{class:"lib-tray"});
-    const c=slotCategory(Store.draft,(arr.find(it=>it&&slotCategory(Store.draft,it[mk]))||{})[mk]); if (c) PICK.cat=c; PICK.q="";
+    const c=slotCategory(Store.draft,(arr.find(it=>it&&slotCategory(Store.draft,it[mk]))||{})[mk]); if (c) PICK.cat=c; PICK.q=""; PICK.use="unused";
     tray.append(h("p",{class:"hint",style:"margin:0",text:"Pick the pictures in the order you want them. Each one becomes a new "+(opts.itemName||"item")+" at the end of the list."}),
       libBrowser({ multi:true, addLabel:"Add as "+(opts.itemName||"item")+"s", onClose:()=>tray.remove(), onAdd:ids=>{
         ids.forEach(id=>{ const it=opts.blank?opts.blank():{}; it[mk]=id; arr.push(it); }); draw(); onChange(); touch();
@@ -1124,7 +1135,7 @@ function panelPages(body){
    - files committed to public/library/<category>/ on GitHub (item.path), found through library/index.json
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
-const LIB={ cat:"", kind:"", q:"", hidden:false };
+const LIB={ cat:"", kind:"", q:"", hidden:false, use:"" };
 const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
@@ -1180,17 +1191,21 @@ function panelMedia(body){
   const search=h("input",{type:"search",placeholder:"Search titles, tags, files","aria-label":"Search the library",value:LIB.q});
   search.addEventListener("input",()=>{ LIB.q=search.value; drawGrid(); });
   const hiddenT=h("label",{class:"toggle"},h("input",{type:"checkbox",checked:LIB.hidden,onchange:e=>{ LIB.hidden=e.target.checked; drawGrid(); }}),"Show hidden");
-  const filters=h("div",{class:"lib-filters"},kinds,h("span",{class:"cat-slot"}),search,hiddenT);
+  const useSel=h("select",{"aria-label":"Used on the site"},...[["","Used or not"],["unused","Not used yet"],["used","Already used"]].map(([v,l])=>h("option",{value:v,text:l,selected:LIB.use===v})));
+  useSel.addEventListener("change",()=>{ LIB.use=useSel.value; drawGrid(); });
+  const filters=h("div",{class:"lib-filters"},kinds,h("span",{class:"cat-slot"}),useSel,search,hiddenT);
   const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"});
   const drawFilters=()=>{ kinds.textContent=""; OPT.libKinds.forEach(([v,l])=>kinds.append(h("button",{type:"button",class:"chip"+(LIB.kind===v?" on":""),text:l,onclick:()=>{ LIB.kind=v; drawFilters(); drawGrid(); }})));
     $(".cat-slot",filters).replaceWith(Object.assign(categorySelect(LIB.cat,v=>{ LIB.cat=v; drawGrid(); }),{className:"cat-slot"})); };
-  const drawGrid=()=>{ grid.textContent="";
-    const list=libFilter(D.media,{kinds:LIB.kind?[LIB.kind]:null,cat:LIB.cat,q:LIB.q,hidden:LIB.hidden});
-    countEl.textContent=list.length+" of "+D.media.length+" items";
+  let usage=mediaUsage(D);
+  const drawGrid=()=>{ grid.textContent=""; usage=mediaUsage(D);
+    const list=libFilter(D.media,{kinds:LIB.kind?[LIB.kind]:null,cat:LIB.cat,q:LIB.q,hidden:LIB.hidden}).filter(m=>!LIB.use||(LIB.use==="used")===usage.has(m.id));
+    const free=D.media.filter(m=>m.kind!=="article"&&!m.hidden&&!usage.has(m.id)).length;
+    countEl.textContent=list.length+" of "+D.media.length+" items · "+free+" pictures not used on the site yet";
     if (!list.length) grid.append(h("p",{class:"adm-intro",text:"Nothing matches. Add files on GitHub (below), or change the filters."}));
     list.forEach(m=>grid.append(h("button",{class:"lib-card"+(m.id===Admin.sel.media?" on":"")+(m.hidden?" is-hidden":""),type:"button",onclick:()=>{ Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
       h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id),m.kind==="article"?null:overlayEl(D,m.id)),
-      h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.url?"Supabase":""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")})))));
+      h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.url?"Supabase":""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")+(m.kind==="article"?"":usage.has(m.id)?" · used"+(usage.get(m.id).length>1?" ×"+usage.get(m.id).length:""):" · not used yet")})))));
   };
   const drawDetail=()=>{ det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
     const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); };
@@ -1207,6 +1222,8 @@ function panelMedia(body){
     det.append(card(h("span",{class:"grow"},"Edit "+({article:"article",scene:"scene",video:"video"}[m.kind]||"image")),pv,src,
       fieldsFor(m,schema,()=>{ redraw(); drawGrid(); }),
       h("p",{class:"hint",text:"Use it in a blog post by writing [["+m.id+"|caption]] on its own line."}),
+      usage.has(m.id)?h("div",{class:"lib-used"},h("b",{text:"Used in "+usage.get(m.id).length+(usage.get(m.id).length===1?" place":" places")}),h("ul",{},...usage.get(m.id).map(w=>h("li",{text:w}))))
+        :h("p",{class:"lib-used is-free",text:"Not used anywhere on the site yet. Image pickers show it first."}),
       h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},del)));
     if (m.kind!=="article") det.append(card("Colour overlay",h("p",{class:"adm-intro",text:"Lay a colour or gradient over this "+(m.kind==="video"?"video":"image")+" wherever it appears. The preview above updates as you change it."}),
       overlayEditor(m,"overlay",{allowDefault:true,onChange:()=>{ redraw(); drawGrid(); }})));
