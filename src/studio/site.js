@@ -1,6 +1,6 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, lightLogoUrl, mediaItem, mediaUrl } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, logoNode } from './core';
 import { Store } from './store';
 import { A } from './data';
 import { flowBlock, sectionVars, modalLook } from './core';
@@ -45,7 +45,8 @@ function renderSite(cfg,pageId){
     sections.forEach(sec=>{ const el=buildSection(cfg,sec,page); if (el){ el.id="sec-"+sec.id; main.append(el); } });
   }
   if (!heroFirst && page.layout!=="console") main.style.paddingTop="110px";
-  app.append(main, h("footer",{class:"wrap site-foot"},h("span",{class:"mono",text:cfg.site.footer||""}),h("span",{class:"mono",html:`<b>${esc(page.title||"")}</b>`})));
+  const fp=((cfg.site.logos||{}).places||{}).footer, footLogo=fp&&fp.show?logoNode(cfg,"footer",siteMode(cfg)==="light"?"light":"dark",{alt:cfg.site.brand||"",cls:"foot-logo"}):null;
+  app.append(main, h("footer",{class:"wrap site-foot"},footLogo,h("span",{class:"mono",text:cfg.site.footer||""}),h("span",{class:"mono",html:`<b>${esc(page.title||"")}</b>`})));
   if (Site.preview) app.append(studioPill(cfg));
   requestAnimationFrame(()=>afterRender(cfg,page));
 }
@@ -57,7 +58,7 @@ function renderSite(cfg,pageId){
 const MENU_DEFAULTS={ mode:"auto", linkStyle:"underline", hover:"fade", upper:false, size:1, gap:30, open:"fade", items:"rise", align:"start", itemSize:1, numbers:false,
   bg:"", bgAlpha:.96, blur:12, fx:"none", logoBottom:true, logo:"", note:"" };
 const menuFor=cfg=>({...MENU_DEFAULTS,...((cfg.theme&&cfg.theme.menu)||{})});
-function menuOverlay(cfg,page,{links,logoUrl}){
+function menuOverlay(cfg,page,{links}){
   const M=menuFor(cfg), ov=h("div",{class:`menu-ov al-${M.align==="center"?"center":"start"}`,role:"dialog","aria-modal":"true","aria-label":ui("Menu"),hidden:true});
   if (hexOk(M.bg)) ov.style.setProperty("--menu-bg",rgba(M.bg,Math.max(0,Math.min(1,+M.bgAlpha))));
   else ov.style.setProperty("--menu-a",String(Math.round(Math.max(0,Math.min(1,+M.bgAlpha||0))*100))+"%");
@@ -67,7 +68,7 @@ function menuOverlay(cfg,page,{links,logoUrl}){
   links.forEach((l,i)=>{ const a=h("a",{href:l.href,"aria-current":l.current?"page":null},M.numbers?h("span",{class:"mono menu-n",text:pad(i+1)}):null,h("span",{class:"menu-t",text:l.text}));
     a.addEventListener("click",()=>Site.closeMenu&&Site.closeMenu(true)); list.append(a); });
   const foot=h("div",{class:"menu-foot"});
-  if (M.logoBottom){ const m=M.logo?mediaItem(cfg,M.logo):null, own=m&&m.kind==="image"&&mediaUrl(m); foot.append(h("img",{class:"menu-logo",src:own||logoUrl(),"data-auto":own?null:"1",alt:cfg.site.brand||""})); }
+  if (M.logoBottom) foot.append(logoNode(cfg,"menu","dark",{alt:cfg.site.brand||"",cls:"menu-logo"})); // its tone follows the header (toneHeader)
   if (M.note) foot.append(h("p",{class:"mono menu-note",text:M.note}));
   ov.append(h("div",{class:"menu-top"},close),list,foot.children.length?foot:null);
   return ov;
@@ -104,8 +105,10 @@ const MOON='<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0
 function toneHeader(cfg,head){
   const light=siteMode(cfg)==="light", dark=!light||head._overHero;
   head.classList.toggle("tone-dark",light&&dark); head.classList.toggle("tone-light",!dark);
-  const img=head.querySelector(".brand-logo img"); if (img) img.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
-  const ml=head.querySelector(".menu-logo[data-auto]"); if (ml) ml.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
+  /* Design → Logo: each place has its own version for dark pages, light pages and (header) over a hero */
+  const bl=head.querySelector(".brand-logo"); if (bl) bl.replaceChildren(logoNode(cfg,"header",!dark?"light":head._overHero?"hero":"dark",{alt:cfg.site.brand||""}));
+  const ml=head.querySelector(".menu-logo"); if (ml) ml.replaceWith(logoNode(cfg,"menu",dark?"dark":"light",{alt:cfg.site.brand||"",cls:"menu-logo"}));
+  const fl=$(".site-foot .foot-logo"); if (fl) fl.replaceWith(logoNode(cfg,"footer",light?"light":"dark",{alt:cfg.site.brand||"",cls:"foot-logo"}));
   const b=head.querySelector(".mode-pill"); if (b){ const l=ui(light?"Switch to dark mode":"Switch to light mode"); b.innerHTML=light?MOON:SUN; b.setAttribute("aria-label",l); b.title=l; }
 }
 /** Switches the site between dark and light in place (no reload) and remembers the visitor's choice. */
@@ -122,7 +125,7 @@ function siteHeader(cfg,page,{overHero=false}={}){
   (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id || (page.isPost && p.id===blogHome(cfg))) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
   const home=cfg.site.logoMode==="text"
     ? h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"")
-    : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},h("img",{src:brandLogoUrl(cfg),alt:cfg.site.brand||"",style:`height:${Math.min(80,Math.max(16,+cfg.site.logoHeight||34))}px`}));
+    : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},logoNode(cfg,"header","dark",{alt:cfg.site.brand||""}));
   const menu=h("button",{class:"menu-btn",type:"button","aria-label":ui("Menu"),"aria-expanded":"false","aria-haspopup":"dialog",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>'});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
   const sp=Site.preview?null:studioPill(cfg);
@@ -134,7 +137,7 @@ function siteHeader(cfg,page,{overHero=false}={}){
   const MN=menuFor(cfg);
   head.classList.add("menu-"+(MN.mode==="overlay"?"overlay":"auto"),"ls-"+(MN.linkStyle||"underline"),"lh-"+(MN.hover||"fade")); if (MN.upper) head.classList.add("nav-upper");
   head.style.setProperty("--nav-size",String(Math.max(.6,Math.min(1.8,+MN.size||1)))); head.style.setProperty("--nav-gap",Math.max(6,Math.min(80,+MN.gap||30))+"px");
-  const ov=menuOverlay(cfg,page,{links:[...nav.querySelectorAll("a")].map(a=>({href:a.getAttribute("href"),text:a.textContent,current:a.hasAttribute("aria-current")})),logoUrl:()=>brandLogoUrl(cfg)});
+  const ov=menuOverlay(cfg,page,{links:[...nav.querySelectorAll("a")].map(a=>({href:a.getAttribute("href"),text:a.textContent,current:a.hasAttribute("aria-current")}))});
   head.append(ov); wireMenu(cfg,head,ov,menu);
   head._overHero=overHero; toneHeader(cfg,head);
   // A page can have its own header colours (Pages → Header on this page); empty values follow the global header.
