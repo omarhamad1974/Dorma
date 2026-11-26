@@ -175,7 +175,9 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
     case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category",required:!!opts.required}); s.id=id; wrap.append(s); break; }
     case "date": { const i=h("input",{id,type:"date",value:obj[key]||""}); i.addEventListener("change",()=>set(i.value)); wrap.append(i); break; }
     case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v),opts.groupLabel?opts.groupLabel+" · "+label:label)); break;
-    case "media": wrap.append(mediaPicker(obj,key,opts,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
+    case "media": { /* a section's main image can also be hidden without removing it (section.mediaHidden) */
+      const secImg=key==="media"&&obj&&typeof obj.type==="string"&&SECTION_TYPES[obj.type]?{hideKey:"mediaHidden"}:{};
+      wrap.append(mediaPicker(obj,key,{...opts,...secImg},()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break; }
     case "icon": wrap.append(iconPicker(obj,key,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
     case "action": { obj[key]=obj[key]||A(); wrap.append(actionEditor(obj[key],()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break; }
     case "button": { obj[key]=obj[key]||{label:"",action:A()}; const b=obj[key];
@@ -312,7 +314,7 @@ function mediaPicker(obj,key,opts,onChange){
     drawer.textContent=""; drawer.append(libBrowser({ current:obj[key], onPick:m=>{ obj[key]=m.id; onChange(); close(); }, onClose:close })); drawer.hidden=false; drawCur(); };
   const drawCur=()=>{ cur.textContent=""; const id=obj[key], m=id?D.media.find(x=>x.id===id):null, st=mediaState(id);
     const pv=h("button",{type:"button",class:"mp-pv"+(m?"":" empty")+(st?" st-"+st:""),title:"Choose from the library","aria-label":(m?"Change "+plain(m.label):"Choose an image")+" from the library","aria-expanded":String(open)});
-    pv.addEventListener("click",toggle);
+    pv.addEventListener("click",toggle); if (opts.hideKey&&obj[opts.hideKey]) pv.classList.add("is-hidden");
     if (m){ pv.append(m.kind==="article"?docThumb(m):(mediaNode(D,m.id,{w:640,hh:360})||h("span",{class:"mp-empty",text:"Can't show this file"}))); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); }
     else pv.append(h("span",{class:"mp-empty",text:id?"Missing":"No image"}));
     pv.append(h("span",{class:"mp-plus",html:open?IC.x:IC.plus,"aria-hidden":"true"}));
@@ -322,7 +324,8 @@ function mediaPicker(obj,key,opts,onChange){
       st&&st!=="empty"?h("span",{class:"mp-flag",text:STATE_TEXT[st]}):null,
       h("div",{class:"mp-actions"},
         h("button",{class:"btn sm"+(open?"":" primary"),type:"button",html:(open?IC.x:IC.plus)+(open?"Close library":m?"Change from library":"Choose from library"),"aria-expanded":String(open),onclick:toggle}),
-        opts.allowNone&&id?h("button",{class:"btn sm",type:"button",text:"Remove",onclick:()=>{ obj[key]=""; onChange(); close(); }}):null,
+        id?h("button",{class:"btn sm",type:"button",text:"Remove image",title:"Take this image out (the library keeps the file)",onclick:()=>{ obj[key]=""; onChange(); close(); }}):null,
+        opts.hideKey&&id?h("button",{class:"btn sm"+(obj[opts.hideKey]?" primary":""),type:"button",text:obj[opts.hideKey]?"Hidden on the site · Show it":"Hide on the site",title:"Keep the image picked but don't show it to visitors",onclick:()=>{ obj[opts.hideKey]=!obj[opts.hideKey]; onChange(); drawCur(); }}):null,
         m?h("button",{class:"btn sm",type:"button",text:"Open in Library",title:"Edit its name, category and overlay",onclick:()=>{ Admin.sel.media=m.id; LIB.cat=""; LIB.kind=""; LIB.q=""; openPanel("media"); }}):null));
     cur.append(pv,info); };
   drawCur(); outer.append(cur,drawer); return outer;

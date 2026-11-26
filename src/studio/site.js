@@ -156,6 +156,7 @@ function studioPill(cfg){
 /* ---------- sections ---------- */
 function buildSection(cfg,sec,page){
   const f=SECTIONS[sec.type]; if (!f) return null;
+  if (sec.mediaHidden) sec={...sec,media:""}; // Pages → section → image → Hide on the site
   let el; try { el=f(cfg,sec,page); } catch(e){ console.error("section",sec.type,e); return null; }
   if (el) try { decorateSection(cfg,sec,el); } catch(e){ console.error("section extras",sec.type,e); }
   return el;

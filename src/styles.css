@@ -1124,3 +1124,4 @@ html.ta-lock,html.ta-lock body{overflow:hidden}
 .menu-note{margin:0;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 html.menu-open{overflow:hidden}
 .site-nav a,.site-head .pill{white-space:nowrap}
+.mp-pv.is-hidden{opacity:.4;filter:grayscale(1)}
