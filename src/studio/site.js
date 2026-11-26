@@ -1,11 +1,13 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, lightLogoUrl, mediaItem, mediaUrl } from './core';
 import { Store } from './store';
 import { A } from './data';
 import { flowBlock, sectionVars, modalLook } from './core';
 import { JUMP, arrive, jumpTo, labelKey } from './jump';
 import { sectionFx } from './fx';
+import { imageFx, sectionMotion, modalIn, modalOut } from './motionfx';
+import { fxPreview } from './fx';
 
 /* ================= SITE RENDERER ================= */
 const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
@@ -19,17 +21,17 @@ function onWin(type,fn,opts){ addEventListener(type,fn,opts); Site.disposers.pus
 function renderSite(cfg,pageId){
   disposePage(); closeModal(true);
   cfg=localize(cfg); NUM.on=cfg.site.showNumbers===true;
-  Site.cfg=cfg; applyTheme(cfg); gsap.globalTimeline.timeScale(+cfg.motion.speed||1);
+  Site.cfg=cfg; applyTheme(cfg,{mode:siteMode(cfg)}); gsap.globalTimeline.timeScale(+cfg.motion.speed||1); watchDeviceMode();
   // "#page/label" opens the page and travels to the section with that label
   if (pageId && !/^post\//.test(pageId) && pageId.includes("/")){ const k=pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
   const pages=cfg.pages||[], page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
   const app=$("#app"); app.textContent=""; scrollTo(0,0);
   if (!page){ app.append(h("div",{class:"denied"},h("div",{},h("p",{class:"lede",text:ui("This site has no pages yet.")})))); return; }
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
-  app.append(siteHeader(cfg,page));
-  const main=h("main",{id:"main"});
   const sections=page.sections.filter(s=>!s.hidden && (!s.previewOnly || Site.preview)); // hidden in the studio = not shown to visitors; preview-only = draft preview only
   const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
+  app.append(siteHeader(cfg,page,{overHero:!!heroFirst}));
+  const main=h("main",{id:"main"});
   if (page.layout==="console"){
     const wrap=h("div",{class:"wrap console"}), rail=h("aside",{class:"rail","aria-label":ui("On this page")}), ol=h("ol"), body=h("div",{class:"console-main"});
     let n=0;
@@ -47,18 +49,94 @@ function renderSite(cfg,pageId){
   if (Site.preview) app.append(studioPill(cfg));
   requestAnimationFrame(()=>afterRender(cfg,page));
 }
-function siteHeader(cfg,page){
+/* ================= MENU =================
+   Design → Global style → Menu (cfg.theme.menu). The header links (style of the current page mark, letter case, size,
+   spacing, hover) and the full-screen menu opened by the menu button: its background, blur, an optional animated effect,
+   how it opens, how its links arrive, numbers, alignment, and the logo and a line of text at the bottom.
+   "Menu button on every screen" uses the full-screen menu on computers too. */
+const MENU_DEFAULTS={ mode:"auto", linkStyle:"underline", hover:"fade", upper:false, size:1, gap:30, open:"fade", items:"rise", align:"start", itemSize:1, numbers:false,
+  bg:"", bgAlpha:.96, blur:12, fx:"none", logoBottom:true, logo:"", note:"" };
+const menuFor=cfg=>({...MENU_DEFAULTS,...((cfg.theme&&cfg.theme.menu)||{})});
+function menuOverlay(cfg,page,{links,logoUrl}){
+  const M=menuFor(cfg), ov=h("div",{class:`menu-ov al-${M.align==="center"?"center":"start"}`,role:"dialog","aria-modal":"true","aria-label":ui("Menu"),hidden:true});
+  if (hexOk(M.bg)) ov.style.setProperty("--menu-bg",rgba(M.bg,Math.max(0,Math.min(1,+M.bgAlpha))));
+  else ov.style.setProperty("--menu-a",String(Math.round(Math.max(0,Math.min(1,+M.bgAlpha||0))*100))+"%");
+  ov.style.setProperty("--menu-blur",Math.max(0,Math.min(30,+M.blur||0))+"px"); ov.style.setProperty("--menu-size",String(Math.max(.5,Math.min(2,+M.itemSize||1))));
+  const close=h("button",{class:"menu-x",type:"button","aria-label":ui("Close"),html:'<svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3 3 13"/></svg>',onclick:()=>Site.closeMenu&&Site.closeMenu()});
+  const list=h("nav",{class:"menu-links","aria-label":ui("Main")});
+  links.forEach((l,i)=>{ const a=h("a",{href:l.href,"aria-current":l.current?"page":null},M.numbers?h("span",{class:"mono menu-n",text:pad(i+1)}):null,h("span",{class:"menu-t",text:l.text}));
+    a.addEventListener("click",()=>Site.closeMenu&&Site.closeMenu(true)); list.append(a); });
+  const foot=h("div",{class:"menu-foot"});
+  if (M.logoBottom){ const m=M.logo?mediaItem(cfg,M.logo):null, own=m&&m.kind==="image"&&mediaUrl(m); foot.append(h("img",{class:"menu-logo",src:own||logoUrl(),"data-auto":own?null:"1",alt:cfg.site.brand||""})); }
+  if (M.note) foot.append(h("p",{class:"mono menu-note",text:M.note}));
+  ov.append(h("div",{class:"menu-top"},close),list,foot.children.length?foot:null);
+  return ov;
+}
+function wireMenu(cfg,head,ov,btn){
+  const M=menuFor(cfg); let fxStop=null, tl=null;
+  const links=()=>$$(".menu-links a",ov), extra=()=>$$(".menu-foot > *",ov);
+  const open=()=>{ if (!ov.hidden) return; ov.hidden=false; btn.setAttribute("aria-expanded","true"); document.documentElement.classList.add("menu-open");
+    if (M.fx&&M.fx!=="none"){ fxStop=fxPreview(ov,{...(((cfg.theme||{}).sections||{}).bgfx||{}),type:M.fx,opacity:.35}); }
+    tl&&tl.kill(); tl=gsap.timeline();
+    if (!reduce){ const o=btn.getBoundingClientRect(), at=`${Math.round(o.left+o.width/2)}px ${Math.round(o.top+o.height/2)}px`;
+      const from={fade:{autoAlpha:0},slide:{xPercent:document.documentElement.dir==="rtl"?-100:100},drop:{yPercent:-100},circle:{clipPath:`circle(0% at ${at})`},curtain:{clipPath:"inset(0% 50% 0% 50%)"},wipe:{clipPath:"inset(0% 0% 100% 0%)"}}[M.open];
+      const to={fade:{autoAlpha:1},slide:{xPercent:0},drop:{yPercent:0},circle:{clipPath:`circle(150% at ${at})`},curtain:{clipPath:"inset(0% 0% 0% 0%)"},wipe:{clipPath:"inset(0% 0% 0% 0%)"}}[M.open];
+      if (M.open==="cmyk"){ const bars=["#00aeef","#ed0677","#ffcb08","#0072bc"].map((c,i)=>{ const b=h("i",{class:"md-bar",style:`background:${c};z-index:${30-i}`}); ov.append(b); return b; });
+        tl.fromTo(bars,{scaleX:0},{scaleX:1,transformOrigin:"100% 50%",duration:.35,ease:"expo.in",stagger:.06}).set(bars,{transformOrigin:"0% 50%"}).to(bars,{scaleX:0,duration:.45,ease:"expo.out",stagger:.06,onComplete:()=>bars.forEach(b=>b.remove())}); }
+      else if (from) tl.fromTo(ov,from,{...to,duration:M.open==="fade"?.4:.7,ease:"expo.inOut",clearProps:"clipPath,transform"});
+      const it={rise:[{y:40,autoAlpha:0},{y:0}],fade:[{autoAlpha:0},{}],slide:[{x:document.documentElement.dir==="rtl"?60:-60,autoAlpha:0},{x:0}],scale:[{scale:.7,autoAlpha:0},{scale:1}],blur:[{filter:"blur(12px)",autoAlpha:0},{filter:"blur(0px)"}]}[M.items];
+      if (it) tl.fromTo(links(),it[0],{...it[1],autoAlpha:1,duration:.6,ease:"power3.out",stagger:.06},M.open==="cmyk"?.45:.2);
+      tl.fromTo(extra(),{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.5,stagger:.08},"-=.3"); }
+    setTimeout(()=>{ const c=$(".menu-x",ov); c&&c.focus({preventScroll:true}); },50); };
+  const close=(now)=>{ if (ov.hidden) return; btn.setAttribute("aria-expanded","false"); document.documentElement.classList.remove("menu-open");
+    const done=()=>{ ov.hidden=true; if (fxStop){ fxStop(); fxStop=null; } gsap.set(ov,{clearProps:"all"}); };
+    tl&&tl.kill(); if (now===true||reduce){ done(); return; }
+    tl=gsap.timeline({onComplete:done}).to(links(),{autoAlpha:0,y:-10,duration:.2,stagger:.02}).to(ov,M.open==="circle"||M.open==="curtain"||M.open==="wipe"?{clipPath:M.open==="curtain"?"inset(0% 50% 0% 50%)":M.open==="wipe"?"inset(0% 0% 100% 0%)":"circle(0% at 100% 0%)",duration:.5,ease:"expo.in"}:M.open==="slide"?{xPercent:100,duration:.45,ease:"expo.in"}:M.open==="drop"?{yPercent:-100,duration:.45,ease:"expo.in"}:{autoAlpha:0,duration:.3},.1);
+    btn.focus({preventScroll:true}); };
+  btn.addEventListener("click",()=>ov.hidden?open():close());
+  ov.addEventListener("keydown",e=>{ if (e.key==="Escape") close(); if (e.key==="Tab"){ const f=$$("a,button",ov); const a=f[0], z=f[f.length-1]; if (e.shiftKey&&document.activeElement===a){ e.preventDefault(); z.focus(); } else if (!e.shiftKey&&document.activeElement===z){ e.preventDefault(); a.focus(); } } });
+  Site.closeMenu=close;
+  Site.disposers.push(()=>{ close(true); document.documentElement.classList.remove("menu-open"); });
+}
+const SUN='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+/** Light or dark tone for the header and its logo: dark mode, or a header over a hero, keeps the dark look. */
+function toneHeader(cfg,head){
+  const light=siteMode(cfg)==="light", dark=!light||head._overHero;
+  head.classList.toggle("tone-dark",light&&dark); head.classList.toggle("tone-light",!dark);
+  const img=head.querySelector(".brand-logo img"); if (img) img.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
+  const ml=head.querySelector(".menu-logo[data-auto]"); if (ml) ml.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
+  const b=head.querySelector(".mode-pill"); if (b){ const l=ui(light?"Switch to dark mode":"Switch to light mode"); b.innerHTML=light?MOON:SUN; b.setAttribute("aria-label",l); b.title=l; }
+}
+/** Switches the site between dark and light in place (no reload) and remembers the visitor's choice. */
+function switchMode(cfg,mode){
+  setSiteMode(mode); applyTheme(cfg,{mode});
+  const head=$(".site-head"); if (head) toneHeader(cfg,head);
+  if (ScrollTrigger) ScrollTrigger.refresh();
+}
+let deviceWatch=false;
+function watchDeviceMode(){ if (deviceWatch||typeof matchMedia==="undefined") return; deviceWatch=true;
+  matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{ const cfg=Site.cfg; if (!cfg||location.hash.slice(1)==="admin") return; applyTheme(cfg,{mode:siteMode(cfg)}); const head=$(".site-head"); if (head) toneHeader(cfg,head); }); }
+function siteHeader(cfg,page,{overHero=false}={}){
   const nav=h("nav",{class:"site-nav","aria-label":ui("Main")});
   (cfg.pages||[]).filter(p=>p.nav).forEach(p=>{ const a=h("a",{href:"#"+p.id,text:p.title}); if (p.id===page.id || (page.isPost && p.id===blogHome(cfg))) a.setAttribute("aria-current","page"); a.addEventListener("click",()=>nav.classList.remove("open")); nav.append(a); });
   const home=cfg.site.logoMode==="text"
     ? h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"")
     : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},h("img",{src:brandLogoUrl(cfg),alt:cfg.site.brand||"",style:`height:${Math.min(80,Math.max(16,+cfg.site.logoHeight||34))}px`}));
-  const menu=h("button",{class:"menu-btn",type:"button","aria-label":ui("Menu"),html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>',onclick:()=>nav.classList.toggle("open")});
+  const menu=h("button",{class:"menu-btn",type:"button","aria-label":ui("Menu"),"aria-expanded":"false","aria-haspopup":"dialog",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>'});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
   const sp=Site.preview?null:studioPill(cfg);
   const langs=siteLangs(cfg), other=langs.find(l=>l!==cfg.__lang);
   const lang=langs.length>1&&other?h("button",{class:"pill lang-pill",type:"button",lang:other,"aria-label":other==="ar"?"عرض الموقع بالعربية":"View the site in English",text:LANGS[other],onclick:()=>{ setLang(other); dispatchEvent(new HashChangeEvent("hashchange")); }}):null;
-  const head=h("header",{class:"site-head"},h("div",{class:"wrap"},home,nav,h("div",{style:"display:flex;gap:10px;align-items:center"},lang,sp,cta,menu)));
+  const modeBtn=(cfg.colorMode||{}).toggle!==false?h("button",{class:"pill mode-pill",type:"button",onclick:()=>switchMode(cfg,siteMode(cfg)==="light"?"dark":"light")}):null;
+  const head=h("header",{class:"site-head"},h("div",{class:"wrap"},home,nav,h("div",{style:"display:flex;gap:10px;align-items:center"},lang,modeBtn,sp,cta,menu)));
+  /* menu: header link style and the full-screen menu */
+  const MN=menuFor(cfg);
+  head.classList.add("menu-"+(MN.mode==="overlay"?"overlay":"auto"),"ls-"+(MN.linkStyle||"underline"),"lh-"+(MN.hover||"fade")); if (MN.upper) head.classList.add("nav-upper");
+  head.style.setProperty("--nav-size",String(Math.max(.6,Math.min(1.8,+MN.size||1)))); head.style.setProperty("--nav-gap",Math.max(6,Math.min(80,+MN.gap||30))+"px");
+  const ov=menuOverlay(cfg,page,{links:[...nav.querySelectorAll("a")].map(a=>({href:a.getAttribute("href"),text:a.textContent,current:a.hasAttribute("aria-current")})),logoUrl:()=>brandLogoUrl(cfg)});
+  head.append(ov); wireMenu(cfg,head,ov,menu);
+  head._overHero=overHero; toneHeader(cfg,head);
   // A page can have its own header colours (Pages → Header on this page); empty values follow the global header.
   const ph=page&&page.header&&page.header.custom?page.header:null;
   if (ph){ const g=cfg.theme.header||{}, m={}; ["bg","bgAlpha","text","link","accent"].forEach(k=>{ m[k]=(k==="bgAlpha"?(ph[k]!==""&&ph[k]!=null):hexOk(ph[k]))?ph[k]:g[k]; }); headerVars(head.style,m); }
@@ -78,6 +156,7 @@ function studioPill(cfg){
 /* ---------- sections ---------- */
 function buildSection(cfg,sec,page){
   const f=SECTIONS[sec.type]; if (!f) return null;
+  if (sec.mediaHidden) sec={...sec,media:""}; // Pages → section → image → Hide on the site
   let el; try { el=f(cfg,sec,page); } catch(e){ console.error("section",sec.type,e); return null; }
   if (el) try { decorateSection(cfg,sec,el); } catch(e){ console.error("section extras",sec.type,e); }
   return el;
@@ -91,7 +170,8 @@ function decorateSection(cfg,sec,el){
     const fl=flowBlock(cfg,fu.flowId,{display:fu.display||""});
     if (fl){ const host=el.querySelector(".inner")||el.querySelector(".wrap")||el; const box=h("div",{class:"flow-under al-"+(fu.align||"start")},fl.el); host.append(box); el._flow=fl; }
   }
-  if (sec.type!=="heroCarousel"&&sec.type!=="hero"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start; }
+  if (sec.type!=="heroCarousel"&&sec.type!=="hero"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start;
+    el._motion=(opts)=>{ try { imageFx(cfg,sec,el,opts); sectionMotion(cfg,sec,el,opts); } catch(e){ console.error("section animation",sec.type,e); } }; }
   if (sec.previewOnly) el.prepend(h("p",{class:"preview-only mono",text:ui("Preview only: fictional sample, not shown to visitors")}));
 }
 const SECTIONS={
@@ -457,6 +537,7 @@ function afterRender(cfg,page){
   const main=$("#main"); if (!main) return;
   $$("section",main).forEach(s=>{ if (s._after) s._after(); });
   $$("section",main).forEach(s=>{ if (s._fx) s._fx(); });
+  $$("section",main).forEach(s=>{ if (s._motion) s._motion(); });
   const M=cfg.motion, ST=ScrollTrigger;
   // scroll reveals: only for things below the first screen, so the page is complete at rest
   if (!reduce && M.scrollReveal!=="none" && ST) $$("[data-rv]",main).forEach(el=>{
@@ -590,24 +671,19 @@ function modalFigure(cfg,mid,caption,{ratio,res,badge}){
   return fig;
 }
 function animateModalIn(cfg,panel,scrim){
-  const items=$$("[data-anim]",panel), style=cfg.motion.modalOpen, LK=MS.look||{};
+  const items=$$("[data-anim]",panel), style=(MS.md&&MS.md.anim&&MS.md.anim.open)||cfg.motion.modalOpen||"line", LK=MS.look||{};
   MS.tl&&MS.tl.kill(); const tl=MS.tl=gsap.timeline();
   if (reduce){ tl.fromTo([scrim,panel],{autoAlpha:0},{autoAlpha:1,duration:.3}); return; }
   const n=(v,d)=>v===""||v==null||isNaN(+v)?d:+v, dim=Math.max(0,Math.min(1,n(LK.dim,.3))), blur=Math.max(0,Math.min(20,n(LK.blur,4)));
   const app=$("#app"); tl.to(app,{autoAlpha:dim,filter:`blur(${blur}px)`,duration:.8,ease:"power3.out"},0).fromTo(scrim,{autoAlpha:0},{autoAlpha:1,duration:.6},0);
-  if (style==="line"){
-    tl.fromTo(panel,{clipPath:"inset(49.6% 50% 49.6% 50%)"},{clipPath:"inset(49.6% 0% 49.6% 0%)",duration:.45,ease:"expo.out"},.05)
-      .to(panel,{clipPath:"inset(0% 0% 0% 0%)",duration:.75,ease:"expo.inOut"},.4)
-      .fromTo($(".scan",panel),{top:"50%",opacity:1},{top:"100%",duration:.75,ease:"expo.inOut"},.4).to($(".scan",panel),{opacity:0,duration:.3},1.05)
-      .fromTo($$(".corner",panel),{scale:0},{scale:1,duration:.5,ease:"back.out(3)",stagger:.05},.9);
-  } else if (style==="scale") tl.fromTo(panel,{scale:.85,autoAlpha:0},{scale:1,autoAlpha:1,duration:.8,ease:ease(cfg)},.05);
-  else if (style==="slide") tl.fromTo(panel,{yPercent:30,autoAlpha:0},{yPercent:0,autoAlpha:1,duration:.9,ease:ease(cfg)},.05);
-  else tl.fromTo(panel,{autoAlpha:0},{autoAlpha:1,duration:.6},.05);
+  const base=modalIn(cfg,tl,panel,style);
+  /* pictures inside the modal (and in its sections) use the image reveal and shape */
+  imageFx(cfg,MS.md,panel,{now:base+.1});
   // Timing values count from when the modal starts opening; the defaults keep the original stagger.
-  const shift=style==="line"?0:-.45, T=MS.md&&MS.md.timing;
+  const shift=base-.75, T=MS.md&&MS.md.timing;
   items.forEach((el,i)=>{ const k=el.dataset.part, at=k?cue(T,k,null):null;
-    tl.fromTo(el,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.7,ease:"power3.out"},at==null?(style==="line"?.75:.3)+i*.06:Math.max(0,at+shift)); });
-  if (MS.subflow){ const at=cue(T,"flow",null); tl.add(()=>MS.subflow.play(0),at==null?(style==="line"?1:.5):Math.max(0,at+shift)); }
+    tl.fromTo(el,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.7,ease:"power3.out"},at==null?base+i*.06:Math.max(0,at+shift)); });
+  if (MS.subflow){ const at=cue(T,"flow",null); tl.add(()=>MS.subflow.play(0),at==null?base+.25:Math.max(0,at+shift)); }
 }
 function stepModal(dir){
   if (MS.seq.length<2) return;
@@ -623,8 +699,10 @@ function closeModal(instant){
   const done=()=>{ MS.tweens.forEach(t=>t.kill()); root.textContent=""; MS.open=false; gsap.set("#app",{clearProps:"filter,opacity,visibility"}); Site.resumeHero&&Site.resumeHero(); if (MS.opener&&MS.opener.focus) MS.opener.focus({preventScroll:true}); };
   MS.tl&&MS.tl.kill();
   if (instant || reduce || !panel){ done(); return; }
-  MS.tl=gsap.timeline({onComplete:done}).to($$("[data-anim]",panel),{y:-10,autoAlpha:0,duration:.3,ease:"power2.in",stagger:.02},0)
-    .to(panel,{autoAlpha:0,scale:.97,duration:.45,ease:"power3.in"},.15).to(scrim,{autoAlpha:0,duration:.45},.3).to("#app",{autoAlpha:1,filter:"blur(0px)",duration:.6,ease:"power3.out"},.35);
+  const cfg=MS.cfg||{motion:{}}, A=(MS.md&&MS.md.anim)||{};
+  MS.tl=gsap.timeline({onComplete:done}).to($$("[data-anim]",panel),{y:-10,autoAlpha:0,duration:.3,ease:"power2.in",stagger:.02},0);
+  modalOut(cfg,MS.tl,panel,A.close||cfg.motion.modalClose||"auto",A.open||cfg.motion.modalOpen||"line");
+  MS.tl.to(scrim,{autoAlpha:0,duration:.45},.3).to("#app",{autoAlpha:1,filter:"blur(0px)",duration:.6,ease:"power3.out"},.35);
 }
 addEventListener("keydown",e=>{
   if (!MS.open) return;
