@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalize, mediaSlots, defaultCategory, STARTER } from '../src/studio/data';
+import { normalize, mediaSlots, mediaUsage, defaultCategory, STARTER } from '../src/studio/data';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
@@ -65,5 +65,36 @@ describe('mediaSlots (Missing images)', () => {
     const c = cfg(); const slot = mediaSlots(c).find((x: Any) => x.state === 'empty');
     slot.obj[slot.key] = 'real';
     expect(c.pages[0].sections[0].media).toBe('real');
+  });
+});
+
+describe('mediaUsage (unused filter in the image pickers)', () => {
+  const cfg = (): Any => {
+    const c: Any = normalize(JSON.parse(JSON.stringify(STARTER)));
+    c.media.push(
+      { id: 'u-free', kind: 'image', path: 'misc/free.jpg', category: 'misc' },
+      { id: 'u-menu', kind: 'image', path: 'misc/menu.jpg', category: 'misc' },
+      { id: 'u-text', kind: 'image', path: 'misc/text.jpg', category: 'misc' },
+      { id: 'u-sec', kind: 'image', path: 'misc/sec.jpg', category: 'misc' },
+    );
+    return c;
+  };
+  it('finds images in sections, in fields outside the named slots, and in [[id]] text', () => {
+    const c = cfg();
+    const sec = c.pages[0].sections.find((s: Any) => 'media' in s && s.type !== 'heroCarousel');
+    sec.media = 'u-sec';
+    c.theme.menu = { ...(c.theme.menu || {}), logo: 'u-menu' };
+    c.posts[0].body = 'Intro\n[[u-text|A caption]]\nMore';
+    const u = mediaUsage(c);
+    expect(u.get('u-sec')[0]).toMatch(/^Page: /);
+    expect(u.get('u-sec').length).toBe(1);
+    expect(u.get('u-menu')).toEqual(['Colours and type › Menu › Logo']);
+    expect(u.get('u-text')[0]).toMatch(/^Blog: .*\(in the text\)$/);
+    expect(u.has('u-free')).toBe(false);
+  });
+  it('ignores strings that are not library ids', () => {
+    const c = cfg();
+    c.site.brand = 'u-nothing';
+    expect(mediaUsage(c).has('u-nothing')).toBe(false);
   });
 });
