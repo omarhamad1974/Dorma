@@ -12,13 +12,15 @@ What each line means:
 
 - Name: the modal's name in the studio. Buttons can open it with (modal:Name) or its id.
   Pick "Update modals with the same name" to change existing ones.
-- Type: 1 (one image or video), 2 (a gallery of three) or 3 (with a flow whose items reveal detail text).
+- Type: 1 (one image or video), 2 (a gallery of three), 3 (with a flow whose items reveal detail text)
+  or 4 (a list of services, each with a short brief and a link).
 - Small label: the label above the title.
 - Title / Text: the heading and short paragraph. Add "Title (Arabic):" and "Text (Arabic):" if needed.
 - Media: one picture for Types 1 and 3, three for Type 2, one per line starting with "- "
   (file path, name as shown in the Library, or https:// link).
 - Captions: one per line starting with "- " (for Type 2, one per gallery picture).
 - Flow: for Type 3. Either the name of a flow, or its items listed underneath, as in flows.md.
+- Services: for Type 4, one per line starting with "- ", with Brief and Link indented under it.
 - More: the button at the bottom, written as [Label](target), for example [Explore the Agency](page:agency).
 
 Everything above the first --- line is ignored.
@@ -69,3 +71,20 @@ Flow:
 - Deliver
   Detail: Coordinate the creative work, production, and delivery required by the brief.
 More: [Start the conversation](modal:md-contact)
+
+---
+Name: Agency services list
+Type: 4
+Small label: Dorma Agency
+Title: Agency services
+Text: Choose a service to see what it can include.
+Media:
+- Placeholder · Ridges detail
+Services:
+- Title: Creative and Visualization
+  Brief: Concepts, brand identity, design, photography, video, and motion.
+  Link: [Open Creative and Visualization](page:creative)
+- Title: Digital Marketing
+  Brief: Website design, content creation, and social media management.
+  Link: [Open Digital Marketing](page:digital-marketing)
+More: [Tell us your challenge](modal:md-contact)

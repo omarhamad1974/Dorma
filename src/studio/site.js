@@ -332,6 +332,27 @@ const SECTIONS={
   banner(cfg,sec){
     return h("section",{class:"sec",style:"padding-block:0"},h("div",{class:"wrap banner","data-rv":""},mediaBox(cfg,sec.media,{ratio:2.39,res:1920,cls:"kb-scrub"}),captionEl(sec.caption)));
   },
+  /* Division: image, short paragraph, an optional button (e.g. open the Agency services modal) and linked items (e.g. service pages). */
+  division(cfg,sec){
+    const txt=h("div",{class:"txt"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb) txt.append(eb);
+    const t=sec.title?h("h2",{class:"h2",text:sec.title}):null, p=sec.text?h("p",{class:"lede",text:sec.text}):null, b=buttonEl(cfg,sec.button);
+    txt.append(...[t,p,b].filter(Boolean));
+    const items=(sec.items||[]).filter(it=>it&&!it.hidden);
+    let list=null;
+    if (items.length){
+      const ul=h("ul",{class:"dv-items"});
+      items.forEach((it,i)=>{ const act=it.action&&it.action.type&&it.action.type!=="none";
+        const inner=[NUM.on?h("span",{class:"mono",text:pad(i+1)}):null,h("span",{class:"dv-t"},h("b",{text:it.title||""}),it.text?h("small",{text:it.text}):null),act?h("span",{class:"dv-go",html:ARROW_SVG}):null];
+        ul.append(h("li",{},act?h("button",{type:"button",class:"dv-row",onclick:()=>runAction(cfg,it.action)},...inner):h("div",{class:"dv-row"},...inner))); });
+      txt.append(ul);
+      list={el:ul,play:(_,at)=>{ const st=cue(sec.timing,"stagger",.08); gsap.fromTo(ul.children,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.8,ease:ease(cfg),delay:at,stagger:st}); }};
+    }
+    const fig=h("figure",{"data-rv":""},mediaBox(cfg,sec.media,{ratio:1.6,res:1200,cls:"kb-scrub"}));
+    const s=h("section",{class:"sec division"},h("div",{class:"wrap"},h("article",{class:"chapter"+(sec.flip?" flip":"")},sec.media?fig:null,txt)));
+    if (!sec.media) s.querySelector(".chapter").classList.add("no-media");
+    s._seq={timing:sec.timing,parts:[["eyebrow",eb,0],["title",t,.1],["text",p,.2],["more",b,.3],["flow",list,.4]]};
+    return s;
+  },
   cta(cfg,sec){
     const w=h("div",{class:"wrap cta","data-rv":""},h("h2",{class:"display",text:sec.title||""})); const b=buttonEl(cfg,sec.button); if (b) w.append(b);
     return h("section",{class:"sec"},w);
@@ -414,7 +435,7 @@ function fillModal(md,panel){
   panel.append(h("span",{class:"scan"}),...["a","b","c","d"].map(c=>h("span",{class:"corner "+c})));
   const multi=MS.seq.length>1;
   panel.append(h("header",{class:"m-head","data-anim":""},h("span",{html:multi&&NUM.on?`${ui("Step")} <b>${pad(MS.idx+1)}</b> / ${pad(MS.seq.length)}`:`<b>${esc(md.kicker||"")}</b>`}),
-    h("span",{class:"m-kind",text:ui(["","Media","Gallery","Flow"][md.type]||"")}),
+    h("span",{class:"m-kind",text:ui(["","Media","Gallery","Flow","Services"][md.type]||"")}),
     h("button",{class:"m-close",type:"button","aria-label":ui("Close"),html:'<svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3 3 13"/></svg>',onclick:()=>closeModal()})));
   const body=h("div",{class:"m-body"});
   const head=[md.kicker?h("p",{class:"eyebrow","data-anim":"","data-part":"eyebrow",text:md.kicker}):null,h("h2",{class:"m-title","data-anim":"","data-part":"title",text:md.title||""})];
@@ -436,8 +457,16 @@ function fillModal(md,panel){
         if (anim && !reduce) gsap.fromTo(det,{autoAlpha:0,y:8},{autoAlpha:1,y:0,duration:.45,ease:"power3.out"}); };
       if (fl){ fl.el.dataset.anim=""; fl.el.dataset.part="flow"; main.append(fl.el,det); show(0,false); MS.subflow=fl; }
     } else MS.subflow=null;
+    if (md.type===4){
+      // Service list: each service has a brief and a link that closes the modal and opens its page.
+      const ul=h("ul",{class:"m-services"});
+      (md.services||[]).filter(sv=>sv&&!sv.hidden).forEach((sv,i)=>{ const L=sv.link||{}, go=L.action&&L.action.type&&L.action.type!=="none";
+        ul.append(h("li",{"data-anim":""},NUM.on?h("span",{class:"mono",text:pad(i+1)}):null,h("div",{},h("h3",{class:"h3",text:sv.title||""}),sv.text?h("p",{text:sv.text}):null,
+          go&&L.label?h("button",{class:"arrow-link",type:"button",html:esc(L.label)+ARROW_SVG,onclick:()=>{ closeModal(); setTimeout(()=>runAction(cfg,L.action),reduce?0:500); }}):null))); });
+      main.append(ul);
+    }
     if (more) main.append(more);
-    if (md.type===3){ body.append(main,fig); } else body.append(fig,main);
+    if (md.type===3||md.type===4){ body.append(main,fig); } else body.append(fig,main);
   }
   panel.append(body);
   if (multi){

@@ -19,14 +19,14 @@ Page lines:
 
 Section lines:
 
-- Section: the section type. One of: Hero carousel, Hero, Chapters, Numbers, About, Clients,
+- Section: the section type. One of: Hero carousel, Hero, Division, Chapters, Numbers, About, Clients,
   Card grid, Accordion, Timeline, Flow strip, Wide banner, Call to action, Blog posts, Text article.
 - Hidden: yes adds the section hidden (you can show it later with one tap in Pages).
 - Any text line can have an Arabic twin on its own line: "Title (Arabic): …".
 - Images: a file path (exhibitions/booth-01.jpg), a name as shown in the Library, or an https:// link.
 - Flow: the name of a flow, or the flow's items listed underneath (see flows.md).
 - Buttons: [Label](target). Targets: modal:name, page:address, post:address, slide:2, https://…
-- Lists (chapters, cards, rows, figures, clients, slides): one item per line starting with "- ",
+- Lists (chapters, linked items, cards, rows, figures, clients, slides): one item per line starting with "- ",
   and that item's own lines indented by two spaces under it.
 - Timing and colour settings are set in the studio after the import.
 
@@ -77,6 +77,23 @@ Eyebrow: Why it matters
 Statement: Your booth should help visitors understand *who you are* and why they should stop.
 Image: Placeholder · Ridges
 Link: [More about the Agency](page:agency)
+
+---
+Section: Division
+Number: 01
+Eyebrow: Dorma Print & Production
+Title: Turn the idea into things people can see and hold.
+Short paragraph: Printed materials, giveaways, packaging, and booths.
+Button: [Agency services](modal:md-agency-services)
+Image on the right: no
+Linked items:
+- Title: Printing Services
+  Brief: Digital, offset, large format, and UV printing.
+  On click: page:printing
+- Title: Booth Construction
+  Brief: From an allocated space to a considered presence.
+  On click: page:booths
+Image: Placeholder · City
 
 ---
 Section: Chapters

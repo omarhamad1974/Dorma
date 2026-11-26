@@ -724,7 +724,7 @@ function panelFlows(body){
 }
 function panelModals(body){
   const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"Type 1 shows one image or video with a caption. Type 2 shows a gallery of three. Type 3 adds a flow whose items reveal detail text. Every type has a More button. Open a modal from any flow item, card or button with the action \"Open modal\"."}),h("div",{class:"imp-links"},importLink("modals","Import modals from a file")));
+  body.append(h("p",{class:"adm-intro",text:"Type 1 shows one image or video with a caption. Type 2 shows a gallery of three. Type 3 adds a flow whose items reveal detail text. Type 4 lists services, each with a short brief and a link to its page. Every type has a More button. Open a modal from any flow item, card or button with the action \"Open modal\"."}),h("div",{class:"imp-links"},importLink("modals","Import modals from a file")));
   masterDetail(body,{items:()=>D.modals,selKey:"modals",label:m=>m.name||m.title,kind:m=>"Type "+m.type,addLabel:"New modal",
     onAdd:()=>{ const m={id:uid("md"),name:"New modal",type:1,kicker:"",title:"New modal",text:"",media:[D.media[0]?.id||""],caption:[],flowId:"",more:{label:"More",action:A()}}; D.modals.push(m); return m; },
     detail:(m,redrawList)=>{
@@ -734,6 +734,7 @@ function panelModals(body){
       drawMedia();
       const base=[["name","text","Name in the studio"],["type","select","Type",{options:OPT.modalTypes}],["kicker","text","Small label"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["caption","strings",m.type===2?"Captions, one per gallery item":"Caption items, one per line (shown with the flow separators)",{wide:true}]];
       if (m.type===3) base.push(["flowId","flow","Flow inside the modal"]);
+      if (m.type===4) base.push(["services","list","Services (each with a short brief and a link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["link","button","Link (e.g. go to the service page)"]], blank:()=>({title:"New service",text:"",link:{label:"Learn more",action:A()}}) }]);
       base.push(["timing","timing","Timing",{parts:m.type===3?[["eyebrow",.75],["title",.81],["text",.87],["flow",1],["detail",.93],["media",.99],["more",1.05]]:[["eyebrow",.75],["title",.81],["text",.87],["media",.93],["more",.99]],hint:"Seconds from when the modal starts opening. Empty uses the default shown. Lower numbers come first."}]);
       return [
         card(h("span",{class:"grow"},"Content"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview modal",onclick:()=>openModal(D,m.id)}),fieldsFor(m,base,(v,k)=>{ if (k==="type"){ openPanel("modals"); } else redrawList(); })),

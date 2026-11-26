@@ -5,6 +5,7 @@
 const A = (type="none",target="") => ({type,target});
 const STARTER = {
   version: 1,
+  contentVersion: 2,   // bump with a migration in normalize() when the starter structure changes
   site: {
     brand: "Dorma Advertising",
     homePage: "home",
@@ -117,6 +118,16 @@ const STARTER = {
       ] }
   ],
   modals: [
+    /* Type 4 · Service list: each service has a short brief and a link to its own page. Opened by the Agency button on the home page. */
+    { id:"md-agency-services", name:"Agency services", type:4, kicker:"Dorma Agency", title:"Agency services",
+      text:"Develop the idea, shape the message, and plan the experience. Choose a service to see what it can include.",
+      media:["m-ridges-2"], caption:["Creative","Digital","Logistics"], flowId:"",
+      services:[
+        { title:"Creative and Visualization", text:"Give your idea a clear direction and its best expression: concepts, brand identity, design, photography, video, and motion.", link:{ label:"Open Creative and Visualization", action:A("page","creative") } },
+        { title:"Digital Marketing", text:"Website design, content creation, and social media management for a clear and consistent digital presence.", link:{ label:"Open Digital Marketing", action:A("page","digital-marketing") } },
+        { title:"Logistics Management", text:"Planning, logistics, and coordination, so people, materials, and timing all work in step.", link:{ label:"Open Logistics Management", action:A("page","logistics") } }
+      ],
+      more:{ label:"Tell us your challenge", action:A("modal","md-contact") } },
     { id:"md-intro", name:"Introducing Dorma", type:1, kicker:"Introducing Dorma", title:"You bring the challenge. We bring it together.",
       text:"Established in 2000, Dorma Advertising brings together creative services, digital communication, event management, printing, and production. We connect the right capabilities around your brief, from a single requirement to a coordinated project.",
       media:["m-nebula-2"], caption:["Since 2000","Agency","Printing & Production"], flowId:"", more:{ label:"About Dorma", action:A("page","about") } },
@@ -177,8 +188,19 @@ const STARTER = {
         { flowId:"f-production", eyebrow:"Printing & Production", title:"Put your brand where people experience it", lede:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city" },
         { eyebrow:"Let's talk", title:"What are you planning next?", lede:"Tell us what you want to achieve. We'll help shape the way forward.", media:"m-ocean" }
       ] },
-      { id:"s-intro", type:"about", num:"01", eyebrow:"Introducing Dorma", text:"You may be launching a product, preparing for an exhibition, refreshing your brand, or looking for a better way to connect with customers. Whatever comes next, it starts with *understanding what you need*.", media:"m-ridges-2", link:{ label:"About Dorma", action:A("page","about") } },
-      { id:"s-divisions", type:"chapters", items:[
+      /* Intro: the two divisions. Agency opens the Agency services modal; each Print & Production item opens its own page. */
+      { id:"s-agency", type:"division", num:"01", eyebrow:"Dorma Agency", title:"Develop the idea, shape the message, and plan the experience.",
+        text:"Established in 2000, Dorma brings together creative services, digital communication, and the logistics that make an experience work. We connect the right capabilities around your brief, from a single requirement to a coordinated project.",
+        media:"m-ridges", flip:false, button:{ label:"Agency services", action:A("modal","md-agency-services") }, items:[] },
+      { id:"s-print", type:"division", num:"02", eyebrow:"Dorma Print & Production", title:"Turn the idea into things people can see and hold.",
+        text:"Printed materials, giveaways, packaging, and booths, produced with attention to materials, details, and finish.",
+        media:"m-city", flip:true, button:{ label:"", action:A() }, items:[
+          { title:"Printing Services", text:"Digital, offset, large format, and UV printing.", action:A("page","printing") },
+          { title:"Giveaways and Packaging", text:"Ready-made branded gifts, merchandising, and manufacturing.", action:A("page","giveaways") },
+          { title:"Booth Construction", text:"From an allocated space to a considered presence.", action:A("page","booths") }
+        ] },
+      { id:"s-intro", hidden:true, type:"about", num:"01", eyebrow:"Introducing Dorma", text:"You may be launching a product, preparing for an exhibition, refreshing your brand, or looking for a better way to connect with customers. Whatever comes next, it starts with *understanding what you need*.", media:"m-ridges-2", link:{ label:"About Dorma", action:A("page","about") } },
+      { id:"s-divisions", hidden:true, type:"chapters", items:[
         { title:"Agency", text:"Develop the idea, shape the message, and plan the experience.", bullets:["Concepts and brand identity","Creative content","Events and brand activation","Exhibitions and booths","Digital presence"], media:"m-ridges", caption:["Division 01","Concepts · Design · Content · Events · Digital"], more:{ label:"Explore the Agency", action:A("page","agency") } },
         { title:"Printing & Production", text:"Turn the idea into printed materials, branded spaces, displays, and products.", bullets:["Print and packaging","Signage and brand applications","Custom fabrication","Corporate gifts and display products"], media:"m-city", caption:["Division 02","Print · Signage · Fabrication · Booths · Gifts & Displays"], more:{ label:"Explore Printing & Production", action:A("page","production") } }
       ] },
@@ -245,6 +267,54 @@ const STARTER = {
         { title:"Printing & Production", tags:["Print","Signage","Fabrication","Booths","Gifts & Displays"], text:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city-2", more:{ label:"Explore Printing & Production", action:A("page","production") } }
       ] },
       { id:"c7", type:"cta", title:"What are you planning next? Let's bring it to life.", button:{ label:"Contact Dorma", action:A("modal","md-contact") } }
+    ] },
+    /* ---------- Service pages (not in the menu: opened from the home intro and the Agency services modal) ---------- */
+    { id:"creative", title:"Creative and Visualization", nav:false, layout:"cinematic", sections:[
+      { id:"cv1", type:"hero", num:"", eyebrow:"Dorma Agency", title:"Creative and Visualization", lede:"Give your idea a clear direction, and your message its best expression.", media:"m-nebula", height:"tall", flowId:"" },
+      { id:"cv2", type:"chapters", items:[
+        { title:"We have an idea. Where do we start?", text:"A new business, campaign, or product needs a concept that people can understand and a visual identity they can recognize. We help define the central idea, shape its message, and develop the design language that carries it across your brand materials.", bullets:["Creative concepts and campaign themes","Brand storytelling and key messages","Logo and visual identity design","Graphic design and campaign artwork","Packaging and business material design"], media:"m-ridges", caption:["Concepts & Brand Identity","From the first thought to a consistent visual expression"], more:{ label:"", action:A() } },
+        { title:"We have something to say. How do we make it connect?", text:"The right image can explain. A film can tell a story. Music can set the mood. We bring design, photography, video, and sound together to create content suited to your message, audience, and channels.", bullets:["Graphic design","Product, corporate, and event photography","Videography and video production","Video editing and motion graphics","Music production"], media:"m-ocean", caption:["Creative Content","One message. The right creative expression."], more:{ label:"", action:A() } }
+      ] },
+      { id:"cv3", type:"cta", title:"We have an idea. Where do we start? With you.", button:{ label:"Tell us your challenge", action:A("modal","md-contact") } }
+    ] },
+    { id:"digital-marketing", title:"Digital Marketing", nav:false, layout:"cinematic", sections:[
+      { id:"dm1", type:"hero", num:"", eyebrow:"Dorma Agency", title:"Digital Marketing", lede:"Build a presence that feels like your brand.", media:"m-ocean", height:"tall", flowId:"" },
+      { id:"dm2", type:"chapters", items:[
+        { title:"Our customers are online. How should we show up?", text:"Your website and social channels should help people understand your business and take the next step. We combine website design, content creation, and social media management to give your brand a clear and consistent digital presence.", bullets:["Website design","Social media planning and management","Graphic content and campaign visuals","Photography and short-form video","Content adapted for different channels"], media:"m-ocean-2", caption:["Digital Marketing","Connected content. Consistent communication."], more:{ label:"", action:A() } }
+      ] },
+      { id:"dm3", type:"cta", title:"Connected content. Consistent communication.", button:{ label:"Tell us your challenge", action:A("modal","md-contact") } }
+    ] },
+    { id:"logistics", title:"Logistics Management", nav:false, layout:"cinematic", sections:[
+      { id:"lg1", type:"hero", num:"", eyebrow:"Dorma Agency", title:"Logistics Management", lede:"Make every element work together.", media:"m-city", height:"tall", flowId:"" },
+      { id:"lg2", type:"chapters", items:[
+        { title:"We need to bring people together. Who connects all the details?", text:"Events and activations depend on more than how they look. People, materials, timing, and logistics all need to work in step. We bring together planning, coordination, and production support for exhibitions, conferences, launches, concerts, and promotional activations.", bullets:["Planning, logistics, and coordination","Event branding and production","Promotional material and sample distribution","Activation team training and supervision","Usher training and supervision"], media:"m-city-2", caption:["Logistics Management","A coordinated experience, from preparation to delivery"], more:{ label:"", action:A() } }
+      ] },
+      { id:"lg3", type:"cta", title:"A coordinated experience, from preparation to delivery.", button:{ label:"Tell us your challenge", action:A("modal","md-contact") } }
+    ] },
+    { id:"printing", title:"Printing Services", nav:false, layout:"cinematic", sections:[
+      { id:"pr1", type:"hero", num:"", eyebrow:"Dorma Print & Production", title:"Printing Services", lede:"Put your brand where people experience it. Different materials, a consistent identity.", media:"m-city", height:"tall", flowId:"" },
+      { id:"pr2", type:"chapters", items:[
+        { title:"Digital Printing", text:"[Short description of digital printing at Dorma: typical jobs, materials, and turnaround.]", bullets:["Stationery and brochures","Labels","[Add more examples]"], media:"m-ridges-2", caption:["Printing Services","Digital Printing"], more:{ label:"", action:A() } },
+        { title:"Offset Printing", text:"[Short description of offset printing at Dorma: typical jobs, quantities, and finishes.]", bullets:["Stationery and brochures","Labels and packaging","[Add more examples]"], media:"m-nebula-2", caption:["Printing Services","Offset Printing"], more:{ label:"", action:A() } },
+        { title:"Large format Printing", text:"[Short description of large format printing at Dorma: sizes, materials, and where it is used.]", bullets:["Indoor and outdoor signage","Window and vinyl graphics","Vehicle branding","[Add more examples]"], media:"m-city-2", caption:["Printing Services","Large format Printing"], more:{ label:"", action:A() } },
+        { title:"UV Printing", text:"[Short description of UV printing at Dorma: surfaces, materials, and typical uses.]", bullets:["[Add examples]"], media:"m-ocean-2", caption:["Printing Services","UV Printing"], more:{ label:"", action:A() } }
+      ] },
+      { id:"pr3", type:"cta", title:"Tell us what you need printed. We'll help shape the way forward.", button:{ label:"Tell us what you need produced", action:A("modal","md-contact") } }
+    ] },
+    { id:"giveaways", title:"Giveaways and Packaging", nav:false, layout:"cinematic", sections:[
+      { id:"gv1", type:"hero", num:"", eyebrow:"Dorma Print & Production", title:"Giveaways and Packaging", lede:"Give your brand a useful place.", media:"m-ridges", height:"tall", flowId:"" },
+      { id:"gv2", type:"chapters", items:[
+        { title:"Ready-made branded gifts", text:"A thoughtful promotional product starts with the person receiving it. We help you explore gifts, merchandise, and display products suited to your audience, occasion, and budget, from everyday essentials to coordinated corporate gift sets.", bullets:["Everyday and office essentials: notebooks, pens, and desk accessories","Drinkware: mugs, bottles, and travel cups","Apparel and bags: T-shirts, caps, and tote bags","Gifts and recognition: gift sets, awards, and commemorative items"], media:"m-ridges-2", caption:["Giveaways and Packaging","Ready-made branded gifts"], more:{ label:"Ask for the catalogues", action:A("modal","md-contact") } },
+        { title:"Merchandising and manufacturing", text:"[Short description of merchandising and custom manufacturing at Dorma: what you make, materials, and packaging.]", bullets:["Labels and packaging","[Add more examples]"], media:"m-nebula-2", caption:["Giveaways and Packaging","Merchandising and manufacturing"], more:{ label:"", action:A() } }
+      ] },
+      { id:"gv3", type:"cta", title:"What can we give people that they'll actually use?", button:{ label:"Ask for the catalogues", action:A("modal","md-contact") } }
+    ] },
+    { id:"booths", title:"Booth Construction", nav:false, layout:"cinematic", sections:[
+      { id:"bc1", type:"hero", num:"", eyebrow:"Dorma Print & Production", title:"Booth Construction", lede:"Turn your space into a brand experience.", media:"m-city", height:"tall", flowId:"" },
+      { id:"bc2", type:"chapters", items:[
+        { title:"We have a space at an exhibition. How do we make it count?", text:"Your booth should help visitors understand who you are, what you offer, and why they should stop and speak with you. We connect the concept, construction, graphics, displays, and presentation materials around your exhibition objectives.", bullets:["Booth concepts and graphic design","Booth construction and custom fabrication","Counters, desks, and product displays","Signage and lighting elements","Presentation films and digital content","Brochures, giveaways, and team preparation"], media:"m-nebula-2", caption:["Booth Construction","From an allocated space to a considered presence"], more:{ label:"", action:A() } }
+      ] },
+      { id:"bc3", type:"cta", title:"Tell us about your next exhibition.", button:{ label:"Plan your booth", action:A("modal","md-contact") } }
     ] }
   ]
 };
@@ -282,7 +352,7 @@ const OPT = {
   heights: [["full","Full screen"],["tall","Tall"],["compact","Compact"]],
   statStyles: [["band","Band"],["hud","HUD tiles"],["meters","Meters"]],
   clientStyles: [["grid","Logo grid"],["marquee","Scrolling logos"],["table","Table"]],
-  modalTypes: [[1,"Type 1 · Media"],[2,"Type 2 · Gallery"],[3,"Type 3 · Flow"]],
+  modalTypes: [[1,"Type 1 · Media"],[2,"Type 2 · Gallery"],[3,"Type 3 · Flow"],[4,"Type 4 · Service list"]],
   scenes: [["nebula","Nebula"],["ridges","Ridges"],["city","City"],["ocean","Ocean"]]
 };
 const ACTION_FIELDS = [["action","action","Action"]];
@@ -306,6 +376,9 @@ const SECTION_TYPES = {
   timeline: { label:"Timeline", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement",{wide:true}],["flowId","flow","Timeline flow (each item's detail text shows on click)"],["timing","timing","Timing",{parts:[["eyebrow",0],["text",.1],["flow",.2],["detail",.5]]}]] },
   flowStrip: { label:"Flow strip", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["flowId","flow","Flow"],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["flow",.2]]}]] },
   banner: { label:"Wide banner", fields:[["caption","strings","Caption items (one per line)",{wide:true}],["media","media","Image",{wide:true}]] },
+  division: { label:"Division (image, text, button and linked items)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["button","button","Button (e.g. open a modal; empty label hides it)"],["flip","toggle","Image on the right"],
+    ["items","list","Linked items (each opens a page, modal or link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["action","action","On click"]], blank:()=>({title:"New item",text:"",action:A()}) }],
+    ["media","media","Image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["text",.2],["more",.3],["flow",.4],["stagger",.08]],hint:"Seconds from when the section comes into view. \"Flow\" is the linked items, \"Gap between flow items\" the time between them."}]] },
   cta: { label:"Call to action", fields:[["title","text","Heading",{wide:true}],["button","button","Button"]] },
   blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
@@ -318,6 +391,7 @@ const SECTION_BLANK = {
   clients:()=>({num:"",eyebrow:"Clients",style:"grid",items:[]}), grid:()=>({title:"Cards",filters:true,items:[]}),
   accordion:()=>({num:"",eyebrow:"",items:[]}), timeline:()=>({num:"",eyebrow:"Story",text:"",flowId:""}),
   flowStrip:()=>({num:"",eyebrow:"",title:"",flowId:""}), banner:()=>({caption:[],media:"m-ocean"}),
+  division:()=>({num:"",eyebrow:"Division",title:"New division",text:"",media:"m-ridges",flip:false,button:{label:"",action:A()},items:[]}),
   cta:()=>({title:"Have a project in mind?",button:{label:"Get in touch",action:A()}}),
   blog:()=>({title:"Latest posts",category:"",limit:12,filters:true,style:"grid"}),
   article:()=>({num:"",eyebrow:"",title:"",body:"Write here. Leave an empty line between paragraphs."})
@@ -334,7 +408,28 @@ function normalize(c){
     else out[k]=c[k];
   }
   (out.flows||[]).forEach(f=>migrateFlow(f,out.motion.flow));
+  migrateContent(out,c);
   return out;
+}
+/* Content updates for sites saved before a new starter structure. Nothing is deleted: new pages and modals are added
+   when missing, and sections they replace are hidden (they can be shown again in Pages). */
+function migrateContent(out,saved){
+  const from=+saved.contentVersion||1;
+  if (from<2 && Array.isArray(saved.pages) && saved.pages.length){
+    const S=JSON.parse(JSON.stringify(STARTER)), has=(list,id)=>list.some(x=>x&&x.id===id);
+    // v2: home intro = Dorma Agency + Dorma Print & Production, the Agency services modal and six service pages
+    S.modals.filter(m=>m.id==="md-agency-services").forEach(m=>{ if (!has(out.modals,m.id)) out.modals.unshift(m); });
+    ["creative","digital-marketing","logistics","printing","giveaways","booths"].forEach(id=>{ const p=S.pages.find(x=>x.id===id); if (p && !has(out.pages,id)) out.pages.push(p); });
+    const home=out.pages.find(p=>p.id===(out.site.homePage||"home"))||out.pages[0], sh=S.pages.find(p=>p.id==="home");
+    if (home && Array.isArray(home.sections) && !has(home.sections,"s-agency")){
+      const add=sh.sections.filter(x=>x.id==="s-agency"||x.id==="s-print");
+      const old=home.sections.filter(x=>x&&(x.id==="s-intro"||x.id==="s-divisions"));
+      old.forEach(x=>x.hidden=true);
+      const at=old.length?home.sections.indexOf(old[0]):Math.min(1,home.sections.length);
+      home.sections.splice(at,0,...add);
+    }
+  }
+  out.contentVersion=Math.max(from,STARTER.contentVersion);
 }
 /* Flows made before global styles keep their look: a flow whose animation differs from the global one becomes "custom". */
 function migrateFlow(f,g={}){

@@ -45,6 +45,42 @@ describe('normalize', () => {
   });
 });
 
+describe('content update v2 (intro divisions and service pages)', () => {
+  const old = () => ({
+    modals: [{ id: 'md-intro', name: 'Mine', type: 1 }],
+    pages: [
+      { id: 'home', title: 'Home', sections: [{ id: 's-hc', type: 'heroCarousel', slides: [{ title: 'Mine' }] }, { id: 's-intro', type: 'about', text: 'My edit' }, { id: 's-divisions', type: 'chapters', items: [] }, { id: 's-cta', type: 'cta' }] },
+      { id: 'about', title: 'About', sections: [] },
+    ],
+  });
+
+  it('adds the new sections after the carousel and hides the old intro without deleting it', () => {
+    const out = normalize(old());
+    const home = out.pages.find((p: Obj) => p.id === 'home');
+    expect(home.sections.map((s: Obj) => s.id)).toEqual(['s-hc', 's-agency', 's-print', 's-intro', 's-divisions', 's-cta']);
+    expect(home.sections[0].slides[0].title).toBe('Mine');
+    expect(home.sections[3]).toMatchObject({ hidden: true, text: 'My edit' });
+    expect(out.contentVersion).toBe(2);
+  });
+
+  it('adds the service pages and the Agency services modal, keeping existing ones', () => {
+    const out = normalize(old());
+    expect(out.pages.map((p: Obj) => p.id)).toEqual(['home', 'about', 'creative', 'digital-marketing', 'logistics', 'printing', 'giveaways', 'booths']);
+    expect(out.modals.map((m: Obj) => m.id)).toEqual(['md-agency-services', 'md-intro']);
+    const printing = out.pages.find((p: Obj) => p.id === 'printing');
+    expect(printing.sections[1].items.map((i: Obj) => i.title)).toEqual(['Digital Printing', 'Offset Printing', 'Large format Printing', 'UV Printing']);
+  });
+
+  it('runs once: a saved v2 site is left as the editor left it', () => {
+    const once = normalize(old());
+    once.pages[0].sections = once.pages[0].sections.filter((s: Obj) => s.id !== 's-print');
+    once.pages = once.pages.filter((p: Obj) => p.id !== 'booths');
+    const again = normalize(once);
+    expect(again.pages[0].sections.some((s: Obj) => s.id === 's-print')).toBe(false);
+    expect(again.pages.some((p: Obj) => p.id === 'booths')).toBe(false);
+  });
+});
+
 describe('starter template', () => {
   const ids = (list: Array<{ id: string }>) => new Set(list.map((x) => x.id));
   const pages = ids(S.pages), modals = ids(S.modals), flows = ids(S.flows), media = ids(S.media), icons = ids(S.icons);
