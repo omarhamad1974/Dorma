@@ -52,5 +52,5 @@ Separator: Single dot
 Size: Small
 Items:
 - [See our booths](modal:md-booths)
-- [Talk to us](modal:md-contact)
+- [Talk to us](modal:md-quote)
 - [Printing & Production](page:production)

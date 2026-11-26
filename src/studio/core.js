@@ -3,6 +3,7 @@ import { gsap } from 'gsap';
 import { openModal } from './site';
 import { isMediaUrl } from './store';
 import { LIBRARY_BASE } from '../config';
+import { goSection } from './jump';
 
 /* ================= CORE HELPERS ================= */
 const $ = (s,el=document)=>el.querySelector(s);
@@ -33,7 +34,7 @@ function localize(cfg){
   const out=walk(cfg); out.__lang=lang; setDocLang(lang); return out;
 }
 /** Visitor-facing words built into the site (buttons, labels), in Arabic. */
-const UI_AR = {"This site has no pages yet.": "لا توجد صفحات في الموقع بعد.", "On this page": "في هذه الصفحة", "Main": "القائمة الرئيسية", "Menu": "القائمة", "Draft preview": "معاينة المسودة", "Back to studio": "العودة إلى الاستوديو", "Open studio": "فتح الاستوديو", "Featured": "مميز", "Previous slide": "الشريحة السابقة", "Next slide": "الشريحة التالية", "New posts are on the way.": "مقالات جديدة قريبًا.", "All posts": "كل المقالات", "More posts": "مقالات أخرى", "Post not found": "المقال غير موجود", "Browse the other posts": "تصفح المقالات الأخرى", "Close": "إغلاق", "Previous": "السابق", "Next": "التالي", "Pause video": "إيقاف الفيديو مؤقتًا", "Play video": "تشغيل الفيديو", "posts": "مقالات", "items": "عناصر", "Media": "وسائط", "Gallery": "معرض", "Flow": "مسار", "Services": "الخدمات", "Step": "الخطوة", "Blog": "المدونة", "This post isn't available": "هذا المقال غير متاح", "It may have been moved or unpublished.": "ربما نُقل أو أُلغي نشره."};
+const UI_AR = {"This site has no pages yet.": "لا توجد صفحات في الموقع بعد.", "On this page": "في هذه الصفحة", "Main": "القائمة الرئيسية", "Menu": "القائمة", "Draft preview": "معاينة المسودة", "Back to studio": "العودة إلى الاستوديو", "Open studio": "فتح الاستوديو", "Featured": "مميز", "Previous slide": "الشريحة السابقة", "Next slide": "الشريحة التالية", "New posts are on the way.": "مقالات جديدة قريبًا.", "All posts": "كل المقالات", "More posts": "مقالات أخرى", "Post not found": "المقال غير موجود", "Browse the other posts": "تصفح المقالات الأخرى", "Close": "إغلاق", "Previous": "السابق", "Next": "التالي", "Pause video": "إيقاف الفيديو مؤقتًا", "Play video": "تشغيل الفيديو", "posts": "مقالات", "items": "عناصر", "Media": "وسائط", "Gallery": "معرض", "Flow": "مسار", "Services": "الخدمات", "Step": "الخطوة", "Blog": "المدونة", "This post isn't available": "هذا المقال غير متاح", "It may have been moved or unpublished.": "ربما نُقل أو أُلغي نشره.", "Explore": "استكشف", "Preview only: fictional sample, not shown to visitors": "للمعاينة فقط: نموذج تجريبي لا يظهر للزوار", "Your name": "الاسم", "Company": "الشركة", "Email": "البريد الإلكتروني", "Phone": "الهاتف", "Service": "الخدمة", "Quantity": "الكمية", "Deadline": "الموعد المطلوب", "Tell us what you need": "أخبرنا بما تحتاج إليه", "Send request": "إرسال الطلب", "Your email app opens with the request ready to send.": "سيفتح تطبيق البريد لديك والطلب جاهز للإرسال.", "Copy the request": "انسخ الطلب", "Copied": "تم النسخ", "Request a Quote": "اطلب عرض سعر", "All": "الكل", "Items are on the way.": "المنتجات قريبًا.", "Quote request": "طلب عرض سعر", "Section": "القسم", "Request a quote for this item": "اطلب عرض سعر لهذا المنتج"};
 const ui = s => LANG.cur==="ar" ? (UI_AR[s]||s) : s;
 const esc = s => String(plain(s)??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -81,8 +82,20 @@ function iconSvg(cfg, id){ const ic=(cfg.icons||[]).find(i=>i.id===id); return i
 /* ---------- theme ---------- */
 function hexRgb(hex){ const m=/^#?([\da-f]{6})$/i.exec(hex||""); if(!m) return [238,241,246]; const n=parseInt(m[1],16); return [n>>16&255,n>>8&255,n&255]; }
 const rgba=(hex,a)=>`rgba(${hexRgb(hex).join(",")},${a})`;
+/* ---------- fonts ----------
+   index.html loads the starter fonts. Any other font picked in the studio is loaded from Google Fonts when it is first used. */
+const PRELOADED=new Set(["Sora","IBM Plex Sans Arabic","Space Grotesk","Manrope","Unbounded","Inter","JetBrains Mono","IBM Plex Mono"]);
+const FONT_W={"Outfit":"300;400;500;600","Syne":"400;500;600;700","Archivo":"300;400;500;600","Poppins":"300;400;500;600","Fraunces":"300;400;500;600","Playfair Display":"400;500;600","Cairo":"300;400;500;600","Tajawal":"300;400;500","Noto Kufi Arabic":"300;400;500;600","Readex Pro":"300;400;500;600","Almarai":"300;400","Alexandria":"300;400;500;600","Caveat":"400;500;600","Kalam":"300;400","Marhey":"400;500;600","Reem Kufi Ink":""};
+const fontsAsked=new Set();
+function loadFonts(names){
+  if (typeof document==="undefined") return;
+  names.filter(n=>typeof n==="string"&&/^[A-Za-z0-9 ]{2,40}$/.test(n)&&!PRELOADED.has(n)&&!fontsAsked.has(n)).forEach(n=>{ fontsAsked.add(n);
+    const w=FONT_W[n], l=document.createElement("link"); l.rel="stylesheet";
+    l.href="https://fonts.googleapis.com/css2?family="+n.replace(/ /g,"+")+(w?":wght@"+w:"")+"&display=swap"; document.head.append(l); });
+}
+const fontStack=(n,fb)=>n?`"${n}",${fb}`:null;
 function applyTheme(cfg){
-  const t=cfg.theme, r=document.documentElement.style, fb='"IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif';
+  const t=cfg.theme, r=document.documentElement.style, ty=t.type||{}, fb=`"${ty.arabic||"IBM Plex Sans Arabic"}","IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif`;
   r.setProperty("--ink",t.ink); r.setProperty("--panel",t.panel); r.setProperty("--fg",t.fg); r.setProperty("--accent",t.accent);
   r.setProperty("--site-ink",t.ink); r.setProperty("--site-panel",t.panel); r.setProperty("--site-fg",t.fg); r.setProperty("--site-accent",t.accent);
   r.setProperty("--site-muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--site-faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--site-glass",rgba(t.fg,.05));
@@ -93,6 +106,13 @@ function applyTheme(cfg){
   r.setProperty("--radius",(+t.radius||0)+"px"); r.setProperty("--ov",t.overlay); r.setProperty("--img-bright",t.imageBrightness);
   r.setProperty("--heading",hexOk(t.heading)?t.heading:t.fg); r.setProperty("--ov-int",String(num(t.overlayIntensity,1)));
   headerVars(r,t.header||{});
+  /* type: sizes multiply the built-in sizes; fonts for subtitles and labels follow Body and Labels when empty */
+  r.setProperty("--ts-title",String(num(ty.titleSize,1))); r.setProperty("--ts-h",String(num(ty.headingSize,1))); r.setProperty("--fw-h",String(num(ty.headingWeight,500)));
+  r.setProperty("--ts-sub",String(num(ty.subSize,1))); r.setProperty("--ts-body",String(num(ty.bodySize,1))); r.setProperty("--ts-label",String(num(ty.labelSize,1)));
+  setVar(r,"--sub-font",fontStack(ty.subFont,fb)); setVar(r,"--label-font",fontStack(ty.labelFont,fb));
+  r.setProperty("--hand",`"${ty.hand||"Caveat"}","${ty.handAr||"Aref Ruqaa"}",cursive`);
+  loadFonts([t.display,t.body,t.mono,ty.subFont,ty.labelFont,ty.arabic,ty.hand||"Caveat",ty.handAr||"Aref Ruqaa"]);
+  sectionVars(r,t.sections||{}); modalVars(r,t.modals||{});
   document.body.style.background=t.ink;
 }
 /* ---------- global style helpers ----------
@@ -100,6 +120,26 @@ function applyTheme(cfg){
 const hexOk=v=>typeof v==="string"&&/^#[\da-f]{6}$/i.test(v);
 const num=(v,d)=>v===""||v==null||isNaN(+v)?d:+v;
 const setVar=(st,k,v)=>v==null||v===""?st.removeProperty(k):st.setProperty(k,v);
+/** Section look: spacing, content width, background, title and subtitle sizes (global, or one section set to Custom). */
+function sectionVars(st,o,{own=false}={}){
+  const pad=num(o.pad,null), w=num(o.width,null), a=Math.max(0,Math.min(1,num(o.bgAlpha,own?1:0)));
+  setVar(st,"--sec-pad",pad==null?null:String(pad)); setVar(st,"--wrap-w",w==null?null:Math.max(640,Math.min(2400,w))+"px");
+  setVar(st,"--sec-bg",hexOk(o.bg)&&a>0?rgba(o.bg,a):null);
+  if (own){ setVar(st,"--ts-h",num(o.titleSize,null)==null?null:String(+o.titleSize)); setVar(st,"--ts-title",num(o.titleSize,null)==null?null:String(+o.titleSize));
+    setVar(st,"--ts-sub",num(o.subSize,null)==null?null:String(+o.subSize)); setVar(st,"--display",o.titleFont?fontStack(o.titleFont,'"IBM Plex Sans Arabic",system-ui,sans-serif'):null);
+    if (o.titleFont) loadFonts([o.titleFont]); setVar(st,"--heading",hexOk(o.title)?o.title:null);
+    setVar(st,"--fg",hexOk(o.text)?o.text:null); setVar(st,"--muted",hexOk(o.text)?rgba(o.text,.72):null); setVar(st,"--accent",hexOk(o.accent)?o.accent:null); }
+}
+/** Modal look: width, panel colour and strength, blur and dim behind it, title size. */
+function modalVars(st,o){
+  const w=num(o.width,null), a=Math.max(0,Math.min(1,num(o.bgAlpha,.88)));
+  setVar(st,"--md-w",w==null?null:Math.max(420,Math.min(1600,w))+"px");
+  setVar(st,"--md-bg",hexOk(o.bg)?rgba(o.bg,a):null);
+  setVar(st,"--md-ts",num(o.titleSize,null)==null?null:String(+o.titleSize));
+}
+/** The look a modal uses: its own (when set to Custom) over the global modal settings. */
+function modalLook(cfg,md){ const g=(cfg.theme&&cfg.theme.modals)||{}, own=md&&md.look&&md.look.custom?md.look:{}; const o={...g};
+  Object.entries(own).forEach(([k,v])=>{ if (k!=="custom" && v!=="" && v!=null) o[k]=v; }); return o; }
 /** Accent colour and its tints, on one element (a flow, a slide) so it only changes there. */
 function accentVars(st,hex){
   for (const k of ["--accent","--accent-soft","--accent-line","--accent-glow"]) st.removeProperty(k);
@@ -228,13 +268,20 @@ function flowItemEl(cfg,flow,it,i){
   const kind=it.kind||"button";
   const b=h("button",{class:"fi k-"+kind,type:"button"});
   const iconMarkup = kind==="svg"?sanitizeSvg(it.svg):(it.icon?iconSvg(cfg,it.icon):"");
-  if (kind==="icon"||kind==="svg"){
+  if (kind==="note"){
+    /* Animated note: the icon draws itself and the label is written beside it in a handwriting font, with a scribbled underline. */
+    b.append(h("span",{class:"ic note-ic",html:iconMarkup||iconSvg(cfg,"i-pen")||'<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg>'}));
+    const hand=h("span",{class:"hand"},h("span",{class:"hand-t",text:it.label||""}));
+    if (it.dots) hand.append(h("span",{class:"hand-dots","aria-hidden":"true",html:"<i>.</i><i>.</i><i>.</i>"}));
+    hand.append(svgEl('<svg class="scribble" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M2 6 C 18 2, 30 9, 46 5 S 76 2, 98 6"/></svg>'));
+    b.append(hand); b.setAttribute("aria-label",plain(it.label)||"");
+  } else if (kind==="icon"||kind==="svg"){
     b.innerHTML=`<span class="ic">${iconMarkup||'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>'}</span>`;
-    b.setAttribute("aria-label",it.label||"Item"); b.title=it.label||"";
+    b.setAttribute("aria-label",plain(it.label)||"Item"); b.title=plain(it.label)||"";
   } else {
     if (it.showIndex && NUM.on && kind==="button") b.append(h("span",{class:"n",text:pad(i+1)}));
     if (iconMarkup){ b.classList.add("has-ic"); b.append(h("span",{class:"ic",html:iconMarkup})); }
-    b.append(document.createTextNode(it.label||""));
+    b.append(document.createTextNode(plain(it.label)||""));
   }
   b.style.setProperty("--gi",String(i));
   return b;
@@ -278,15 +325,78 @@ function animateFlow(cfg,ctl,extraDelay=0,at=null,stagger=null){
     } else {
       presetTween(unit,a.preset,{duration:+a.duration||.8,delay:(+a.delay||0)+extraDelay+seq*(+a.stagger||0),cfg});
     }
+    if ((it.kind||"button")==="note") noteIn(cfg,ctl.btns[i],(+a.delay||0)+extraDelay+(a.mode==="group"?0:seq*(+a.stagger||0))+.25);
     seq++;
   });
+}
+/** The note item's drawing: icon strokes draw in, the words are written left to right (right to left in Arabic), then the underline. */
+function noteIn(cfg,btn,delay=0){
+  if (!btn || reduce) return;
+  const shapes=$$(".note-ic svg path,.note-ic svg circle,.note-ic svg line,.note-ic svg polyline,.note-ic svg polygon,.note-ic svg rect,.note-ic svg ellipse",btn);
+  shapes.forEach(x=>x.setAttribute("pathLength","1"));
+  const t=$(".hand-t",btn), sc=$(".scribble path",btn), dots=$$(".hand-dots i",btn), rtl=LANG.cur==="ar"||document.documentElement.dir==="rtl";
+  if (sc) sc.setAttribute("pathLength","1");
+  const n=Math.max(4,(t&&t.textContent.length)||6), tl=gsap.timeline({delay});
+  if (shapes.length) tl.fromTo(shapes,{strokeDasharray:1,strokeDashoffset:1},{strokeDashoffset:0,duration:.9,ease:"power2.inOut",stagger:.12},0);
+  if (t) tl.fromTo(t,{clipPath:rtl?"inset(-20% 0 -20% 100%)":"inset(-20% 100% -20% 0)"},{clipPath:"inset(-20% 0% -20% 0%)",duration:Math.min(2.2,.09*n+.3),ease:"power1.inOut"},.35);
+  if (sc) tl.fromTo(sc,{strokeDasharray:1,strokeDashoffset:1},{strokeDashoffset:0,duration:.6,ease:"power2.out"},">-0.1");
+  if (dots.length) tl.add(gsap.fromTo(dots,{autoAlpha:.15},{autoAlpha:1,duration:.4,stagger:.18,repeat:-1,yoyo:true,ease:"sine.inOut"}),">");
+  const ic=$(".note-ic",btn); if (ic) tl.add(gsap.to(ic,{rotate:-8,y:-1.5,duration:1.4,ease:"sine.inOut",repeat:-1,yoyo:true,transformOrigin:"50% 80%"}),">");
+  return tl;
+}
+/* ---------- flow blocks: a flow with panels ----------
+   display "row": items run their own action. "tabs": each item switches the visible panel. "reveal": each item reveals its own
+   part of the section (the parts stay once revealed). A panel shows the item's label, detail text, an optional image and,
+   when the item has an action, a button that runs it (open a modal, go to a page or a labelled section, ...). */
+function flowBlock(cfg,flowId,{display="",onAction=null}={}){
+  const flow=(cfg.flows||[]).find(f=>f.id===flowId); if (!flow) return null;
+  const mode=display||flow.display||"row";
+  if (mode!=="tabs"&&mode!=="reveal") return renderFlow(cfg,flowId);
+  const box=h("div",{class:"fblock fb-"+mode}), stage=h("div",{class:"fb-panels"+(mode==="reveal"?" n"+Math.min(4,flow.items.length):""),"aria-live":"polite"});
+  const act=(it)=>{ if (onAction) onAction(it); else runAction(cfg,it.action); };
+  const panel=(it,i)=>{ const go=it.action&&it.action.type&&it.action.type!=="none";
+    const p=h("div",{class:"fb-panel"+(it.media?" has-media":""),"data-i":String(i),role:mode==="tabs"?"tabpanel":"region","aria-label":it.label||""});
+    if (it.media){ const mb=mediaBox(cfg,it.media,{ratio:16/10,res:900}); mb.classList.add("fb-media"); p.append(mb); }
+    const tx=h("div",{class:"fb-txt"},h("small",{class:"mono",text:it.label||""}),it.detail?h("p",{text:it.detail}):null);
+    if (go) tx.append(h("button",{class:"more",type:"button",html:esc(it.ctaLabel||ui("Explore"))+ARROW_SVG,onclick:()=>act(it)}));
+    p.append(tx); return p; };
+  let cur=-1; const done=new Set(), panels=[];
+  const fl=renderFlow(cfg,flowId,{onItem:(i)=>show(i,true)});
+  function show(i,anim){
+    const it=flow.items[i]; if (!it) return;
+    if (mode==="tabs"){
+      if (i===cur) return; const old=stage.firstElementChild, nx=panel(it,i), dir=i>cur?1:-1; cur=i; fl.setActive(i,{fill:true});
+      if (!anim||reduce){ stage.textContent=""; stage.append(nx); return; }
+      stage.style.minHeight=stage.offsetHeight+"px";
+      const tl=gsap.timeline({onComplete:()=>{ stage.style.minHeight=""; }});
+      if (old) tl.to(old,{clipPath:dir>0?"inset(0 100% 0 0)":"inset(0 0 0 100%)",autoAlpha:0,duration:.45,ease:"power3.in",onComplete:()=>old.parentNode&&old.parentNode.removeChild(old)});
+      tl.add(()=>stage.append(nx)).fromTo(nx,{clipPath:dir>0?"inset(0 0 0 100%)":"inset(0 100% 0 0)"},{clipPath:"inset(0 0% 0 0%)",duration:.8,ease:ease(cfg)})
+        .fromTo($$(".fb-txt > *",nx),{y:14,autoAlpha:0},{y:0,autoAlpha:1,duration:.55,stagger:.07,ease:"power3.out"},"<.2");
+      const img=$(".fb-media > *",nx); if (img) tl.fromTo(img,{scale:1.18},{scale:1,duration:1.4,ease:"expo.out"},"<");
+      return;
+    }
+    /* reveal: the part opens from the item that was clicked, through a growing circle mask */
+    fl.setActive(i,{fill:true}); fl.btns[i].classList.add("is-done");
+    const slot=panels[i]; if (!slot||done.has(i)){ if (slot&&anim&&!reduce) gsap.fromTo(slot,{scale:.98},{scale:1,duration:.5,ease:"back.out(3)"}); return; }
+    done.add(i); const nx=panel(it,i); slot.textContent=""; slot.append(nx); slot.classList.remove("is-locked");
+    if (!anim||reduce) return;
+    const r=fl.btns[i].getBoundingClientRect(), s=slot.getBoundingClientRect(), cx=Math.round(r.left+r.width/2-s.left), cy=Math.round(r.top+r.height/2-s.top);
+    gsap.timeline().fromTo(nx,{clipPath:`circle(0px at ${cx}px ${cy}px)`},{clipPath:`circle(${Math.round(Math.hypot(s.width,s.height)+Math.hypot(cx,cy))}px at ${cx}px ${cy}px)`,duration:1.1,ease:"expo.out",clearProps:"clipPath"})
+      .fromTo($$(".fb-txt > *",nx),{y:16,autoAlpha:0},{y:0,autoAlpha:1,duration:.6,stagger:.08,ease:"power3.out"},.25);
+  }
+  if (mode==="reveal") flow.items.forEach((it,i)=>{ const slot=h("div",{class:"fb-slot is-locked",role:"button",tabindex:"0","aria-label":it.label||""},h("span",{class:"fb-lock",html:'<svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg>'}),h("span",{class:"mono",text:it.label||""}));
+    const open=()=>{ if (slot.classList.contains("is-locked")) show(i,true); };
+    slot.addEventListener("click",open); slot.addEventListener("keydown",e=>{ if (e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } }); stage.append(slot); panels.push(slot); });
+  box.append(fl.el,stage);
+  if (mode==="tabs") show(0,false);
+  return {...fl, el:box, flowEl:fl.el, show};
 }
 
 /* ---------- actions ---------- */
 function runAction(cfg,action,ctx={}){
   if (!action || !action.type || action.type==="none") return;
-  if (action.type==="modal") openModal(cfg,action.target,ctx);
-  else if (action.type==="page"){ if ((cfg.pages||[]).some(p=>p.id===action.target)) location.hash=action.target; }
+  if (action.type==="modal") openModal(cfg,action.target,{...ctx,section:action.section||""});
+  else if (action.type==="page"){ if (!(cfg.pages||[]).some(p=>p.id===action.target)) return; if (action.section) goSection(cfg,action.target,action.section); else location.hash=action.target; }
   else if (action.type==="slide"){ ctx.goSlide && ctx.goSlide((parseInt(action.target,10)||1)-1); }
   else if (action.type==="post"){ const p=(cfg.posts||[]).find(x=>x.id===action.target); if (p) location.hash="post/"+encodeURIComponent(p.slug||p.id); }
   else if (action.type==="doc"){ const m=mediaItem(cfg,action.target); const u=m?(/^https:\/\//i.test(m.link||"")?m.link:mediaUrl(m)):""; if (u){ const a=h("a",{href:u,target:"_blank",rel:"noopener"}); document.body.append(a); a.click(); a.remove(); } }
@@ -352,4 +462,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { loadFonts, sectionVars, modalVars, modalLook, flowBlock, noteIn, hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

@@ -1,5 +1,5 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -7,6 +7,7 @@ import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
+import { labelKey } from './jump';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -85,6 +86,7 @@ function updateTop(){
   top.append(h("h1",{},h("span",{class:"crumb",text:groupOf(Admin.panel)[1]}),(PANELS.find(p=>p[0]===Admin.panel)||[])[1]||"Studio"),
     h("span",{class:"status "+(st==="saving"||st==="pending"?"saving":st==="error"?"err":Store.mode==="local"?"local":""),role:"status"},h("i"),label),
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
+    newMenu(),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
     h("button",{class:"btn primary",type:"button",disabled:!diff,html:IC.up+"Publish",onclick:async()=>{ if (await publishDraft()) toast("Published. Visitors now see this version."); updateTop(); }}));
 }
@@ -107,7 +109,7 @@ function openPanel(k){
 /* ---------- generic field engine ---------- */
 /* Bilingual entry: when the site has Arabic, every text box shows English and Arabic side by side.
    Settings that are not shown to visitors as text (ids, slugs, links, studio names, library files, the loader) stay single. */
-const MONO_KEYS=new Set(["id","slug","name","path","url","target","code","homePage","logo","image"]);
+const MONO_KEYS=new Set(["id","slug","name","path","url","target","code","homePage","logo","image","anchor","quoteEmail","section"]);
 const MEDIA_KINDS=new Set(["image","video","scene","article"]);
 function bilingual(obj,key,kind){
   const D=Store.draft; if (!D || D.site.languages==="en" || !D.site.languages) return false;
@@ -159,8 +161,14 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       i.addEventListener("change",()=>set(i.checked,opts.theme?{theme:true}:undefined)); wrap.append(h("label",{class:"toggle",for:id},i,label)); break; }
     case "flow": case "modal": case "page": {
       const list=kind==="flow"?D.flows:kind==="modal"?D.modals:D.pages;
-      const s=h("select",{id},h("option",{value:"",text:"None"})); list.forEach(x=>{ const op=h("option",{value:x.id,text:x.name||x.title||x.id}); if (obj[key]===x.id) op.selected=true; s.append(op); });
-      s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
+      const s=h("select",{id},h("option",{value:"",text:"None"})); list.forEach(x=>{ const op=h("option",{value:x.id,text:plain(x.name)||plain(x.title)||x.id}); if (obj[key]===x.id) op.selected=true; s.append(op); });
+      s.addEventListener("change",()=>set(s.value));
+      if (kind==="flow" && !opts.noCreate){
+        /* make a flow right here, or jump to the one picked */
+        const mk=h("button",{class:"btn sm",type:"button",html:IC.plus+"New",title:"Make a new flow and use it here",onclick:()=>{ const f=makeFlow(D); s.append(h("option",{value:f.id,text:f.name})); s.value=f.id; set(f.id); toast("New flow made and picked. Add its items under Flows (Edit)."); }});
+        const ed=h("button",{class:"btn sm",type:"button",text:"Edit",title:"Open this flow under Flows",onclick:()=>{ if (!obj[key]){ toast("Pick a flow first."); return; } Admin.sel.flows=obj[key]; openPanel("flows"); }});
+        wrap.append(h("div",{class:"pick-row"},s,mk,ed));
+      } else wrap.append(s); break; }
     case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category"}); s.id=id; wrap.append(s); break; }
     case "date": { const i=h("input",{id,type:"date",value:obj[key]||""}); i.addEventListener("change",()=>set(i.value)); wrap.append(i); break; }
     case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v),opts.groupLabel?opts.groupLabel+" · "+label:label)); break;
@@ -231,14 +239,26 @@ function actionEditor(a,onChange){
   const D=Store.draft, row=h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"});
   const type=h("select",{"aria-label":"Action"}); OPT.actions.forEach(([v,l])=>{ const o=h("option",{value:v,text:l}); if (a.type===v) o.selected=true; type.append(o); });
   const tgt=h("span",{style:"flex:1;min-width:140px;display:flex"});
+  const secSel=h("span",{class:"act-sec"});
+  /* "Go to section": a labelled section inside the page or modal; the button travels to it with an animation */
+  const drawSec=()=>{ secSel.textContent=""; if (a.type!=="page"&&a.type!=="modal"){ delete a.section; return; }
+    const L=sectionLabels(D,a.type,a.target); if (!L.length && !a.section) return;
+    const s=h("select",{"aria-label":"Section inside it",title:"Travel to a labelled section inside it"},h("option",{value:"",text:a.type==="page"?"Top of the page":"Start of the modal"}));
+    L.forEach(([v,l])=>{ const o=h("option",{value:v,text:"Go to: "+l}); if (a.section===v) o.selected=true; s.append(o); });
+    if (a.section && !L.some(x=>x[0]===a.section)) s.append(h("option",{value:a.section,text:"Go to: "+a.section+" (label not found)",selected:true}));
+    s.addEventListener("change",()=>{ if (s.value) a.section=s.value; else delete a.section; onChange(); }); secSel.append(s); styleIn(secSel); };
+  const styleIn=el=>$$("select,input",el).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)");
   const drawTarget=()=>{ tgt.textContent="";
-    if (a.type==="modal"||a.type==="page"||a.type==="post"||a.type==="doc"){ const s=h("select",{"aria-label":"Target",style:"width:100%"}); const opts={modal:D.modals,page:D.pages,post:D.posts,doc:D.media.filter(m=>m.kind==="article")}[a.type]; opts.forEach(x=>{ const o=h("option",{value:x.id,text:x.name||x.title||x.label}); if (a.target===x.id) o.selected=true; s.append(o); });
-      if (!a.target && s.options[0]){ a.target=s.options[0].value; } s.addEventListener("change",()=>{ a.target=s.value; onChange(); }); tgt.append(s); }
+    if (a.type==="modal"||a.type==="page"||a.type==="post"||a.type==="doc"){ const s=h("select",{"aria-label":"Target",style:"width:100%"}); const opts={modal:D.modals,page:D.pages,post:D.posts,doc:D.media.filter(m=>m.kind==="article")}[a.type]; opts.forEach(x=>{ const o=h("option",{value:x.id,text:plain(x.name)||plain(x.title)||plain(x.label)||x.id}); if (a.target===x.id) o.selected=true; s.append(o); });
+      if (!a.target && s.options[0]){ a.target=s.options[0].value; } s.addEventListener("change",()=>{ a.target=s.value; delete a.section; drawSec(); onChange(); }); tgt.append(s);
+      if (a.type==="modal"||a.type==="page") tgt.append(h("button",{class:"btn sm",type:"button",html:IC.plus+"New",title:"Make a new "+a.type+" and open it from here",onclick:()=>{
+        const n=a.type==="modal"?makeModal(D,1):makePage(D,"blank"); a.target=n.id; delete a.section; drawTarget(); onChange(); touch(); toast("New "+a.type+" made: "+(plain(n.name)||plain(n.title))+". Edit it under "+(a.type==="modal"?"Modals":"Pages")+"."); }}));
+      drawSec(); }
     else if (a.type==="slide"||a.type==="url"){ const i=h("input",{type:a.type==="slide"?"number":"text",value:a.target||"",placeholder:a.type==="url"?"https://…":"Slide number","aria-label":"Target",style:"width:100%"}); i.addEventListener("input",()=>{ a.target=i.value; onChange(); }); tgt.append(i); }
   };
-  type.addEventListener("change",()=>{ a.type=type.value; a.target=""; drawTarget(); onChange(); });
+  type.addEventListener("change",()=>{ a.type=type.value; a.target=""; delete a.section; drawTarget(); onChange(); });
   $$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:rgba(0,0,0,.25)");
-  row.append(type,tgt); drawTarget();
+  row.append(type,tgt,secSel); drawTarget();
   setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"));
   return row;
 }
@@ -339,6 +359,8 @@ function panelSite(body){
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
+  body.append(card("Quote requests",h("p",{class:"adm-intro",style:"margin:0",text:"Quote request forms (service pages, catalogs and the Request a Quote modal) open the visitor's email app with the request filled in, addressed to this email. Nothing is stored on the site. Without an email, visitors can copy their request instead."}),
+    fieldsFor(D.site,[["quoteEmail","text","Send quote requests to (email)",{placeholder:"name@company.com"}]])));
   body.append(card("Languages and numbering",h("p",{class:"adm-intro",text:"Choose the languages visitors can read. With both, a switch in the header lets them change language. When Arabic is on, every text box in the studio shows English and Arabic side by side. A language left empty shows the other language's text."}),
     fieldsFor(D.site,[["languages","select","Site languages",{options:[["en","English only"],["ar","Arabic only"],["both","English and Arabic"]]}],["defaultLang","select","Language for first-time visitors",{options:[["en","English"],["ar","العربية"]]}],["showNumbers","toggle","Show numbering (01, 02… counters, steps and badges)"]],(v,k)=>{ if (k==="languages") openPanel("site"); })));
   body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
@@ -426,7 +448,14 @@ function panelTheme(body){
     card(h("span",{class:"grow"},"My colours"),importLink("colours","Import colours"),h("p",{class:"adm-intro",style:"margin:0",text:"Your own named colours. They show as small dots next to every colour picker in the studio (colours, overlays, everywhere), so one click applies them."}),myBox),
     card("Preview",prev),
     card("Background colours",fieldsFor(T,[["ink","color","Background"],["panel","color","Panels"],["lineOpacity","range","Line strength",{min:.04,max:.4,step:.01,theme:true}]])),
-    card("Type",fieldsFor(T,[["display","select","Headings",{options:OPT.fonts,theme:true}],["body","select","Body",{options:OPT.fonts,theme:true}],["mono","select","Labels",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]])),
+    card("Type",h("p",{class:"adm-intro",style:"margin:0",text:"Fonts and sizes for titles, headings, subtitles, body text and labels across the site. Sizes multiply the designed sizes (1 = as designed). Any section or modal set to Custom can change its own title and subtitle sizes and title font."}),
+      fieldsFor(T,[["display","select","Titles and headings font",{options:OPT.fonts,theme:true}],["body","select","Body font",{options:OPT.fonts,theme:true}],["mono","select","Labels font",{options:OPT.monos,theme:true}],["radius","range","Corner radius",{min:0,max:16,step:1,theme:true}]]),
+      fieldsFor(T.type=T.type||{},[["titleSize","range","Hero and slide titles: size",{min:.5,max:1.6,step:.05,theme:true}],["headingSize","range","Section headings: size",{min:.5,max:1.6,step:.05,theme:true}],
+        ["headingWeight","select","Titles and headings: weight",{options:[[300,"Light"],[400,"Regular"],[500,"Medium"],[600,"Semibold"],[700,"Bold"]],theme:true}],
+        ["subFont","select","Subtitles and short paragraphs: font",{options:[["","Same as body"],...OPT.fonts],theme:true}],["subSize","range","Subtitles and short paragraphs: size",{min:.7,max:1.6,step:.05,theme:true}],
+        ["bodySize","range","Body text: size",{min:.7,max:1.5,step:.05,theme:true}],
+        ["labelFont","select","Eyebrows and labels: font",{options:[["","Same as labels font"],...OPT.fonts,...OPT.monos],theme:true}],["labelSize","range","Eyebrows and labels: size",{min:.7,max:1.6,step:.05,theme:true}],
+        ["arabic","select","Arabic text font",{options:OPT.arabicFonts,theme:true}],["hand","select","Handwriting (animated notes)",{options:OPT.handFonts,theme:true}],["handAr","select","Arabic handwriting (animated notes)",{options:OPT.handArFonts,theme:true}]])),
     goStyle("Text, accent, header colours, the image filter and the defaults for every flow and slide are in Global style."));
 }
 /* ---------- colour overlay editor ----------
@@ -610,8 +639,12 @@ function carouselFilterFields(){
     fieldsFor(T.slide,[["intensity","number","Filter strength on carousel slides (0 to 1.5, empty follows every image)",{min:0,step:.05,optional:true,placeholder:String(T.overlayIntensity??1)}]],()=>touch({theme:true})));
   return box;
 }
+function countOwn(D){ let sections=0, fx=0; const all=[...D.pages.flatMap(p=>p.sections||[]),...D.modals.flatMap(m=>m.sections||[])];
+  all.forEach(x=>{ if (x&&x.style&&x.style.custom) sections++; if (x&&x.bgfx&&x.bgfx.type&&x.bgfx.type!=="default") fx++; }); return {sections,fx}; }
 function panelStyle(body){
   const D=Store.draft, T=D.theme, M=D.motion;
+  T.sections={pad:1,width:1320,bg:"",bgAlpha:0,titleSize:1,subSize:1,...(T.sections||{})}; T.sections.bgfx={type:"none",color:"",opacity:.4,speed:1,...(T.sections.bgfx||{})};
+  T.modals={width:980,bg:"",bgAlpha:.88,corners:true,scan:true,blur:4,dim:.3,titleSize:1,...(T.modals||{})};
   T.header={bg:"#040915",bgAlpha:0,text:"",link:"",accent:"",...(T.header||{})}; T.flow={...(T.flow||{})}; T.slide={...(T.slide||{})};
   M.flow={mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0,...(M.flow||{})}; M.slideTiming={...(M.slideTiming||{})}; D.styles=Array.isArray(D.styles)?D.styles:[];
   const pv=stylePreview(D); Admin.refresh=pv.draw;
@@ -655,7 +688,16 @@ function panelStyle(body){
       h("p",{class:"hint",style:"margin:0",text:"Slide colours"}),
       fieldsFor(T.slide,[["title","color","Title",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>hexOk(T.heading)?T.heading:T.fg}],["text","color","Paragraph and eyebrow",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.fg}],
         ["accent","color","Accent (flow and glow)",{optional:true,placeholder:"Site",globalLabel:"Use site",fallback:()=>T.accent}],["headerText","color","Header text over slides",{optional:true,placeholder:"Header",globalLabel:"Use header",fallback:()=>hexOk(T.header.text)?T.header.text:T.fg}]],()=>touch({theme:true})),
-      cnt.slides?resetBtn("Make every carousel and slide use the global style",{flows:false,slides:true}):null)
+      cnt.slides?resetBtn("Make every carousel and slide use the global style",{flows:false,slides:true}):null),
+    card("Every section",h("p",{class:"adm-intro",style:"margin:0",text:`Spacing, width, background, title sizes and the background effect for every section. ${countOwn(D).sections} sections use their own look (Pages → section → More options → Look), ${countOwn(D).fx} their own background effect.`}),
+      fieldsFor(T.sections,[["pad","select","Spacing above and below",{options:OPT.pads,theme:true}],["width","number","Content width in px",{min:640,step:20,theme:true}],["bg","color","Background colour",{optional:true,placeholder:"None",globalLabel:"None",fallback:()=>T.ink}],["bgAlpha","range","Background strength",{min:0,max:1,step:.05,theme:true}]]),
+      h("p",{class:"hint",style:"margin:0"},"Title, subtitle and body sizes and fonts for the whole site are under ",h("button",{type:"button",class:"linkish",text:"Colours and type → Type",onclick:()=>openPanel("theme")}),"."),
+      h("p",{class:"hint",style:"margin:0",text:"Background effect for every section that has none of its own"}),
+      fieldsFor(T.sections.bgfx,[["type","select","Background effect",{options:OPT.bgfx}],["color","color","Effect colour",{optional:true,placeholder:"Accent",globalLabel:"Use accent",fallback:()=>T.accent}],["opacity","range","Strength",{min:0,max:1,step:.05}],["speed","range","Speed",{min:.2,max:3,step:.1}]])),
+    card("Every modal",h("p",{class:"adm-intro",style:"margin:0",text:"Width, panel colour, title size, corner marks and the blur behind every modal. Each modal can use its own (Modals → Look)."}),
+      fieldsFor(T.modals,[["width","number","Width in px",{min:420,step:20,theme:true}],["bg","color","Panel colour",{optional:true,placeholder:"Panels",globalLabel:"Use panels",fallback:()=>T.panel}],["bgAlpha","range","Panel strength",{min:0,max:1,step:.02,theme:true}],
+        ["titleSize","range","Title size",{min:.5,max:1.6,step:.05,theme:true}],["blur","range","Blur behind (px)",{min:0,max:16,step:1}],["dim","range","Page brightness behind",{min:0,max:1,step:.05}],["corners","toggle","Corner marks"],["scan","toggle","Scan lines"]]),
+      fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]]))
   );
 }
 function panelIcons(body){
@@ -676,20 +718,24 @@ function panelIcons(body){
   body.append(grid,det); draw();
 }
 function flowItemSchema(it){
-  const s=[["kind","select","Type",{options:OPT.kinds}],["label","text",it.kind==="icon"||it.kind==="svg"?"Label (screen readers and hover)":"Label"]];
+  const s=[["kind","select","Type",{options:OPT.kinds}],["label","text",it.kind==="icon"||it.kind==="svg"?"Label (screen readers and hover)":it.kind==="note"?"Words written by hand (e.g. analysing, challenge accepted)":"Label"]];
   if (it.kind==="button") s.push(["showIndex","toggle","Show number"]);
+  if (it.kind==="note") s.push(["dots","toggle","Animated dots after the words (analysing…)"]);
   if (it.kind==="svg") s.push(["svg","code","SVG code",{wide:true}]);
-  else s.push(["icon","icon",it.kind==="icon"?"Icon":"Icon (optional)",{wide:true}]);
-  s.push(["action","action","On click",{wide:true}],["detail","area","Detail text (used by timelines and Type 3 modals)",{wide:true}]);
+  else s.push(["icon","icon",it.kind==="icon"?"Icon":it.kind==="note"?"Icon (draws itself; empty uses a pen)":"Icon before the text (optional)",{wide:true}]);
+  s.push(["action","action","On click (in Tabs and Reveal flows, the panel's button runs this)",{wide:true}],["detail","area","Panel text (Tabs and Reveal flows, timelines and Type 3 modals)",{wide:true}],
+    ["ctaLabel","text","Panel button label (when the item has an action; empty shows Explore)"],["media","media","Panel image (Tabs and Reveal flows, optional)",{wide:true,allowNone:true}]);
   return s;
 }
 function panelFlows(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"A flow is a row of items separated by small marks. Draw it from buttons, plain text, icons or your own SVG, then choose how it animates: as one piece or item by item, with optional settings per item. Any page section or Type 3 modal can use a flow."}),h("div",{class:"imp-links"},importLink("flows","Import flows from a file")));
   masterDetail(body,{items:()=>D.flows,selKey:"flows",label:f=>f.name||f.id,kind:f=>f.items.length+" items",addLabel:"New flow",
-    onAdd:()=>{ const f={id:uid("f"),name:"New flow",separator:"dots3",size:"m",progress:false,anim:{...D.motion.flow},custom:{anim:false,colors:false},colors:{},items:[{id:uid("x"),kind:"button",label:"First",icon:"",svg:"",showIndex:true,detail:"",action:A(),anim:null}]}; D.flows.push(f); return f; },
+    onAdd:()=>makeFlow(D),
     detail:(f,redrawList)=>{
-      const prev=h("div",{class:"preview-box"}); const drawPrev=()=>{ prev.textContent=""; const fl=renderFlow(D,f.id,{onItem:(i)=>fl.setActive(i,{fill:true})}); if (fl){ fl.setActive(0,{fill:true}); prev.append(fl.el); fl.play(0); } prev.append(h("span",{class:"lbl-a",text:"Preview · click items"})); };
+      const prev=h("div",{class:"preview-box fb-prev"}); const drawPrev=()=>{ prev.textContent=""; const show=f.display==="tabs"||f.display==="reveal";
+        const fl=show?flowBlock(D,f.id,{onAction:()=>toast("In the site this runs the item's action.")}):renderFlow(D,f.id,{onItem:(i)=>fl.setActive(i,{fill:true})});
+        if (fl){ if (!show) fl.setActive(0,{fill:true}); prev.append(fl.el); fl.play(0); } prev.append(h("span",{class:"lbl-a",text:"Preview · click items"})); };
       Admin.refresh=drawPrev; drawPrev();
       const items=h("div",{class:"sub-list"});
       const drawItems=()=>{ items.textContent="";
@@ -706,14 +752,14 @@ function panelFlows(body){
           items.append(c);
         });
         const add=h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"}); OPT.kinds.forEach(([k,l])=>add.append(h("button",{class:"btn sm",type:"button",html:IC.plus+esc(l),onclick:()=>{
-          f.items.push({id:uid("x"),kind:k,label:k==="icon"||k==="svg"?"Icon":"New item",icon:k==="icon"?(D.icons[0]?.id||""):"",svg:k==="svg"?'<svg viewBox="0 0 24 24"><path d="M4 12h16M12 4v16"/></svg>':"",showIndex:k==="button",detail:"",action:A(),anim:null});
+          f.items.push({id:uid("x"),kind:k,label:k==="icon"||k==="svg"?"Icon":k==="note"?"analysing":"New item",icon:k==="icon"?(D.icons[0]?.id||""):"",svg:k==="svg"?'<svg viewBox="0 0 24 24"><path d="M4 12h16M12 4v16"/></svg>':"",showIndex:k==="button",dots:k==="note",detail:"",action:A(),anim:null});
           drawItems(); items.children[items.children.length-2]?._open?.(); touch(); }})));
         items.append(add); sortable(items,f.items,()=>{ drawItems(); touch(); });
       };
       drawItems();
       return [
         card(h("span",{class:"grow"},"Preview"),prev,h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.replay+"Replay animation",onclick:drawPrev})),
-        card("Flow settings",fieldsFor(f,[["name","text","Name"],["separator","select","Separator",{options:OPT.separators}],["size","select","Size",{options:OPT.sizes}]],()=>redrawList())),
+        card("Flow settings",fieldsFor(f,[["name","text","Name"],["display","select","How the items behave",{options:OPT.flowDisplays,hint:"Row: each item runs its own action. Tabs: items switch the visible panel. Reveal: each item reveals its own part of the section. A section can override this where the flow is used."}],["separator","select","Separator",{options:OPT.separators}],["size","select","Size",{options:OPT.sizes}]],(v,k)=>{ redrawList(); if (k==="display") drawPrev(); })),
         card("Animation and timing",globalOrCustom(f,"anim",{what:"global flow animation (Design → Global style)",onChange:drawPrev,body:()=>[flowAnimFields(f.anim=f.anim||{...D.motion.flow})]}),
           h("p",{class:"adm-intro",style:"font-size:.8rem",text:"Items with their own animation keep their settings in either mode when animating item by item."})),
         card("Colours",globalOrCustom(f,"colors",{what:"global flow colours (Design → Global style)",onChange:drawPrev,body:()=>[flowColorFields(f.colors=f.colors||{},drawPrev)]})),
@@ -726,7 +772,7 @@ function panelModals(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Type 1 shows one image or video with a caption. Type 2 shows a gallery of three. Type 3 adds a flow whose items reveal detail text. Type 4 lists services, each with a short brief and a link to its page. Every type has a More button. Open a modal from any flow item, card or button with the action \"Open modal\"."}),h("div",{class:"imp-links"},importLink("modals","Import modals from a file")));
   masterDetail(body,{items:()=>D.modals,selKey:"modals",label:m=>m.name||m.title,kind:m=>"Type "+m.type,addLabel:"New modal",
-    onAdd:()=>{ const m={id:uid("md"),name:"New modal",type:1,kicker:"",title:"New modal",text:"",media:[D.media[0]?.id||""],caption:[],flowId:"",more:{label:"More",action:A()}}; D.modals.push(m); return m; },
+    onAdd:()=>makeModal(D,1),
     detail:(m,redrawList)=>{
       const mediaBoxEl=h("div");
       const drawMedia=()=>{ mediaBoxEl.textContent=""; const n=m.type===2?3:1; m.media=m.media||[]; while (m.media.length<n) m.media.push(D.media[m.media.length%D.media.length]?.id||"");
@@ -734,11 +780,18 @@ function panelModals(body){
       drawMedia();
       const base=[["name","text","Name in the studio"],["type","select","Type",{options:OPT.modalTypes}],["kicker","text","Small label"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["caption","strings",m.type===2?"Captions, one per gallery item":"Caption items, one per line (shown with the flow separators)",{wide:true}]];
       if (m.type===3) base.push(["flowId","flow","Flow inside the modal"]);
-      if (m.type===4) base.push(["services","list","Services (each with a short brief and a link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["link","button","Link (e.g. go to the service page)"]], blank:()=>({title:"New service",text:"",link:{label:"Learn more",action:A()}}) }]);
+      if (m.type===4) base.push(["services","list","Services (each with a short brief and a link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["anchor","text","Label (buttons can open this modal at this service; empty uses the title)"],["text","area","Brief",{wide:true}],["link","button","Link (e.g. go to the service page)"]], blank:()=>({title:"New service",text:"",link:{label:"Learn more",action:A()}}) }]);
+      if (m.type===5){ const i=base.findIndex(x=>x[0]==="caption"); if (i>=0) base.splice(i,1); }
       base.push(["timing","timing","Timing",{parts:m.type===3?[["eyebrow",.75],["title",.81],["text",.87],["flow",1],["detail",.93],["media",.99],["more",1.05]]:[["eyebrow",.75],["title",.81],["text",.87],["media",.93],["more",.99]],hint:"Seconds from when the modal starts opening. Empty uses the default shown. Lower numbers come first."}]);
+      if (m.type===5) m.sections=Array.isArray(m.sections)?m.sections:[];
+      const lookFields=()=>[fieldsFor(m.look,[["width","number","Width in px (empty follows global)",{optional:true,min:420,step:20,placeholder:String((D.theme.modals||{}).width??980)}],["bg","color","Panel colour",{optional:true,placeholder:"Global"}],["bgAlpha","range","Panel strength",{min:0,max:1,step:.02}],
+        ["titleSize","number","Title size (1 = normal, empty follows global)",{optional:true,min:.4,step:.05}],["blur","number","Blur behind the modal in px (empty follows global)",{optional:true,min:0,step:1}],["dim","number","Page brightness behind (0 to 1, empty follows global)",{optional:true,min:0,step:.05}],
+        ["corners","select","Corner marks",{options:[["","Global"],[true,"Show"],[false,"Hide"]]}],["scan","select","Scan lines",{options:[["","Global"],[true,"Show"],[false,"Hide"]]}]])];
       return [
         card(h("span",{class:"grow"},"Content"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview modal",onclick:()=>openModal(D,m.id)}),fieldsFor(m,base,(v,k)=>{ if (k==="type"){ openPanel("modals"); } else redrawList(); })),
-        card("Media",mediaBoxEl), card("More button",h("div",{class:"fields"},F(m,"more","button","More button"))),
+        m.type===5?card(h("span",{class:"grow"},"Sections inside this modal · drag to reorder"),h("p",{class:"adm-intro",style:"margin:0",text:"Any page section can go in a modal. Give a section a label (More options) and any button can open this modal straight at it."}),sectionsEditor(m.sections,{inModal:true})):card("Media",mediaBoxEl),
+        card("Look",globalOrCustom(m,"look",{flag:"custom",what:"global modal look (Design → Global style → Every modal)",body:lookFields})),
+        card("More button",h("div",{class:"fields"},F(m,"more","button","More button"))),
         h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete modal",onclick:e=>confirmInline(e.currentTarget,"Delete this modal?",()=>{ D.modals.splice(D.modals.indexOf(m),1); touch(); openPanel("modals"); })}))
       ];
     }});
@@ -841,7 +894,7 @@ function panelPages(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Each page is a stack of sections. Pick a layout, add sections and drag them into order. Preview draft shows the page you have selected."}),h("div",{class:"imp-links"},importLink("pages","Import pages and sections from a file")));
   masterDetail(body,{items:()=>D.pages,selKey:"pages",label:p=>plain(p.title)||p.id,kind:p=>{ const hid=(p.sections||[]).filter(s=>s.hidden).length; return (p.id===D.site.homePage?"Home":(OPT.layouts.find(l=>l[0]===p.layout)||[])[1])+(hid?" · "+hid+" hidden":""); },addLabel:"New page",
-    onAdd:()=>{ let n=1; while (D.pages.some(p=>p.id==="page-"+n)) n++; const p={id:"page-"+n,title:"New page",nav:true,layout:"cinematic",sections:[{id:uid("s"),type:"hero",...SECTION_BLANK.hero()}]}; D.pages.push(p); return p; },
+    onAdd:()=>makePage(D,"blank"),
     detail:(p,redrawList)=>{
       const slug=h("input",{type:"text",value:p.id,id:uid("f")}), slugHint=h("span",{class:"hint",text:"Used in the address after #. Lowercase letters, numbers and hyphens."});
       slug.addEventListener("change",()=>{ const v=slug.value.trim(); if (!idOk(v,D.pages,p)){ slugHint.textContent="That address is taken or not allowed."; slugHint.style.color="var(--bad)"; slug.value=p.id; return; }
@@ -850,24 +903,7 @@ function panelPages(body){
         Admin.sel.pages=v; slugHint.style.color=""; slugHint.textContent="Address updated."; touch(); redrawList(); });
       const meta=fieldsFor(p,[["title","text","Title"],["layout","select","Layout",{options:OPT.layouts}],["nav","toggle","Show in menu"]],()=>redrawList());
       meta.prepend(h("div",{class:"field"},h("label",{for:slug.id,text:"Address"}),slug,slugHint));
-      const secs=h("div",{class:"sub-list"}), visBar=h("div",{class:"vis-bar",role:"status"});
-      const drawVis=()=>{ visBar.textContent=""; redrawList(); const hid=p.sections.filter(s=>s.hidden).length, all=p.sections.length;
-        visBar.append(...[h("span",{class:"vis-count"},h("b",{text:String(all-hid)})," shown",hid?h("span",{class:"warn"}," · ",h("b",{text:String(hid)})," hidden"):" · none hidden"),
-          hid?h("button",{class:"btn sm",type:"button",html:IC.eye+"Show all",onclick:()=>{ p.sections.forEach(s=>{ s.hidden=false; }); drawSecs(); touch(); toast("Every section on this page is shown."); }}):null,
-          h("span",{class:"hint",text:"Tap Shown or Hidden on a section to switch it. Hidden sections stay here and are not shown to visitors."})].filter(Boolean)); };
-      const drawSecs=()=>{ secs.textContent=""; drawVis();
-        p.sections.forEach((s,i)=>{ const T=SECTION_TYPES[s.type]; if (!T) return;
-          secs.append(subCard(s,{title:()=>secTitle(s),kind:T.label,open:false,
-            body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
-                h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):fieldsFor(s,T.fields),
-            onRemove:()=>{ p.sections.splice(i,1); drawSecs(); touch(); },
-            onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
-            onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; p.sections.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
-        const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"}); Object.entries(SECTION_TYPES).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
-        secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ p.sections.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
-        sortable(secs,p.sections,()=>{ drawSecs(); touch(); });
-      };
-      drawSecs();
+      const sx=sectionsEditor(p.sections,{onVis:()=>redrawList()}), visBar=sx.visBar, secs=sx.el;
       return [
         card(h("span",{class:"grow"},"Page"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:previewDraft}),meta),
         card("Header on this page",globalOrCustom(p,"header",{what:"global header colours",flag:"custom",body:()=>[headerFields(p.header,{optional:true})]})),
@@ -1024,4 +1060,98 @@ function proseField(obj,key,id,set,label="Text"){
   return h("div",{class:"prose-wrap"},expandable(t,label),h("div",{class:"prose-tools"},pick,h("span",{class:"hint",text:"Empty line = new paragraph · ## Heading · - list item · > quote · **bold** · *italic* · [text](https://…)"})));
 }
 
-export { overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+
+/* ================= QUICK CREATE =================
+   New flows, modals and pages can be made from the "New" menu at the top of the studio, from any flow picker,
+   and from any button's action (Open modal / Go to page → New). Pages come from simple templates. */
+function makeFlow(D,name="New flow"){
+  const f={id:uid("f"),name,separator:"dots3",size:"m",progress:false,display:"row",anim:{...D.motion.flow},custom:{anim:false,colors:false},colors:{},
+    items:[{id:uid("x"),kind:"button",label:"First",icon:"",svg:"",showIndex:false,detail:"",action:A(),anim:null},{id:uid("x"),kind:"text",label:"Second",icon:"",svg:"",showIndex:false,detail:"",action:A(),anim:null}]};
+  D.flows.push(f); return f;
+}
+function makeModal(D,type=1){
+  const m={id:uid("md"),name:type===5?"New modal with sections":"New modal",type,kicker:"",title:"New modal",text:"",media:type===5?[]:[D.media[0]?.id||""],caption:[],flowId:"",more:{label:type===5?"":"More",action:A()}};
+  if (type===5) m.sections=[{id:uid("s"),type:"article",anchor:"start",...SECTION_BLANK.article()}];
+  D.modals.push(m); return m;
+}
+const PAGE_TEMPLATES=[["blank","Page (hero)"],["service","Service page (hero, services list, quote form)"],["catalog","Catalog page (hero, catalog, quote form)"],["article","Article page (hero and text)"]];
+function makePage(D,kind="blank"){
+  let n=1; while (D.pages.some(p=>p.id==="page-"+n)) n++; const id="page-"+n;
+  const hero={id:uid("s"),type:"hero",...SECTION_BLANK.hero(),height:kind==="blank"?"tall":"compact"};
+  const quote=()=>({id:uid("s"),type:"quote",...SECTION_BLANK.quote()});
+  if (kind==="service"||kind==="catalog") hero.button={label:"Request a Quote",action:{type:"page",target:id,section:"quote"}};
+  const sections=kind==="service"?[hero,{id:uid("s"),type:"features",anchor:"services",...SECTION_BLANK.features(),items:[{title:"First service",text:"",icon:""},{title:"Second service",text:"",icon:""},{title:"Third service",text:"",icon:""}]},quote()]
+    :kind==="catalog"?[hero,{id:uid("s"),type:"catalog",...SECTION_BLANK.catalog()},quote()]
+    :kind==="article"?[hero,{id:uid("s"),type:"article",...SECTION_BLANK.article()}]:[hero];
+  const p={id,title:"New page",nav:kind==="blank",layout:"cinematic",sections}; D.pages.push(p); return p;
+}
+/** The "New" menu in the studio's top bar. */
+function newMenu(){
+  const s=h("select",{class:"new-menu","aria-label":"Make something new"},h("option",{value:"",text:"＋ New…"}),
+    h("optgroup",{label:"Page"},...PAGE_TEMPLATES.map(([v,l])=>h("option",{value:"page:"+v,text:l}))),
+    h("optgroup",{label:"Modal"},...OPT.modalTypes.map(([v,l])=>h("option",{value:"modal:"+v,text:l}))),
+    h("optgroup",{label:"Flow"},h("option",{value:"flow:row",text:"Flow (row of items)"}),h("option",{value:"flow:tabs",text:"Flow as tabs"}),h("option",{value:"flow:reveal",text:"Flow that reveals parts of a section"})));
+  s.addEventListener("change",()=>{ const [k,v]=s.value.split(":"); s.value=""; const D=Store.draft; if (!k) return;
+    if (k==="page"){ const p=makePage(D,v); Admin.sel.pages=p.id; touch(); openPanel("pages"); toast("New page made. Change its address and title at the top."); }
+    else if (k==="modal"){ const m=makeModal(D,+v); Admin.sel.modals=m.id; touch(); openPanel("modals"); toast("New modal made."); }
+    else { const f=makeFlow(D,v==="tabs"?"New tabs":v==="reveal"?"New reveal flow":"New flow"); f.display=v; Admin.sel.flows=f.id; touch(); openPanel("flows"); toast("New flow made. Use it from any section (More options → Flow under this section)."); } });
+  return s;
+}
+/** Labelled sections a button can travel to: a page's sections, a modal's sections (Type 5) or services (Type 4). */
+function sectionLabels(D,type,id){
+  const sec=x=>[labelKey(x.anchor)||x.id,(plain(x.anchor)?plain(x.anchor)+" · ":"")+secTitle(x)];
+  if (type==="page"){ const p=D.pages.find(x=>x.id===id); return p?(p.sections||[]).filter(x=>x.type!=="heroCarousel").map(sec):[]; }
+  const m=D.modals.find(x=>x.id===id); if (!m) return [];
+  if (m.type===5) return (m.sections||[]).map(sec);
+  if (m.type===4) return (m.services||[]).map(x=>[labelKey(x.anchor||x.title),plain(x.title)||"Service"]);
+  return [];
+}
+/* ================= SECTION LIST =================
+   Pages and Type 5 modals share one editor: sections in order, each with Shown / Hidden, duplicate and remove,
+   its own settings, and "More options" for what every section can have. */
+function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
+  const D=Store.draft, secs=h("div",{class:"sub-list"}), visBar=h("div",{class:"vis-bar",role:"status"});
+  const drawVis=()=>{ visBar.textContent=""; onVis(); const hid=list.filter(s=>s.hidden).length, all=list.length;
+    visBar.append(...[h("span",{class:"vis-count"},h("b",{text:String(all-hid)})," shown",hid?h("span",{class:"warn"}," · ",h("b",{text:String(hid)})," hidden"):" · none hidden"),
+      hid?h("button",{class:"btn sm",type:"button",html:IC.eye+"Show all",onclick:()=>{ list.forEach(s=>{ s.hidden=false; }); drawSecs(); touch(); toast("Every section is shown."); }}):null,
+      h("span",{class:"hint",text:"Tap Shown or Hidden on a section to switch it. Hidden sections stay here and are not shown to visitors."})].filter(Boolean)); };
+  const drawSecs=()=>{ secs.textContent=""; drawVis();
+    list.forEach((s,i)=>{ const T=SECTION_TYPES[s.type]; if (!T) return;
+      secs.append(subCard(s,{title:()=>(s.previewOnly?"[Preview only] ":"")+secTitle(s),kind:T.label+(s.anchor?" · #"+plain(s.anchor):""),open:false,
+        body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
+            h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):
+          h("div",{class:"sec-body"},fieldsFor(s,T.fields),sectionExtras(s)),
+        onRemove:()=>{ list.splice(i,1); drawSecs(); touch(); },
+        onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
+        onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
+    const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"});
+    Object.entries(SECTION_TYPES).filter(([k])=>!(inModal&&k==="heroCarousel")).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
+    secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ list.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
+    sortable(secs,list,()=>{ drawSecs(); touch(); });
+  };
+  drawSecs();
+  return {el:secs,visBar,draw:drawSecs};
+}
+/** What every section can have: a label, a flow under it, its own look, a background effect, preview only. */
+function sectionExtras(s){
+  const D=Store.draft, T=D.theme, G=T.sections||{}, GF=G.bgfx||{};
+  s.flowUnder=s.flowUnder&&typeof s.flowUnder==="object"?s.flowUnder:{flowId:"",display:"",align:"start"};
+  s.bgfx=s.bgfx&&typeof s.bgfx==="object"?s.bgfx:{type:"default"};
+  const fxName=v=>(OPT.bgfx.find(x=>x[0]===v)||[])[1]||v;
+  const box=h("details",{class:"sec-more"},h("summary",{},h("b",{text:"More options"}),h("span",{text:" · label, flow under it, look, background effect"+(s.bgfx.type&&s.bgfx.type!=="default"?" ("+fxName(s.bgfx.type)+")":"")})));
+  box.append(
+    h("p",{class:"hint",text:"Label: buttons anywhere can open this page or modal and travel to this section (Action → Go to: label). It is also its link: #page/label."}),
+    fieldsFor(s,[["anchor","text","Label (e.g. quote, services)"],["previewOnly","toggle","Preview only: a fictional sample shown in the draft preview, never to visitors"]]),
+    h("p",{class:"hint",text:"Flow under this section: any flow, as a row, tabs or reveal panels."}),
+    fieldsFor(s.flowUnder,[["flowId","flow","Flow under this section"],["display","select","Behaviour",{options:[["","As set on the flow"],...OPT.flowDisplays]}],["align","select","Align",{options:[["start","Start"],["center","Centre"]]}]]),
+    h("p",{class:"hint",text:"Background effect: animated SVG behind the section (it runs only while the section is on screen)."}),
+    fieldsFor(s.bgfx,[["type","select","Background effect",{options:[["default","Use global ("+fxName(GF.type||"none")+")"],...OPT.bgfx]}],["color","color","Effect colour",{optional:true,placeholder:"Global",fallback:()=>hexOk(GF.color)?GF.color:T.accent}],
+      ["opacity","number","Strength (0 to 1, empty follows global)",{optional:true,min:0,step:.05,placeholder:String(GF.opacity??.4)}],["speed","number","Speed (1 = normal, empty follows global)",{optional:true,min:.1,step:.1,placeholder:String(GF.speed??1)}]]),
+    h("p",{class:"hint",text:"Look: spacing, width, background, title and subtitle size and font for this section only."}),
+    globalOrCustom(s,"style",{flag:"custom",what:"global section look (Design → Global style → Every section)",body:()=>[fieldsFor(s.style,[["pad","select","Spacing above and below",{options:[["","Global"],...OPT.pads]}],["width","number","Content width in px (empty follows global)",{optional:true,min:640,step:20,placeholder:String(G.width??1320)}],
+      ["bg","color","Background colour",{optional:true,placeholder:"None"}],["bgAlpha","range","Background strength",{min:0,max:1,step:.05}],
+      ["titleSize","number","Title size (1 = normal)",{optional:true,min:.4,step:.05,placeholder:"1"}],["subSize","number","Subtitle size (1 = normal)",{optional:true,min:.4,step:.05,placeholder:"1"}],
+      ["titleFont","select","Title font",{options:[["","Global"],...OPT.fonts]}],["title","color","Title colour",{optional:true,placeholder:"Global"}],["text","color","Text colour",{optional:true,placeholder:"Global"}],["accent","color","Accent",{optional:true,placeholder:"Global"}]])]}));
+  return box;
+}
+export { makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };

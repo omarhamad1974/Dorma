@@ -1,8 +1,11 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba } from './core';
 import { Store } from './store';
 import { A } from './data';
+import { flowBlock, sectionVars, modalLook } from './core';
+import { JUMP, arrive, jumpTo, labelKey } from './jump';
+import { sectionFx } from './fx';
 
 /* ================= SITE RENDERER ================= */
 const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
@@ -17,13 +20,15 @@ function renderSite(cfg,pageId){
   disposePage(); closeModal(true);
   cfg=localize(cfg); NUM.on=cfg.site.showNumbers===true;
   Site.cfg=cfg; applyTheme(cfg); gsap.globalTimeline.timeScale(+cfg.motion.speed||1);
+  // "#page/label" opens the page and travels to the section with that label
+  if (pageId && !/^post\//.test(pageId) && pageId.includes("/")){ const k=pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
   const pages=cfg.pages||[], page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
   const app=$("#app"); app.textContent=""; scrollTo(0,0);
   if (!page){ app.append(h("div",{class:"denied"},h("div",{},h("p",{class:"lede",text:ui("This site has no pages yet.")})))); return; }
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
   app.append(siteHeader(cfg,page));
   const main=h("main",{id:"main"});
-  const sections=page.sections.filter(s=>!s.hidden); // hidden in the studio = not shown to visitors
+  const sections=page.sections.filter(s=>!s.hidden && (!s.previewOnly || Site.preview)); // hidden in the studio = not shown to visitors; preview-only = draft preview only
   const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
   if (page.layout==="console"){
     const wrap=h("div",{class:"wrap console"}), rail=h("aside",{class:"rail","aria-label":ui("On this page")}), ol=h("ol"), body=h("div",{class:"console-main"});
@@ -73,7 +78,21 @@ function studioPill(cfg){
 /* ---------- sections ---------- */
 function buildSection(cfg,sec,page){
   const f=SECTIONS[sec.type]; if (!f) return null;
-  try { return f(cfg,sec,page); } catch(e){ console.error("section",sec.type,e); return null; }
+  let el; try { el=f(cfg,sec,page); } catch(e){ console.error("section",sec.type,e); return null; }
+  if (el) try { decorateSection(cfg,sec,el); } catch(e){ console.error("section extras",sec.type,e); }
+  return el;
+}
+/* Things every section can have, whatever its type (Pages → section → Label, Flow under this section, Look, Background effect). */
+function decorateSection(cfg,sec,el){
+  el.dataset.label=labelKey(sec.anchor)||sec.id; el.dataset.type=sec.type;
+  if (sec.style&&sec.style.custom){ sectionVars(el.style,sec.style,{own:true}); el.classList.add("sec-own"); }
+  const fu=sec.flowUnder;
+  if (fu&&fu.flowId&&sec.type!=="heroCarousel"){
+    const fl=flowBlock(cfg,fu.flowId,{display:fu.display||""});
+    if (fl){ const host=el.querySelector(".inner")||el.querySelector(".wrap")||el; const box=h("div",{class:"flow-under al-"+(fu.align||"start")},fl.el); host.append(box); el._flow=fl; }
+  }
+  if (sec.type!=="heroCarousel"&&sec.type!=="hero"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start; }
+  if (sec.previewOnly) el.prepend(h("p",{class:"preview-only mono",text:ui("Preview only: fictional sample, not shown to visitors")}));
 }
 const SECTIONS={
   heroCarousel(cfg,sec){
@@ -180,14 +199,16 @@ const SECTIONS={
     const eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.in=""; inner.append(eb); }
     const t=h("h1",{class:"display"}); t.textContent=sec.title||""; inner.append(t);
     if (sec.lede) inner.append(h("p",{class:"lede","data-in":"",text:sec.lede}));
-    const fl=sec.flowId?renderFlow(cfg,sec.flowId):null; if (fl) inner.append(fl.el);
+    const hb=buttonEl(cfg,sec.button); if (hb){ hb.classList.add("hero-btn"); inner.append(hb); }
+    const fl=sec.flowId?flowBlock(cfg,sec.flowId):null; if (fl) inner.append(fl.el);
     root.append(inner);
     root._after=()=>{
       const n=box.firstElementChild; if (n && !reduce && cfg.motion.kenBurns) gsap.fromTo(n,{scale:+cfg.motion.kbZoom||1.16},{scale:1.02,xPercent:-1.5,duration:(+cfg.motion.kbDuration||10)*1.4,ease:"sine.inOut",repeat:-1,yoyo:true});
       const T=sec.timing;
       revealTitle(cfg,t,sec.title||"",cue(T,"title",.15));
       if (!reduce){ if (eb) gsap.fromTo(eb,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:cue(T,"eyebrow",.1)});
-        const ld=$(".lede",inner); if (ld) gsap.fromTo(ld,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:cue(T,"text",.2)}); }
+        const ld=$(".lede",inner); if (ld) gsap.fromTo(ld,{y:24,autoAlpha:0},{y:0,autoAlpha:1,duration:1,ease:ease(cfg),delay:cue(T,"text",.2)});
+        if (hb) gsap.fromTo(hb,{y:18,autoAlpha:0},{y:0,autoAlpha:1,duration:.9,ease:ease(cfg),delay:cue(T,"more",.35)}); }
       if (fl){ const at=cue(T,"flow",null); if (at==null) fl.play(.4); else fl.play(0,at); }
     };
     return root;
@@ -326,7 +347,7 @@ const SECTIONS={
   flowStrip(cfg,sec){
     const w=h("div",{class:"wrap txt"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb) w.append(eb);
     const t=sec.title?h("h2",{class:"h2",text:sec.title}):null; if (t) w.append(t);
-    const fl=sec.flowId?renderFlow(cfg,sec.flowId):null; if (fl) w.append(fl.el);
+    const fl=sec.flowId?flowBlock(cfg,sec.flowId,{display:sec.display||""}):null; if (fl) w.append(fl.el);
     const s=h("section",{class:"sec"},w); s._seq={timing:sec.timing,parts:[["eyebrow",eb,0],["title",t,.1],["flow",fl,.2]]}; return s;
   },
   banner(cfg,sec){
@@ -353,6 +374,66 @@ const SECTIONS={
     s._seq={timing:sec.timing,parts:[["eyebrow",eb,0],["title",t,.1],["text",p,.2],["more",b,.3],["flow",list,.4]]};
     return s;
   },
+  /* Feature list: a grid of short items (e.g. the subsections of a service page). */
+  features(cfg,sec){
+    const w=h("div",{class:"wrap"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.rv=""; w.append(eb); }
+    if (sec.title) w.append(h("h2",{class:"h2 ft-title","data-rv":"",text:sec.title}));
+    if (sec.text) w.append(h("p",{class:"lede","data-rv":"",text:sec.text}));
+    const items=(sec.items||[]).filter(it=>it&&!it.hidden), grid=h("ul",{class:"ft-grid c"+Math.max(2,Math.min(4,+sec.cols||3))});
+    items.forEach((it,i)=>{ const ic=it.icon?iconSvg(cfg,it.icon):"";
+      grid.append(h("li",{class:"ft-item"},h("span",{class:"ft-mark",html:ic||`<b>${NUM.on?pad(i+1):""}</b>`}),h("div",{},h("h3",{class:"h3",text:it.title||""}),it.text?h("p",{text:it.text}):null))); });
+    w.append(grid);
+    const s=h("section",{class:"sec features"},w);
+    s._seq={timing:sec.timing,parts:[["flow",{el:grid,play:(_,at)=>gsap.fromTo(grid.children,{y:22,autoAlpha:0},{y:0,autoAlpha:1,duration:.8,ease:ease(cfg),delay:at,stagger:.06})},.15]]};
+    return s;
+  },
+  /* Testimonials */
+  quotes(cfg,sec){
+    const w=h("div",{class:"wrap"}), eb=eyebrowEl(sec.num,sec.eyebrow); if (eb){ eb.dataset.rv=""; eb.style.marginBottom="28px"; w.append(eb); }
+    const g=h("div",{class:"qt-grid"});
+    (sec.items||[]).filter(q=>q&&!q.hidden).forEach(q=>g.append(h("figure",{class:"qt","data-rv":""},h("blockquote",{text:q.quote||""}),h("figcaption",{},h("b",{text:q.name||""}),q.role?h("span",{class:"mono",text:q.role}):null))));
+    w.append(g); return h("section",{class:"sec quotes"},w);
+  },
+  /* Quote request: the visitor's email app opens with the request filled in (Site and titles → Quote requests email).
+     Without an email set, the request can be copied instead. Nothing is stored or sent by the site itself. */
+  quote(cfg,sec){
+    const w=h("div",{class:"wrap qf-wrap"}), head=h("div",{class:"txt","data-rv":""}), eb=eyebrowEl("",sec.eyebrow); if (eb) head.append(eb);
+    if (sec.title) head.append(h("h2",{class:"h2",text:sec.title})); if (sec.text) head.append(h("p",{class:"lede",text:sec.text}));
+    const fid=k=>"q-"+sec.id+"-"+k, F=(k,label,type="text",val="")=>{ const i=type==="area"?h("textarea",{id:fid(k),name:k,rows:4}):h("input",{id:fid(k),name:k,type,value:val,autocomplete:k==="name"?"name":k==="email"?"email":k==="phone"?"tel":k==="company"?"organization":"off"}); if (type==="area") i.value=val;
+      return h("label",{class:"qf-f"+(type==="area"?" wide":""),for:fid(k)},h("span",{class:"mono",text:label}),i); };
+    const form=h("form",{class:"qf","data-rv":"",novalidate:true},F("name",ui("Your name")),F("company",ui("Company")),F("email",ui("Email"),"email"),F("phone",ui("Phone"),"tel"),
+      F("service",ui("Service"),"text",sec.service||""),F("quantity",ui("Quantity")),F("deadline",ui("Deadline"),"date"),F("details",ui("Tell us what you need"),"area"));
+    const status=h("p",{class:"qf-status mono",role:"status"}), send=h("button",{class:"more",type:"submit",html:esc(ui("Send request"))+ARROW_SVG});
+    form.append(h("div",{class:"qf-go wide"},send,status));
+    if (sec.hint) form.append(h("p",{class:"qf-hint wide",text:sec.hint}));
+    const body=()=>{ const v=k=>(form.elements[k]&&form.elements[k].value||"").trim(); return [[ui("Service"),v("service")],[ui("Your name"),v("name")],[ui("Company"),v("company")],[ui("Email"),v("email")],[ui("Phone"),v("phone")],[ui("Quantity"),v("quantity")],[ui("Deadline"),v("deadline")],["",v("details")]].filter(x=>x[1]).map(([k,x])=>k?k+": "+x:"\n"+x).join("\n"); };
+    form.addEventListener("submit",e=>{ e.preventDefault(); const mail=String(Site.cfg.site.quoteEmail||"").trim(), subject=ui("Quote request")+(form.elements.service.value?" · "+form.elements.service.value:"");
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ location.href="mailto:"+encodeURIComponent(mail)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body()); status.textContent=ui("Your email app opens with the request ready to send."); }
+      else { const t=subject+"\n"+body(); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{ status.textContent=ui("Copied"); }).catch(()=>{ status.textContent=t; }); }
+      if (!reduce) gsap.fromTo(send,{scale:.94},{scale:1,duration:.6,ease:"elastic.out(1,.4)"}); });
+    // a catalog item's "Request a quote" fills in the details
+    onWin("dorma:quote",e=>{ const d=e.detail||{}; if (d.section&&d.section!==sec.id) return; const t=form.elements.details; if (t&&d.text&&!t.value.includes(d.text)) t.value=(t.value?t.value+"\n":"")+d.text; });
+    w.append(head,form); return h("section",{class:"sec quote-sec"},w);
+  },
+  /* Catalog: items with up to three filters (item type, package type, price range). Each item's button travels to the quote form. */
+  catalog(cfg,sec,page){
+    const w=h("div",{class:"wrap"}), head=h("div",{class:"head-row","data-rv":""},h("h2",{class:"h2",text:sec.title||""})), count=h("span",{class:"mono"}); head.append(count); w.append(head);
+    if (sec.text) w.append(h("p",{class:"lede","data-rv":"",text:sec.text}));
+    const items=(sec.items||[]).filter(x=>x&&!x.hidden), keys=["itemType","packageType","price"], names=sec.filters||[], sel={};
+    const setCount=n=>count.innerHTML=`<b>${n}</b> ${ui("items")}`; setCount(items.length);
+    if (!items.length){ w.append(h("p",{class:"lede cat-empty","data-rv":"",text:ui("Items are on the way.")})); return h("section",{class:"sec catalog"},w); }
+    const bar=h("div",{class:"cat-filters","data-rv":""});
+    keys.forEach((k,i)=>{ const vals=[...new Set(items.map(x=>x[k]).filter(Boolean))]; if (!vals.length||!names[i]) return;
+      const s=h("select",{"aria-label":names[i]},h("option",{value:"",text:names[i]+" · "+ui("All")}),...vals.map(v=>h("option",{value:v,text:v}))); s.addEventListener("change",()=>{ sel[k]=s.value; apply(); }); bar.append(s); });
+    if (bar.children.length) w.append(bar);
+    const grid=h("div",{class:"grid-cards"}), quoteId=((page&&page.sections)||[]).find(x=>x.type==="quote"&&!x.hidden);
+    const cards=items.map(it=>{ const c=h("div",{class:"card cat-card","data-rv":""},mediaBox(cfg,it.media,{ratio:4/3,res:800}),captionEl([it.itemType,it.packageType,it.price].filter(Boolean)),h("h3",{class:"h3",text:it.title||""}),it.text?h("p",{text:it.text}):null);
+      c._it=it; if (quoteId) c.append(h("button",{class:"arrow-link",type:"button",html:esc(ui("Request a quote for this item"))+ARROW_SVG,onclick:()=>{ dispatchEvent(new CustomEvent("dorma:quote",{detail:{section:quoteId.id,text:it.title}})); jumpTo(quoteId.anchor||quoteId.id); }}));
+      grid.append(c); return c; });
+    const apply=()=>{ const show=cards.filter(c=>keys.every(k=>!sel[k]||c._it[k]===sel[k])); setCount(show.length);
+      gsap.to(cards,{autoAlpha:0,y:10,duration:.2,ease:"power2.in",onComplete(){ cards.forEach(c=>c.hidden=!show.includes(c)); gsap.fromTo(show,{autoAlpha:0,y:20},{autoAlpha:1,y:0,duration:.55,ease:"power3.out",stagger:.05}); }}); };
+    w.append(grid); return h("section",{class:"sec catalog"},w);
+  },
   cta(cfg,sec){
     const w=h("div",{class:"wrap cta","data-rv":""},h("h2",{class:"display",text:sec.title||""})); const b=buttonEl(cfg,sec.button); if (b) w.append(b);
     return h("section",{class:"sec"},w);
@@ -375,6 +456,7 @@ function playSequence(cfg,sec,seq,ST){
 function afterRender(cfg,page){
   const main=$("#main"); if (!main) return;
   $$("section",main).forEach(s=>{ if (s._after) s._after(); });
+  $$("section",main).forEach(s=>{ if (s._fx) s._fx(); });
   const M=cfg.motion, ST=ScrollTrigger;
   // scroll reveals: only for things below the first screen, so the page is complete at rest
   if (!reduce && M.scrollReveal!=="none" && ST) $$("[data-rv]",main).forEach(el=>{
@@ -392,6 +474,7 @@ function afterRender(cfg,page){
   if (page.layout==="console" && ST) $$(".rail a[data-sec]").forEach((a,i)=>{ const s=$("#sec-"+a.dataset.sec); if (!s) return; if (i===0) a.classList.add("on");
     ST.create({trigger:s,start:"top 45%",end:"bottom 45%",onToggle:self=>{ if (self.isActive){ $$(".rail a.on").forEach(x=>x.classList.remove("on")); a.classList.add("on"); } }}); });
   if (ST) ST.refresh();
+  arrive();
 }
 
 /* ================= MODALS ================= */
@@ -427,11 +510,17 @@ function openModal(cfg,id,ctx={}){
     MS.open=true; Site.pauseHero&&Site.pauseHero();
     fillModal(md,panel);
     animateModalIn(cfg,panel,scrim);
-  } else { const panel=$(".panel",root); fillModal(md,panel); }
+    if (ctx.section) MS.tl.add(()=>jumpTo(ctx.section,{root:panel,scroller:panel}),"+=0.05");
+  } else { const panel=$(".panel",root); fillModal(md,panel); if (ctx.section) setTimeout(()=>jumpTo(ctx.section,{root:panel,scroller:panel}),reduce?0:350); }
 }
 function fillModal(md,panel){
   const cfg=MS.cfg; MS.md=md; MS.tweens.forEach(t=>t.kill()); MS.tweens=[];
-  panel.className="panel t"+md.type; panel.textContent=""; panel.setAttribute("aria-label",(md.kicker?md.kicker+": ":"")+(md.title||""));
+  const LK=modalLook(cfg,md); MS.look=LK;
+  panel.className="panel t"+md.type+(LK.corners===false?" no-corners":"")+(LK.scan===false?" no-scan":""); panel.textContent=""; panel.setAttribute("aria-label",(md.kicker?md.kicker+": ":"")+(md.title||""));
+  panel.style.cssText=""; if (md.look&&md.look.custom){ const n=x=>x===""||x==null||isNaN(+x)?null:+x;
+    if (n(md.look.width)!=null) panel.style.setProperty("--md-w",Math.max(420,Math.min(1600,n(md.look.width)))+"px");
+    if (hexOk(md.look.bg)) panel.style.setProperty("--md-bg",rgba(md.look.bg,Math.max(0,Math.min(1,n(md.look.bgAlpha)??.88))));
+    if (n(md.look.titleSize)!=null) panel.style.setProperty("--md-ts",String(n(md.look.titleSize))); }
   panel.append(h("span",{class:"scan"}),...["a","b","c","d"].map(c=>h("span",{class:"corner "+c})));
   const multi=MS.seq.length>1;
   panel.append(h("header",{class:"m-head","data-anim":""},h("span",{html:multi&&NUM.on?`${ui("Step")} <b>${pad(MS.idx+1)}</b> / ${pad(MS.seq.length)}`:`<b>${esc(md.kicker||"")}</b>`}),
@@ -442,7 +531,13 @@ function fillModal(md,panel){
   const text=md.text?h("p",{class:"lede","data-anim":"","data-part":"text",text:md.text}):null;
   const more=md.more&&md.more.label?h("button",{class:"more","data-anim":"","data-part":"more",type:"button",style:"margin-top:6px",html:esc(md.more.label)+ARROW_SVG,onclick:()=>{ const a=md.more.action; closeModal(); setTimeout(()=>runAction(cfg,a),reduce?0:500); }}):null;
   const media=md.media||[];
-  if (md.type===2){
+  if (md.type===5){
+    // Sections: any page sections stacked inside the modal, each with its own label for buttons that travel to it
+    const intro=h("div",{class:"m-main m-intro5"},...head.filter(Boolean),text); if (md.kicker||md.title||md.text) body.append(intro);
+    (md.sections||[]).filter(x=>x&&!x.hidden&&x.type!=="heroCarousel"&&(!x.previewOnly||Site.preview)).forEach(x=>{ const el=buildSection(cfg,x,{id:"modal-"+md.id,sections:md.sections}); if (el){ el.classList.add("m-sec"); body.append(el); } });
+    if (more) body.append(more);
+    MS.subflow=null;
+  } else if (md.type===2){
     body.append(h("div",{class:"m-intro"},h("div",{class:"m-main"},head),h("div",{class:"m-main"},text,more)));
     const g=h("div",{class:"m-gallery"});
     media.slice(0,3).forEach((mid,k)=>g.append(modalFigure(cfg,mid,[pn(k+1),(md.caption||[])[k]].filter(Boolean),{ratio:.8,res:640,badge:pad(k+1)})));
@@ -461,7 +556,7 @@ function fillModal(md,panel){
       // Service list: each service has a brief and a link that closes the modal and opens its page.
       const ul=h("ul",{class:"m-services"});
       (md.services||[]).filter(sv=>sv&&!sv.hidden).forEach((sv,i)=>{ const L=sv.link||{}, go=L.action&&L.action.type&&L.action.type!=="none";
-        ul.append(h("li",{"data-anim":""},NUM.on?h("span",{class:"mono",text:pad(i+1)}):null,h("div",{},h("h3",{class:"h3",text:sv.title||""}),sv.text?h("p",{text:sv.text}):null,
+        ul.append(h("li",{"data-anim":"","data-label":labelKey(sv.anchor||sv.title)},NUM.on?h("span",{class:"mono",text:pad(i+1)}):null,h("div",{},h("h3",{class:"h3",text:sv.title||""}),sv.text?h("p",{text:sv.text}):null,
           go&&L.label?h("button",{class:"arrow-link",type:"button",html:esc(L.label)+ARROW_SVG,onclick:()=>{ closeModal(); setTimeout(()=>runAction(cfg,L.action),reduce?0:500); }}):null))); });
       main.append(ul);
     }
@@ -495,10 +590,11 @@ function modalFigure(cfg,mid,caption,{ratio,res,badge}){
   return fig;
 }
 function animateModalIn(cfg,panel,scrim){
-  const items=$$("[data-anim]",panel), style=cfg.motion.modalOpen;
+  const items=$$("[data-anim]",panel), style=cfg.motion.modalOpen, LK=MS.look||{};
   MS.tl&&MS.tl.kill(); const tl=MS.tl=gsap.timeline();
   if (reduce){ tl.fromTo([scrim,panel],{autoAlpha:0},{autoAlpha:1,duration:.3}); return; }
-  const app=$("#app"); tl.to(app,{autoAlpha:.3,filter:"blur(4px)",duration:.8,ease:"power3.out"},0).fromTo(scrim,{autoAlpha:0},{autoAlpha:1,duration:.6},0);
+  const n=(v,d)=>v===""||v==null||isNaN(+v)?d:+v, dim=Math.max(0,Math.min(1,n(LK.dim,.3))), blur=Math.max(0,Math.min(20,n(LK.blur,4)));
+  const app=$("#app"); tl.to(app,{autoAlpha:dim,filter:`blur(${blur}px)`,duration:.8,ease:"power3.out"},0).fromTo(scrim,{autoAlpha:0},{autoAlpha:1,duration:.6},0);
   if (style==="line"){
     tl.fromTo(panel,{clipPath:"inset(49.6% 50% 49.6% 50%)"},{clipPath:"inset(49.6% 0% 49.6% 0%)",duration:.45,ease:"expo.out"},.05)
       .to(panel,{clipPath:"inset(0% 0% 0% 0%)",duration:.75,ease:"expo.inOut"},.4)

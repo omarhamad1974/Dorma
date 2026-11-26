@@ -53,7 +53,7 @@ Captions:
 - Print
 - Signage
 - Fabrication
-More: [Tell us what you need produced](modal:md-contact)
+More: [Tell us what you need produced](modal:md-quote)
 
 ---
 Name: Our process
@@ -70,7 +70,7 @@ Flow:
   Detail: Develop the approach and agree on the scope, materials, and schedule.
 - Deliver
   Detail: Coordinate the creative work, production, and delivery required by the brief.
-More: [Start the conversation](modal:md-contact)
+More: [Start the conversation](modal:md-quote)
 
 ---
 Name: Agency services list
@@ -87,4 +87,4 @@ Services:
 - Title: Digital Marketing
   Brief: Website design, content creation, and social media management.
   Link: [Open Digital Marketing](page:digital-marketing)
-More: [Tell us your challenge](modal:md-contact)
+More: [Tell us your challenge](modal:md-quote)

@@ -20,7 +20,8 @@ Page lines:
 Section lines:
 
 - Section: the section type. One of: Hero carousel, Hero, Division, Chapters, Numbers, About, Clients,
-  Card grid, Accordion, Timeline, Flow strip, Wide banner, Call to action, Blog posts, Text article.
+  Card grid, Accordion, Timeline, Flow strip, Wide banner, Call to action, Blog posts, Text article,
+  Feature list, Testimonials, Quote request form, Catalog.
 - Hidden: yes adds the section hidden (you can show it later with one tap in Pages).
 - Any text line can have an Arabic twin on its own line: "Title (Arabic): …".
 - Images: a file path (exhibitions/booth-01.jpg), a name as shown in the Library, or an https:// link.
@@ -50,7 +51,7 @@ Height: Tall
 Background image: Placeholder · City
 Flow:
 - [See our booths](modal:md-booths)
-- [Talk to us](modal:md-contact)
+- [Talk to us](modal:md-quote)
 
 ---
 Section: Hero carousel
@@ -142,7 +143,7 @@ Cards:
   Code: PR-01
   Tag: Print
   Text: Digital and offset printing, large-format printing, labels and packaging.
-  On click: modal:md-gifts
+  On click: modal:md-giveaways
   Image: Placeholder · Ridges detail
 - Title: Signage & Brand Applications
   Code: SG-02
@@ -165,7 +166,7 @@ Section: Timeline
 Number: 06
 Eyebrow: How we bring it together
 Statement: Every brief has its own audience, priorities, and practical considerations.
-Timeline flow: How we bring it together
+Timeline flow: Default process flow
 
 ---
 Section: Flow strip
@@ -204,6 +205,38 @@ A clear brief saves time on every stage that follows.
 - What should happen at the stand?
 
 ---
+Section: Feature list
+Eyebrow: Booth Production
+Heading: Services
+Columns: 3
+Items:
+- Booth design and 3D visualization
+- Custom booths
+- Reusable modular booths
+
+---
+Section: Testimonials
+Eyebrow: Sample testimonials
+Quotes:
+- Quote: The booth was ready before the doors opened.
+  Name: Sample client
+  Role or company: Sample testimonial
+
+---
+Section: Quote request form
+Heading: Request a Quote
+Service: Booth Production
+
+---
+Section: Catalog
+Heading: Business Giveaways & Packages
+Short paragraph: Browse individual items and packages.
+Filter names:
+- Item Type
+- Package Type
+- Price Range
+
+---
 Section: Call to action
 Heading: What are you planning next? Let's bring it to life.
-Button: [Contact Dorma](modal:md-contact)
+Button: [Contact Dorma](modal:md-quote)

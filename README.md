@@ -48,9 +48,22 @@ The key in `src/config.ts` is the public "publishable" key, which is safe in the
 | `src/studio/core.js` | Helpers, theme, media, flows (items, separators, whole or per-item animation) and button actions. |
 | `src/studio/site.js` | The public site: sections, scroll animations, the hero carousel and the three modal types. |
 | `src/studio/admin.js` | The studio: sign-in, every panel, the field editors and published versions. |
+| `src/studio/content.js` | The bilingual site content from the content handoff: services, flows, modals, pages, catalogs and draft posts. |
+| `src/studio/jump.js` | Button jumps to a labelled section on another page or inside a modal (curtain travel, scroll and lock-on). |
+| `src/studio/fx.js` | Animated SVG section backgrounds with masks (contours, orbits, grid, goo, stripes, waves, reveal, type). |
 | `src/studio/store.ts` | Supabase: loading, autosave, publish, sign-in and uploads. Falls back to browser storage offline. |
 | `src/studio/scenes.js` | Generated placeholder images used until real photos are uploaded. |
 | `scripts/library-index.mjs` | Lists the files in `public/library/` for the studio (runs before dev and build). |
+
+## Flows, jumps and section effects
+
+- **Any section can have a flow under it.** Pages → section → More options → Flow under this section. The same panel sets the section's **label** (used as a jump target), whether it is a **preview only** sample, its **background effect**, and its own **Look** (spacing, width, background, title sizes, fonts and colours).
+- **Flow items** can be a button, plain text, text with an icon, an icon, or a **note**: an animated icon with handwritten text beside it (for example "Briefing…").
+- **Flow display**: the usual storytelling row, **Tabs** (each item swaps a panel), or **Reveal** (each item unlocks its part of the section with a circle mask).
+- **Any button** can open a modal or a page and then travel to a labelled section in it: the page slides under a curtain, scrolls to the section and marks it with corner brackets. Links look like `#agency/services`.
+- **Global style → Every section / Every modal** set the defaults; each section or modal can use its own look instead. **Colours and type** sets sizes and fonts for titles, headings, subtitles, body text, labels, handwritten notes and Arabic.
+- **＋ New…** in the studio top bar creates a page (blank, service, catalog or article), a modal or a flow.
+- Quote forms send by email to the address in Site → Quote requests, or copy the request when that is empty. No paid service is used.
 
 ## Studio layout
 
