@@ -43,8 +43,12 @@ const STARTER = {
     /* Every section unless a section is set to Custom (Pages → section → Look). */
     sections: { pad: 1, width: 1320, bg: "", bgAlpha: 0, titleSize: 1, subSize: 1, bgfx: { type: "none", color: "", opacity: 0.4, speed: 1 } },
     /* Every modal unless a modal is set to Custom (Flows and modals → Modals → Look). */
-    modals: { width: 980, bg: "", bgAlpha: 0.88, corners: true, scan: true, blur: 4, dim: 0.3, titleSize: 1 }
+    modals: { width: 980, bg: "", bgAlpha: 0.88, corners: true, scan: true, blur: 4, dim: 0.3, titleSize: 1 },
+    /* Light mode colours (the colours above are the dark mode). Empty heading/accent follow text/Dorma blue. */
+    light: { ink: "#f4f6fb", panel: "#ffffff", fg: "#0b1630", heading: "", accent: "#0072bc" }
   },
+  /* Dark and light mode for visitors: the starting mode and whether the header shows a switch (their choice is remembered). */
+  colorMode: { default: "auto", toggle: true },
   motion: {
     speed: 1, ease: "expo",
     kenBurns: true, kbZoom: 1.18, kbDuration: 10,
@@ -53,7 +57,12 @@ const STARTER = {
     /* Global flow animation: every flow follows it unless that flow is set to its own animation. */
     flow: { mode: "items", preset: "rise", duration: 0.8, stagger: 0.06, delay: 0 },
     /* Global slide timing (seconds from when a slide's text starts). Carousels and slides can override each part. */
-    slideTiming: { eyebrow: 0.05, title: 0, text: 0.5, flow: 1.5, stagger: 0.2 }
+    slideTiming: { eyebrow: 0.05, title: 0, text: 0.5, flow: 1.5, stagger: 0.2 },
+    /* Pictures in sections and modals: reveal mask, shape and hover (each section can use its own). */
+    imageFx: { reveal: "none", dir: "left", duration: 1.2, color: "", shape: "none", hover: "none" },
+    /* Every section's entrance as it scrolls in and exit as it leaves (each section can use its own). */
+    sectionFx: { in: "none", out: "none", duration: 1 },
+    modalClose: "auto"
   },
   /* Generated placeholder scenes. Replace them with real project photos in the studio (Images). */
   media: [
@@ -135,7 +144,19 @@ const OPT = {
   ease: [["expo","Expo (sharp, cinematic)"],["power3","Power (smooth)"],["sine","Sine (gentle)"],["back","Back (overshoot)"],["elastic","Elastic (springy)"]],
   transition: [["wipe","Light wipe"],["fade","Crossfade"],["slide","Slide"],["zoom","Zoom through"]],
   titleReveal: [["chars","Letter by letter"],["words","Word by word"],["fade","Fade up"],["blur","Blur in"]],
-  modalOpen: [["line","Scan line"],["fade","Fade"],["scale","Scale up"],["slide","Slide up"]],
+  modalOpen: [["line","Scan line"],["fade","Fade"],["scale","Scale up"],["slide","Slide up"],["iris","Circle from the click"],["zoom","Grow from the click"],["wipe","Wipe across"],["curtain","Open from the centre"],["unfold","Unfold (line, then open)"],["diagonal","Diagonal wipe"],["flip","Flip down (3D)"],["drop","Drop and bounce"],["blur","Blur into focus"],["blinds","Colour bars sweep"],["cmyk","CMYK print pass"]],
+  modalClose: [["auto","Match the opening"],["fade","Fade"],["shrink","Shrink"],["slideDown","Slide down"],["iris","Circle into the click"],["zoomOut","Shrink into the click"],["wipe","Wipe away"],["curtain","Close to the centre"],["collapse","Collapse to a line"],["flip","Flip away (3D)"],["blur","Blur away"],["blinds","Colour bars cover"]],
+  imageReveal: [["none","None (pictures just show)"],["wipe","Wipe (from a side)"],["iris","Circle (iris opens)"],["diamond","Diamond opens"],["diagonal","Diagonal cut"],["split","Split from the centre"],["bars","Opens from a line"],["curtain","Curtain (two halves slide away)"],["blinds","Blinds (horizontal slats)"],["shutters","Shutters (vertical slats)"],["tiles","Tiles (squares flip away)"],["cmyk","CMYK print pass (colour bands)"],["spot","Soft spotlight grows"],["zoom","Zoom out of a frame"],["blur","Blur into focus"]],
+  imageShape: [["none","As designed (rectangle)"],["rounded","Rounded corners"],["pill","Pill"],["arch","Arch"],["circle","Circle or oval"],["hexagon","Hexagon"],["diamond","Diamond"],["slant","Slanted bottom"],["notch","Cut corners"],["leaf","Leaf"],["blob","Soft blob"]],
+  imageHover: [["none","None"],["zoom","Slow zoom"],["tilt","3D tilt with the pointer"],["spot","Light follows the pointer"],["color","Black and white, colour on hover"],["lift","Lift with a glow"]],
+  dirs4: [["left","From the left"],["right","From the right"],["up","From the bottom"],["down","From the top"]],
+  sectionIn: [["none","None"],["rise","Rise"],["fade","Fade"],["scale","Scale up"],["zoom","Zoom in"],["blur","Blur into focus"],["slideLeft","Slide from the left"],["slideRight","Slide from the right"],["tilt","Tilt up (3D)"],["skew","Skew up"],["wipe","Wipe up (mask)"],["iris","Circle opens (mask)"],["curtain","Open from the centre (mask)"],["stagger","Each part in turn"]],
+  sectionOut: [["none","None"],["fade","Fade as it leaves"],["shrink","Shrink as it leaves"],["blur","Blur as it leaves"],["parallax","Lag behind (parallax)"],["dim","Darken as it leaves"],["fold","Fold back (3D)"],["slide","Slide away"]],
+  fxPalettes: [["single","One colour"],["two","Two colours"],["brand","Dorma CMYK"]],
+  fxDirs: [["","Effect default"],["right","Right"],["left","Left"],["up","Up"],["down","Down"],["diag","Diagonal up"],["diag2","Diagonal down"]],
+  fxPos: [["","Effect default"],["left","Left"],["center","Centre"],["right","Right"]],
+  fxSoften: [["","Effect default"],["side","Fade behind the text side"],["even","Even veil"],["none","No veil (full effect)"]],
+  colorModes: [["auto","Follow the visitor's device"],["dark","Dark"],["light","Light"]],
   scrollReveal: [["rise","Rise"],["fade","Fade"],["none","None"]],
   presets: [["rise","Rise"],["fade","Fade"],["scale","Scale"],["blur","Blur"],["slideLeft","Slide from left"],["slideRight","Slide from right"],["flip","Flip"],["pop","Pop"],["none","None"]],
   separators: [["dots3","Three dots"],["dot","Single dot"],["line","Line"],["chevron","Chevron"],["none","None"]],
@@ -310,8 +331,8 @@ function migrateFlow(f,g={}){
 /* ================= SAVED STYLES =================
    A saved style is a snapshot of the global layer (colours, type, header, image filter, flow and slide defaults, animation).
    Per-item custom settings are not part of it, so applying a style never wipes a flow or slide that has its own look. */
-const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals"];
-const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming"];
+const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals","light"];
+const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming","imageFx","sectionFx","modalClose"];
 const pickKeys=(o,ks)=>JSON.parse(JSON.stringify(Object.fromEntries(ks.filter(k=>o&&o[k]!==undefined).map(k=>[k,o[k]]))));
 function snapshotStyle(cfg,name){ return { id:"st-"+Math.random().toString(36).slice(2,8), name:name||"My style", savedAt:new Date().toISOString(), theme:pickKeys(cfg.theme,STYLE_THEME), motion:pickKeys(cfg.motion,STYLE_MOTION) }; }
 function applyStyle(cfg,st){

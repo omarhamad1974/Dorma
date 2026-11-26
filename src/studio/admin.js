@@ -1,5 +1,5 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -8,6 +8,8 @@ import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyl
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
 import { labelKey } from './jump';
+import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
+import { previewImage, previewSection, previewModal } from './motionfx';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -40,8 +42,8 @@ const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colo
 const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
-/* Studio light or dark mode: a per-person preference kept in this browser. */
-const studioMode=()=>{ try { return localStorage.getItem("dorma.studioMode")==="light"?"light":"dark"; } catch { return "dark"; } };
+/* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
+const studioMode=()=>{ let v=""; try { v=localStorage.getItem("dorma.studioMode")||""; } catch { /* storage blocked */ } return v==="light"||v==="dark"?v:(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"); };
 function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } catch { /* storage blocked */ }
   const a=$(".adm"); if (a) a.classList.toggle("light",m==="light"); document.documentElement.style.colorScheme=m; const b=$("#admMode"); if (b) b.innerHTML=(m==="light"?IC.moon+"Dark mode":IC.sun+"Light mode"); }
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
@@ -97,7 +99,7 @@ function previewDraft(){
 }
 function openPanel(k){
   if (!PANELS.some(p=>p[0]===k)) k="pages";
-  if (cpClose) cpClose(); Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
+  if (cpClose) cpClose(); stopPreviews(); Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
   $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
@@ -109,7 +111,7 @@ function openPanel(k){
 /* ---------- generic field engine ---------- */
 /* Bilingual entry: when the site has Arabic, every text box shows English and Arabic side by side.
    Settings that are not shown to visitors as text (ids, slugs, links, studio names, library files, the loader) stay single. */
-const MONO_KEYS=new Set(["id","slug","name","path","url","target","code","homePage","logo","image","anchor","quoteEmail","section"]);
+const MONO_KEYS=new Set(["id","slug","name","path","url","target","code","homePage","logo","logoLight","image","anchor","quoteEmail","section"]);
 const MEDIA_KINDS=new Set(["image","video","scene","article"]);
 function bilingual(obj,key,kind){
   const D=Store.draft; if (!D || D.site.languages==="en" || !D.site.languages) return false;
@@ -141,13 +143,14 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
     case "color": {
       /* opts.optional: the value may be empty, meaning "follow the global / site colour" (opts.fallback shows which). */
       const opt=!!opts.optional, val=()=>hexOk(obj[key])?obj[key]:"", fb=()=>{ const f=typeof opts.fallback==="function"?opts.fallback():opts.fallback; return hexOk(f)?f:"#000000"; };
-      const c=h("input",{id,type:"color"}), t=h("input",{type:"text",placeholder:opt?(opts.placeholder||"Global"):"","aria-label":label+" hex",style:"width:96px"});
+      /* the swatch opens the colour wheel; the hex box takes a typed code */
+      const c=h("button",{id,type:"button",class:"cp-swatch",title:"Open the colour wheel","aria-label":"Colour wheel for "+label}), t=h("input",{type:"text",placeholder:opt?(opts.placeholder||"Global"):"","aria-label":label+" hex",style:"width:96px"});
       let row=null;
-      const sync=()=>{ c.value=val()||fb(); t.value=val(); if (row) row.classList.toggle("inherit",opt&&!val()); };
+      const sync=()=>{ c.style.background=val()||fb(); t.value=val(); if (row) row.classList.toggle("inherit",opt&&!val()); };
       const put=v=>{ set(v,{theme:true}); sync(); };
-      c.addEventListener("input",()=>{ t.value=c.value; set(c.value,{theme:true}); row.classList.remove("inherit"); });
+      c.addEventListener("click",()=>colorPanel(c,{value:val()||fb(),title:label,onPick:put}));
       t.addEventListener("change",()=>{ const v=t.value.trim(); if (opt&&v==="") put(""); else if (hexOk(v)) put(v.toLowerCase()); else sync(); });
-      const pick=h("button",{type:"button",class:"cp-btn",title:"Open the colour panel","aria-label":"Colour panel for "+label,html:IC.theme,onclick:e=>colorPanel(e.currentTarget,{value:val()||fb(),onPick:put})});
+      const pick=null;
       const mine=h("div",{class:"my-sw"}); (D.theme.swatches||[]).filter(s=>hexOk(s.hex)).forEach(s=>mine.append(h("button",{type:"button",title:(s.name||s.hex)+" "+s.hex,"aria-label":"Use "+(s.name||s.hex),style:"background:"+s.hex,
         onclick:()=>put(s.hex.toLowerCase())})));
       const reset=opt?h("button",{type:"button",class:"cp-global",text:opts.globalLabel||"Use global",title:"Clear this colour so it follows the global style",onclick:()=>put("")}):null;
@@ -409,7 +412,7 @@ function panelSite(body){
   body.append(card("Languages and numbering",h("p",{class:"adm-intro",text:"Choose the languages visitors can read. With both, a switch in the header lets them change language. When Arabic is on, every text box in the studio shows English and Arabic side by side. A language left empty shows the other language's text."}),
     fieldsFor(D.site,[["languages","select","Site languages",{options:[["en","English only"],["ar","Arabic only"],["both","English and Arabic"]]}],["defaultLang","select","Language for first-time visitors",{options:[["en","English"],["ar","العربية"]]}],["showNumbers","toggle","Show numbering (01, 02… counters, steps and badges)"]],(v,k)=>{ if (k==="languages") openPanel("site"); })));
   body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
-    fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}]])));
+    fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}],["logoLight","media","Logo on light pages, light mode (None uses the blue Dorma logo)",{allowNone:true}]])));
   body.append(loaderCard());
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(plain(p.title)||p.id)+" in menu")); });
@@ -480,8 +483,9 @@ function panelTheme(body){
   /* My colours: named swatches shown next to every colour picker in the studio */
   const myBox=h("div",{class:"my-colours"});
   const drawMine=()=>{ myBox.textContent="";
-    T.swatches.forEach((s,i)=>{ const c=h("input",{type:"color",value:/^#[\da-f]{6}$/i.test(s.hex||"")?s.hex:"#000000","aria-label":"Colour"}), x=h("input",{type:"text",value:s.hex||"","aria-label":"Hex code",style:"width:96px"}), n=h("input",{type:"text",value:s.name||"",placeholder:"Name","aria-label":"Colour name"});
-      c.addEventListener("input",()=>{ s.hex=x.value=c.value; touch(); }); x.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(x.value.trim())){ s.hex=c.value=x.value.trim().toLowerCase(); touch(); } else x.value=s.hex; }); n.addEventListener("input",()=>{ s.name=n.value; touch(); });
+    T.swatches.forEach((s,i)=>{ const c=h("button",{type:"button",class:"cp-swatch",title:"Open the colour wheel","aria-label":"Change "+(s.name||"colour"),style:"background:"+(hexOk(s.hex)?s.hex:"#000000")}), x=h("input",{type:"text",value:s.hex||"","aria-label":"Hex code",style:"width:96px"}), n=h("input",{type:"text",value:s.name||"",placeholder:"Name","aria-label":"Colour name"});
+      c.addEventListener("click",()=>colorPanel(c,{value:hexOk(s.hex)?s.hex:"#000000",title:s.name||"My colour",onPick:hex=>{ s.hex=x.value=hex; c.style.background=hex; scheduleSave(); }}));
+      x.addEventListener("change",()=>{ if (/^#[\da-f]{6}$/i.test(x.value.trim())){ s.hex=x.value.trim().toLowerCase(); c.style.background=s.hex; touch(); } else x.value=s.hex; }); n.addEventListener("input",()=>{ s.name=n.value; touch(); });
       myBox.append(h("div",{class:"my-row"},c,x,n,h("button",{class:"x",type:"button","aria-label":"Remove colour",title:"Remove",html:IC.x,onclick:()=>{ T.swatches.splice(i,1); touch(); drawMine(); }}))); });
     myBox.append(h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.plus+"Add colour",title:"Pick a colour from the panel to add it",onclick:e=>colorPanel(e.currentTarget,{value:T.accent,title:"Add a colour",addMode:true,onPick:hex=>{
       if (!T.swatches.some(s=>(s.hex||"").toLowerCase()===hex)){ T.swatches.push({name:"",hex}); touch(); } drawMine(); }})})); };
@@ -553,44 +557,85 @@ function panelMotion(body){
   body.append(card(h("span",{},"Preview"),prev,h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.replay+"Replay",onclick:play})),
     card("Global",fieldsFor(M,[["speed","range","Overall speed",{min:.4,max:2,step:.05}],["ease","select","Easing",{options:OPT.ease}],["titleReveal","select","Title reveal",{options:OPT.titleReveal}],["scrollReveal","select","Sections on scroll",{options:OPT.scrollReveal}],["counters","toggle","Count numbers up"],["parallax","toggle","Mouse parallax on heroes"]])),
     card("Buttons",fieldsFor(M,[["buttonGlow","range","Button glow (0 = off)",{min:0,max:1,step:.05,theme:true}]])),
-    card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]])),
+    card("Modals",fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}],["modalClose","select","Closing style",{options:OPT.modalClose}]])),
     h("p",{class:"adm-intro",text:"Each flow also has its own animation settings, under Flows. Carousel transitions and slide times are under Carousels."}));
 }
 /* ---------- colour panel ----------
-   A popover grid of colours: My colours, the Dorma brand colours, a full spectrum and greys, plus any custom colour.
-   Picking applies the colour; "Add to My colours" keeps it in the palette shown next to every colour picker. */
+   A colour wheel: drag round the ring for the hue, and in the square for how strong and how bright it is.
+   Under it, shades of the current colour from dark to light (one click picks a grade), its tints from grey to full,
+   the hex code, My colours and the Dorma brand colours, and the colours used most recently.
+   Picking applies the colour as you drag; "Add to My colours" keeps it in the palette shown next to every colour field. */
 function hslHex(hh,s,l){ s/=100; l/=100; const k=n=>(n+hh/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1));
   return "#"+[f(0),f(8),f(4)].map(x=>Math.round(x*255).toString(16).padStart(2,"0")).join(""); }
+function hexHsv(hex){ const n=parseInt(hex.slice(1),16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255, mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  let hh=0; if (d){ hh=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4; hh*=60; if (hh<0) hh+=360; }
+  return {h:hh,s:mx?d/mx:0,v:mx}; }
+function hsvHex(hh,s,v){ const f=n=>{ const k=(n+hh/60)%6; return v-v*s*Math.max(0,Math.min(k,4-k,1)); };
+  return "#"+[f(5),f(3),f(1)].map(x=>Math.round(Math.max(0,Math.min(1,x))*255).toString(16).padStart(2,"0")).join(""); }
+function hexHsl(hex){ const {h:hh,s,v}=hexHsv(hex), l=v*(1-s/2), sl=l===0||l===1?0:(v-l)/Math.min(l,1-l); return {h:hh,s:sl*100,l:l*100}; }
 const CP_BRAND=[["Dorma blue","#0072bc"],["Dorma yellow","#ffcb08"],["Dorma magenta","#ed0677"],["Dorma cyan","#00aeef"],["Ink","#040915"],["Night panel","#0b1630"],["White","#ffffff"],["Black","#000000"]];
-const CP_GRID=(()=>{ const hues=[0,15,30,45,55,75,120,155,180,195,210,235,265,290,320,340];
-  const rows=[[92,70],[80,75],[66,78],[52,80],[40,78],[28,70],[16,60]].map(([l,s])=>hues.map(x=>hslHex(x,s,l)));
-  rows.push(hues.map((_,i)=>hslHex(0,0,Math.round(100-i*100/(hues.length-1)))));
-  return rows; })();
+const RECENT_KEY="dorma.recentColours";
+const recentColours=()=>{ try { const a=JSON.parse(localStorage.getItem(RECENT_KEY)||"[]"); return Array.isArray(a)?a.filter(hexOk).slice(0,10):[]; } catch { return []; } };
+const rememberColour=hex=>{ try { localStorage.setItem(RECENT_KEY,JSON.stringify([hex,...recentColours().filter(x=>x!==hex)].slice(0,10))); } catch { /* storage blocked */ } };
 let cpClose=null;
 function colorPanel(anchor,{value="#ffffff",onPick=()=>{},title="Pick a colour",addMode=false}={}){
   if (cpClose) cpClose();
   const D=Store.draft, T=D.theme; T.swatches=Array.isArray(T.swatches)?T.swatches:[];
-  let cur=hexOk(value)?value.toLowerCase():"#ffffff";
+  let cur=hexOk(value)?value.toLowerCase():"#ffffff", hsv=hexHsv(cur);
+  const start=cur;
   const panel=h("div",{class:"cpanel",role:"dialog","aria-label":title});
-  const nat=h("input",{type:"color",value:cur,"aria-label":"Any colour"}), hx=h("input",{type:"text",value:cur,"aria-label":"Hex code",style:"width:96px"});
+  /* wheel: hue ring + strength/brightness square */
+  const ringKnob=h("i",{class:"cw-knob"}), sqKnob=h("i",{class:"cw-knob"});
+  const ring=h("div",{class:"cw-ring",role:"slider","aria-label":"Hue","aria-valuemin":"0","aria-valuemax":"360",tabindex:"0"});
+  const sq=h("div",{class:"cw-sq",role:"slider","aria-label":"Strength and brightness (arrow keys: left/right strength, up/down brightness)",tabindex:"0"},sqKnob);
+  const wheel=h("div",{class:"cw"},ring,sq,ringKnob);
+  const was=h("button",{type:"button",class:"cw-was",title:"Back to "+start,"aria-label":"Back to the starting colour",style:"background:"+start,onclick:()=>choose(start)}), now=h("span",{class:"cw-now"});
+  const hx=h("input",{type:"text",value:cur,"aria-label":"Hex code",spellcheck:"false",maxlength:"7"});
+  const shades=h("div",{class:"cp-grade","aria-label":"Shades"}), tints=h("div",{class:"cp-grade","aria-label":"Strength"});
   const marks=()=>$$(".cp-sw",panel).forEach(b=>b.classList.toggle("on",b.dataset.hex===cur));
-  const added=()=>{ onPick(cur); close(); toast("Added to My colours."); };
-  const choose=hex=>{ cur=hex.toLowerCase(); nat.value=hx.value=cur; marks(); if (addMode) added(); else onPick(cur); };
-  const sw=(hex,name)=>h("button",{type:"button",class:"cp-sw","data-hex":hex.toLowerCase(),style:"background:"+hex,title:(name?name+" · ":"")+hex,"aria-label":name||hex,onclick:()=>choose(hex)});
-  nat.addEventListener("input",()=>{ cur=nat.value; hx.value=cur; marks(); if (!addMode) onPick(cur); });
-  hx.addEventListener("change",()=>{ const v=hx.value.trim().toLowerCase(); if (hexOk(v)){ cur=v; nat.value=v; marks(); if (!addMode) onPick(cur); } else hx.value=cur; });
+  /* everything that shows the current colour */
+  const paint=({fromHex=false,grades=true}={})=>{
+    const a=hsv.h*Math.PI/180; ringKnob.style.left=(50+Math.cos(a)*44.5)+"%"; ringKnob.style.top=(50+Math.sin(a)*44.5)+"%";
+    ringKnob.style.background=hsvHex(hsv.h,1,1); ring.setAttribute("aria-valuenow",String(Math.round(hsv.h)));
+    sq.style.setProperty("--hue",hsvHex(hsv.h,1,1)); sqKnob.style.left=(hsv.s*100)+"%"; sqKnob.style.top=((1-hsv.v)*100)+"%"; sqKnob.style.background=cur;
+    now.style.background=cur; if (!fromHex) hx.value=cur;
+    if (grades) drawGrades(); marks(); };
+  const drawGrades=()=>{ const {h:hh,s}=hexHsl(cur); shades.textContent=""; tints.textContent="";
+    [8,16,26,36,46,56,66,76,86,94].forEach(l=>shades.append(sw(hslHex(Math.round(hh),Math.round(Math.max(s,8)),l),"Shade "+l+"%")));
+    [0,12,24,36,48,60,72,84,100].forEach(k=>tints.append(sw(hsvHex(hsv.h,k/100,Math.max(hsv.v,.35)),"Strength "+k+"%"))); };
+  const added=()=>{ rememberColour(cur); onPick(cur); close(); toast("Added to My colours."); };
+  const apply=()=>{ if (!addMode) onPick(cur); };
+  function choose(hex,{grades=true}={}){ cur=hex.toLowerCase(); hsv=hexHsv(cur); paint({grades}); if (addMode) added(); else { onPick(cur); rememberColour(cur); } }
+  function sw(hex,name){ return h("button",{type:"button",class:"cp-sw","data-hex":hex.toLowerCase(),style:"background:"+hex,title:(name?name+" · ":"")+hex,"aria-label":(name||"Colour")+" "+hex,onclick:()=>choose(hex,{grades:!/^(Shade|Strength)/.test(name||"")})}); }
+  /* dragging */
+  const drag=(el,fn)=>{ el.addEventListener("pointerdown",e=>{ e.preventDefault(); el.setPointerCapture(e.pointerId); fn(e); el.focus({preventScroll:true});
+    const mv=ev=>fn(ev), up=()=>{ el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",up); el.removeEventListener("pointercancel",up); if (!addMode) rememberColour(cur); drawGrades(); };
+    el.addEventListener("pointermove",mv); el.addEventListener("pointerup",up); el.addEventListener("pointercancel",up); }); };
+  drag(ring,e=>{ const r=ring.getBoundingClientRect(); let a=Math.atan2(e.clientY-r.top-r.height/2,e.clientX-r.left-r.width/2)*180/Math.PI; if (a<0) a+=360;
+    hsv.h=a; if (hsv.s<.05&&hsv.v>.95){ hsv.s=.8; hsv.v=.9; } cur=hsvHex(hsv.h,hsv.s,hsv.v); paint({grades:false}); apply(); });
+  drag(sq,e=>{ const r=sq.getBoundingClientRect(); hsv.s=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)); hsv.v=Math.max(0,Math.min(1,1-(e.clientY-r.top)/r.height));
+    cur=hsvHex(hsv.h,hsv.s,hsv.v); paint({grades:false}); apply(); });
+  ring.addEventListener("keydown",e=>{ const d={ArrowRight:5,ArrowUp:5,ArrowLeft:-5,ArrowDown:-5}[e.key]; if (d==null) return; e.preventDefault(); hsv.h=(hsv.h+d*(e.shiftKey?3:1)+360)%360; cur=hsvHex(hsv.h,hsv.s,hsv.v); paint(); apply(); });
+  sq.addEventListener("keydown",e=>{ const k=e.shiftKey?.1:.02; if (e.key==="ArrowRight") hsv.s=Math.min(1,hsv.s+k); else if (e.key==="ArrowLeft") hsv.s=Math.max(0,hsv.s-k); else if (e.key==="ArrowUp") hsv.v=Math.min(1,hsv.v+k); else if (e.key==="ArrowDown") hsv.v=Math.max(0,hsv.v-k); else return;
+    e.preventDefault(); cur=hsvHex(hsv.h,hsv.s,hsv.v); paint(); apply(); });
+  hx.addEventListener("input",()=>{ let v=hx.value.trim().toLowerCase(); if (/^[\da-f]{6}$/.test(v)) v="#"+v; if (/^#[\da-f]{3}$/.test(v)) v="#"+v.slice(1).split("").map(c=>c+c).join("");
+    if (hexOk(v)){ cur=v; hsv=hexHsv(cur); paint({fromHex:true}); apply(); } });
+  hx.addEventListener("change",()=>{ hx.value=cur; if (!addMode) rememberColour(cur); });
   const mineRow=h("div",{class:"cp-row"});
   const drawMine=()=>{ mineRow.textContent=""; const ok=T.swatches.filter(s=>hexOk(s.hex));
     if (!ok.length) mineRow.append(h("span",{class:"hint",text:"None yet. Pick a colour and add it."})); ok.forEach(s=>mineRow.append(sw(s.hex,s.name))); marks(); };
-  const grid=h("div",{class:"cp-grid"}); CP_GRID.forEach(r=>r.forEach(c=>grid.append(sw(c))));
   const brand=h("div",{class:"cp-row"}); CP_BRAND.forEach(([n,c])=>brand.append(sw(c,n)));
-  const addBtn=h("button",{class:"btn sm"+(addMode?" primary":""),type:"button",html:IC.plus+"Add to My colours",onclick:()=>{
+  const recent=recentColours(), recentRow=recent.length?h("div",{class:"cp-row"},...recent.map(c=>sw(c,"Recent"))):null;
+  const addBtn=h("button",{class:"btn sm"+(addMode?" primary":""),type:"button",html:IC.plus+(addMode?"Add this colour":"Add to My colours"),onclick:()=>{
     if (addMode){ added(); return; }
     if (!T.swatches.some(s=>(s.hex||"").toLowerCase()===cur)){ T.swatches.push({name:"",hex:cur}); touch(); toast("Added to My colours."); } drawMine(); }});
   panel.append(h("div",{class:"cp-head"},h("strong",{text:title}),h("button",{class:"x",type:"button","aria-label":"Close",html:IC.x,onclick:()=>close()})),
-    h("p",{class:"hint",text:"My colours"}),mineRow,h("p",{class:"hint",text:"Dorma"}),brand,h("p",{class:"hint",text:addMode?"Click a colour to add it":"All colours"}),grid,
-    h("div",{class:"cp-custom"},nat,hx,addBtn));
-  drawMine();
+    h("div",{class:"cw-top"},wheel,h("div",{class:"cw-side"},h("div",{class:"cw-cmp",title:"Starting colour and new colour"},was,now),h("label",{class:"cw-hex"},h("span",{class:"hint",text:"Hex"}),hx),addBtn,
+      h("p",{class:"hint cw-tip",text:"Drag the ring for the colour, the square for strength (left to right) and brightness (top to bottom)."}))),
+    h("p",{class:"hint",text:"Shades: dark to light"}),shades,h("p",{class:"hint",text:"Strength: grey to full colour"}),tints,
+    h("p",{class:"hint",text:"My colours"}),mineRow,h("p",{class:"hint",text:"Dorma"}),brand,
+    ...(recentRow?[h("p",{class:"hint",text:"Recent"}),recentRow]:[]));
+  drawMine(); paint();
   const host=$(".adm")||document.body; host.append(panel);
   const place=()=>{ const r=anchor.getBoundingClientRect(), w=panel.offsetWidth, ph=panel.offsetHeight;
     const left=Math.min(Math.max(8,r.left),innerWidth-w-8); let top=r.bottom+6; if (top+ph>innerHeight-8) top=Math.max(8,r.top-ph-6);
@@ -600,7 +645,97 @@ function colorPanel(anchor,{value="#ffffff",onPick=()=>{},title="Pick a colour",
   const onKey=e=>{ if (e.key==="Escape"){ close(); anchor.focus(); } };
   function close(){ panel.parentNode&&panel.parentNode.removeChild(panel); removeEventListener("pointerdown",outside,true); removeEventListener("keydown",onKey); removeEventListener("resize",place); removeEventListener("scroll",place,true); if (cpClose===close) cpClose=null; }
   addEventListener("pointerdown",outside,true); addEventListener("keydown",onKey); addEventListener("resize",place); addEventListener("scroll",place,true);
-  cpClose=close; (panel.querySelector(".cp-sw.on")||panel.querySelector(".cp-sw"))?.focus();
+  cpClose=close; sq.focus({preventScroll:true});
+}
+/* ================= EFFECT EDITORS =================
+   Background effects, picture masks, section entrance/exit and modal opening/closing, each with a live preview.
+   The global editors set every value; a section's or modal's editor leaves a value empty to follow the global one. */
+const PREVIEW_STOPS=new Set();
+function stopPreviews(){ PREVIEW_STOPS.forEach(f=>{ try { f(); } catch(e){ /* already gone */ } }); PREVIEW_STOPS.clear(); }
+/** Runs start(box) while box is on screen, and stops it when it scrolls away or the studio tab changes. */
+function whileVisible(box,start){
+  let stop=null; const off=()=>{ if (stop){ stop(); PREVIEW_STOPS.delete(off); stop=null; } };
+  const on=()=>{ off(); stop=start()||(()=>{}); PREVIEW_STOPS.add(off); };
+  const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting?on():off()),{threshold:.05}); io.observe(box);
+  return { restart:()=>{ if (stop) on(); } };
+}
+const debounce=(fn,ms=160)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+const ownOnly=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>v!==""&&v!=null&&v!=="default"));
+const fxName=v=>v==="none"?"None":(FX[v]||{}).label||v;
+OPT.bgfx=FX_OPTIONS;
+/** Background effect: type, colours and the controls that effect uses, with a live preview. */
+function fxEditor(fx,{global=false,sec=null}={}){
+  const D=Store.draft, T=D.theme, GF={...FX_DEFAULTS,...((T.sections||{}).bgfx||{})};
+  const prev=h("div",{class:"fx-prev"},h("div",{class:"fx-prev-txt"},h("p",{class:"eyebrow",text:sec?plain(sec.eyebrow)||"Section":"Every section"}),h("strong",{text:sec?plain(sec.title)||"Section title":"Section title"}),h("span",{text:"Text stays readable over the effect."})));
+  const eff=()=>global?{...FX_DEFAULTS,...fx}:{...GF,...ownOnly(fx)};
+  const vis=whileVisible(prev,()=>fxPreview(prev,eff(),sec));
+  const fields=h("div");
+  const draw=()=>{ fields.textContent=""; const e=eff(), type=e.type, ctrl=(FX[type]||{}).ctrl||[], on=k=>ctrl.includes(k), G=global?"":"Global";
+    const sel=(opts)=>global?opts:[["","Global"],...opts.filter(o=>o[0]!=="")];
+    const amount=(k,label,min,max,step)=>global?[k,"range",label,{min,max,step}]:[k,"number",label+" (empty follows global)",{optional:true,min,step,placeholder:String(GF[k])}];
+    const list=[["type","select","Background effect",{options:global?FX_OPTIONS:[["default","Use global ("+fxName(GF.type||"none")+")"],...FX_OPTIONS]}]];
+    if (type&&type!=="none"){
+      list.push(["color","color","Effect colour",{optional:true,placeholder:global?"Accent":G,globalLabel:global?"Use accent":"Use global",fallback:()=>hexOk(GF.color)?GF.color:T.accent}]);
+      if (on("palette")) list.push(["palette","select","Colours",{options:sel(OPT.fxPalettes)}]);
+      if (on("color2")&&e.palette==="two") list.push(["color2","color","Second colour",{optional:true,placeholder:global?"Dorma blue":G,globalLabel:global?"Use Dorma blue":"Use global",fallback:()=>hexOk(GF.color2)?GF.color2:"#0072bc"}]);
+      list.push(amount("opacity","Strength",0,1,.05),amount("speed","Speed (1 = normal)",.2,3,.1));
+      if (on("density")) list.push(amount("density","Amount (how many shapes)",.3,2.5,.1));
+      if (on("size")) list.push(amount("size","Size",.4,2.5,.1));
+      if (on("dir")) list.push(["dir","select","Direction",{options:sel(OPT.fxDirs)}]);
+      if (on("pos")) list.push(["pos","select","Where it gathers",{options:sel(OPT.fxPos)}]);
+      if (on("pointer")) list.push(global?["pointer","toggle","Reacts to the mouse"]:["pointer","select","Reacts to the mouse",{options:[["","Global"],[true,"Yes"],[false,"No"]]}]);
+      list.push(["soften","select","Veil behind the text",{options:sel(OPT.fxSoften)}]);
+    }
+    fields.append(fieldsFor(fx,list,(v,k)=>{ if (k==="type"||k==="palette") draw(); restart(); }));
+  };
+  const restart=debounce(()=>vis.restart());
+  draw();
+  return h("div",{class:"fx-edit"},prev,fields);
+}
+/** A sample picture from the library for the previews. */
+function samplePicture(D){ const m=(D.media||[]).find(x=>x&&x.kind==="image")||(D.media||[]).find(x=>x&&x.kind!=="article"); return mediaBox(D,m&&m.id,{ratio:1.6,res:640}); }
+/** Pictures: reveal mask, direction, length, cover colour, kept shape and hover. */
+function imageFxEditor(o,{global=false}={}){
+  const D=Store.draft, G={reveal:"none",dir:"left",duration:1.2,color:"",shape:"none",hover:"none",...(D.motion.imageFx||{})};
+  const sel=(opts,k)=>global?opts:[["","Global ("+(((opts.find(x=>x[0]===G[k])||[])[1])||G[k])+")"],...opts];
+  const box=h("div",{class:"img-prev"}), pic=samplePicture(D); box.append(pic);
+  const eff=()=>global?{...G,...o}:{...G,...ownOnly(o)};
+  const play=()=>previewImage(pic,eff());
+  const fields=h("div");
+  const draw=()=>{ fields.textContent=""; const e=eff(), cover=["blinds","shutters","tiles","curtain","cmyk"].includes(e.reveal), dirs=["wipe","diagonal","cmyk"].includes(e.reveal);
+    const list=[["reveal","select","Reveal as it scrolls in",{options:sel(OPT.imageReveal,"reveal")}]];
+    if (dirs) list.push(["dir","select","Opens from",{options:global?OPT.dirs4:[["","Global"],...OPT.dirs4]}]);
+    if (e.reveal&&e.reveal!=="none") list.push(global?["duration","range","Length (s)",{min:.3,max:3,step:.1}]:["duration","number","Length in seconds (empty follows global)",{optional:true,min:.2,step:.1,placeholder:String(G.duration)}]);
+    if (cover) list.push(["color","color","Cover colour",{optional:true,placeholder:global?"Page background":"Global",globalLabel:global?"Use page background":"Use global",fallback:()=>D.theme.ink}]);
+    list.push(["shape","select","Shape (mask kept on the picture)",{options:sel(OPT.imageShape,"shape")}],["hover","select","When the pointer is over it",{options:sel(OPT.imageHover,"hover")}]);
+    fields.append(fieldsFor(o,list,(v,k)=>{ if (k==="reveal") draw(); play(); })); };
+  draw(); setTimeout(play,300);
+  return h("div",{class:"fx-edit"},h("div",{class:"img-prev-wrap"},box,h("button",{class:"btn sm",type:"button",html:IC.replay+"Replay",onclick:play})),fields);
+}
+/** Section entrance (once, as it scrolls in) and exit (follows the scroll as it leaves). */
+function sectionAnimEditor(o,{global=false}={}){
+  const D=Store.draft, G={in:"none",out:"none",duration:1,...(D.motion.sectionFx||{})};
+  const lab=(opts,v)=>(opts.find(x=>x[0]===v)||[])[1]||v;
+  const mock=h("div",{class:"sec-mock"},h("i",{class:"l1"}),h("i",{class:"l2"}),h("i",{class:"l3"}),h("i",{class:"l4"}));
+  const stage=h("div",{class:"sec-stage"},mock);
+  const eff=()=>global?{...G,...o}:{...G,...ownOnly(o)};
+  const play=()=>previewSection(mock,eff());
+  const list=[["in","select","Entrance",{options:global?OPT.sectionIn:[["","Global ("+lab(OPT.sectionIn,G.in)+")"],...OPT.sectionIn]}],
+    ["out","select","Exit (as it scrolls away)",{options:global?OPT.sectionOut:[["","Global ("+lab(OPT.sectionOut,G.out)+")"],...OPT.sectionOut]}],
+    global?["duration","range","Entrance length (s)",{min:.3,max:2.5,step:.1}]:["duration","number","Entrance length in seconds (empty follows global)",{optional:true,min:.2,step:.1,placeholder:String(G.duration)}]];
+  return h("div",{class:"fx-edit"},h("div",{class:"img-prev-wrap"},stage,h("button",{class:"btn sm",type:"button",html:IC.replay+"Replay entrance",onclick:play})),
+    fieldsFor(o,list,(v,k)=>{ if (k!=="out") play(); }),h("p",{class:"hint",style:"margin:0",text:"The exit shows on the site as you scroll past the section. Sections on the first screen don't use the entrance, so the page is complete when it opens."}));
+}
+/** Modal opening and closing with a replay on a small sample panel. */
+function modalAnimEditor(o,{global=false}={}){
+  const D=Store.draft, M=D.motion, lab=(opts,v)=>(opts.find(x=>x[0]===v)||[])[1]||v;
+  const keyOpen=global?"modalOpen":"open", keyClose=global?"modalClose":"close";
+  const mini=h("div",{class:"md-mini"},h("span",{class:"scan"}),...["a","b","c","d"].map(c=>h("span",{class:"corner "+c})),h("b",{text:"Modal"}),h("p",{text:"Opening and closing"}));
+  const stage=h("div",{class:"md-stage"},mini);
+  const play=()=>previewModal(D,stage,(global?o[keyOpen]:o[keyOpen]||M.modalOpen)||"line",(global?o[keyClose]:o[keyClose]||M.modalClose)||"auto");
+  const list=[[keyOpen,"select","Opening",{options:global?OPT.modalOpen:[["","Global ("+lab(OPT.modalOpen,M.modalOpen||"line")+")"],...OPT.modalOpen]}],
+    [keyClose,"select","Closing",{options:global?OPT.modalClose:[["","Global ("+lab(OPT.modalClose,M.modalClose||"auto")+")"],...OPT.modalClose]}]];
+  return h("div",{class:"fx-edit"},h("div",{class:"img-prev-wrap"},stage,h("button",{class:"btn sm",type:"button",html:IC.replay+"Replay",onclick:play})),fieldsFor(o,list,()=>play()));
 }
 /* ================= GLOBAL STYLE =================
    One layer for the look of the whole site: text and accent colours, header colours, the image filter, and the defaults
@@ -688,7 +823,9 @@ function countOwn(D){ let sections=0, fx=0; const all=[...D.pages.flatMap(p=>p.s
   all.forEach(x=>{ if (x&&x.style&&x.style.custom) sections++; if (x&&x.bgfx&&x.bgfx.type&&x.bgfx.type!=="default") fx++; }); return {sections,fx}; }
 function panelStyle(body){
   const D=Store.draft, T=D.theme, M=D.motion;
-  T.sections={pad:1,width:1320,bg:"",bgAlpha:0,titleSize:1,subSize:1,...(T.sections||{})}; T.sections.bgfx={type:"none",color:"",opacity:.4,speed:1,...(T.sections.bgfx||{})};
+  T.sections={pad:1,width:1320,bg:"",bgAlpha:0,titleSize:1,subSize:1,...(T.sections||{})}; T.sections.bgfx={...FX_DEFAULTS,...(T.sections.bgfx||{})};
+  M.imageFx={reveal:"none",dir:"left",duration:1.2,color:"",shape:"none",hover:"none",...(M.imageFx||{})}; M.sectionFx={in:"none",out:"none",duration:1,...(M.sectionFx||{})}; if (!M.modalClose) M.modalClose="auto";
+  D.colorMode={default:"auto",toggle:true,...(D.colorMode||{})}; T.light={ink:"#f4f6fb",panel:"#ffffff",fg:"#0b1630",heading:"",accent:"#0072bc",...(T.light||{})};
   T.modals={width:980,bg:"",bgAlpha:.88,corners:true,scan:true,blur:4,dim:.3,titleSize:1,...(T.modals||{})};
   T.header={bg:"#040915",bgAlpha:0,text:"",link:"",accent:"",...(T.header||{})}; T.flow={...(T.flow||{})}; T.slide={...(T.slide||{})};
   M.flow={mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0,...(M.flow||{})}; M.slideTiming={...(M.slideTiming||{})}; D.styles=Array.isArray(D.styles)?D.styles:[];
@@ -738,11 +875,22 @@ function panelStyle(body){
       fieldsFor(T.sections,[["pad","select","Spacing above and below",{options:OPT.pads,theme:true}],["width","number","Content width in px",{min:640,step:20,theme:true}],["bg","color","Background colour",{optional:true,placeholder:"None",globalLabel:"None",fallback:()=>T.ink}],["bgAlpha","range","Background strength",{min:0,max:1,step:.05,theme:true}]]),
       h("p",{class:"hint",style:"margin:0"},"Title, subtitle and body sizes and fonts for the whole site are under ",h("button",{type:"button",class:"linkish",text:"Colours and type → Type",onclick:()=>openPanel("theme")}),"."),
       h("p",{class:"hint",style:"margin:0",text:"Background effect for every section that has none of its own"}),
-      fieldsFor(T.sections.bgfx,[["type","select","Background effect",{options:OPT.bgfx}],["color","color","Effect colour",{optional:true,placeholder:"Accent",globalLabel:"Use accent",fallback:()=>T.accent}],["opacity","range","Strength",{min:0,max:1,step:.05}],["speed","range","Speed",{min:.2,max:3,step:.1}]])),
+      fxEditor(T.sections.bgfx,{global:true})),
+    card("Section entrance and exit",h("p",{class:"adm-intro",style:"margin:0",text:"How every section arrives as it scrolls into view and how it leaves. A section can use its own (Pages → section → More options → Animation)."}),
+      sectionAnimEditor(M.sectionFx,{global:true})),
+    card("Pictures: masks, reveals and hover",h("p",{class:"adm-intro",style:"margin:0",text:"Every picture in sections and modals (not the full-screen hero backgrounds). Reveal plays once as the picture scrolls in; the shape stays on as a mask. A section can use its own."}),
+      imageFxEditor(M.imageFx,{global:true})),
     card("Every modal",h("p",{class:"adm-intro",style:"margin:0",text:"Width, panel colour, title size, corner marks and the blur behind every modal. Each modal can use its own (Modals → Look)."}),
       fieldsFor(T.modals,[["width","number","Width in px",{min:420,step:20,theme:true}],["bg","color","Panel colour",{optional:true,placeholder:"Panels",globalLabel:"Use panels",fallback:()=>T.panel}],["bgAlpha","range","Panel strength",{min:0,max:1,step:.02,theme:true}],
         ["titleSize","range","Title size",{min:.5,max:1.6,step:.05,theme:true}],["blur","range","Blur behind (px)",{min:0,max:16,step:1}],["dim","range","Page brightness behind",{min:0,max:1,step:.05}],["corners","toggle","Corner marks"],["scan","toggle","Scan lines"]]),
-      fieldsFor(M,[["modalOpen","select","Opening style",{options:OPT.modalOpen}]]))
+      h("p",{class:"hint",style:"margin:0",text:"Opening and closing for every modal (each modal can use its own under Modals → Animation)"}),
+      modalAnimEditor(M,{global:true})),
+    card("Light and dark mode",h("p",{class:"adm-intro",style:"margin:0",text:"The colours above are the dark mode. Visitors can switch with the sun and moon button in the header, and their choice is remembered. Heroes and carousels stay dark in light mode because their text sits on pictures."}),
+      fieldsFor(D.colorMode,[["default","select","Visitors start in",{options:OPT.colorModes}],["toggle","toggle","Show the switch in the header"]]),
+      h("p",{class:"hint",style:"margin:0",text:"Light mode colours"}),
+      fieldsFor(T.light,[["ink","color","Page background"],["panel","color","Panels and modals"],["fg","color","Text"],["heading","color","Headings",{optional:true,placeholder:"Text",globalLabel:"Same as text",fallback:()=>T.light.fg}],["accent","color","Accent (buttons, glow, highlights)"]]),
+      h("p",{class:"hint",style:"margin:0"},"The header logo on light pages is set under ",h("button",{type:"button",class:"linkish",text:"Site and titles",onclick:()=>openPanel("site")}),". ",
+        h("button",{type:"button",class:"linkish",text:"Preview the site in light mode",onclick:()=>{ try { localStorage.setItem("dorma.siteMode","light"); } catch(e){ /* storage blocked */ } previewDraft(); }}),"."))
   );
 }
 function panelIcons(body){
@@ -836,6 +984,7 @@ function panelModals(body){
         card(h("span",{class:"grow"},"Content"),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview modal",onclick:()=>openModal(D,m.id)}),fieldsFor(m,base,(v,k)=>{ if (k==="type"){ openPanel("modals"); } else redrawList(); })),
         m.type===5?card(h("span",{class:"grow"},"Sections inside this modal · drag to reorder"),h("p",{class:"adm-intro",style:"margin:0",text:"Any page section can go in a modal. Give a section a label (More options) and any button can open this modal straight at it."}),sectionsEditor(m.sections,{inModal:true})):card("Media",mediaBoxEl),
         card("Look",globalOrCustom(m,"look",{flag:"custom",what:"global modal look (Design → Global style → Every modal)",body:lookFields})),
+        card("Animation",h("p",{class:"adm-intro",style:"margin:0",text:"How this modal opens and closes. Global follows Design → Global style → Every modal."}),modalAnimEditor(m.anim=m.anim&&typeof m.anim==="object"?m.anim:{open:"",close:""})),
         card("More button",h("div",{class:"fields"},F(m,"more","button","More button"))),
         h("div",{},h("button",{class:"btn danger sm",type:"button",text:"Delete modal",onclick:e=>confirmInline(e.currentTarget,"Delete this modal?",()=>{ D.modals.splice(D.modals.indexOf(m),1); touch(); openPanel("modals"); })}))
       ];
@@ -1242,16 +1391,18 @@ function sectionExtras(s){
   const D=Store.draft, T=D.theme, G=T.sections||{}, GF=G.bgfx||{};
   s.flowUnder=s.flowUnder&&typeof s.flowUnder==="object"?s.flowUnder:{flowId:"",display:"",align:"start"};
   s.bgfx=s.bgfx&&typeof s.bgfx==="object"?s.bgfx:{type:"default"};
-  const fxName=v=>(OPT.bgfx.find(x=>x[0]===v)||[])[1]||v;
-  const box=h("details",{class:"sec-more"},h("summary",{},h("b",{text:"More options"}),h("span",{text:" · label, flow under it, look, background effect"+(s.bgfx.type&&s.bgfx.type!=="default"?" ("+fxName(s.bgfx.type)+")":"")})));
+  s.anim=s.anim&&typeof s.anim==="object"?s.anim:{}; s.imgfx=s.imgfx&&typeof s.imgfx==="object"?s.imgfx:{};
+  const own=Object.keys(ownOnly(s.anim)).length+Object.keys(ownOnly(s.imgfx)).length;
+  const box=h("details",{class:"sec-more"},h("summary",{},h("b",{text:"More options"}),h("span",{text:" · label, flow under it, look, background effect"+(s.bgfx.type&&s.bgfx.type!=="default"?" ("+fxName(s.bgfx.type)+")":"")+", animation"+(own?" (own)":"")})));
   box.append(
     h("p",{class:"hint",text:"Label: buttons anywhere can open this page or modal and travel to this section (Action → Go to: label). It is also its link: #page/label."}),
     fieldsFor(s,[["anchor","text","Label (e.g. quote, services)"],["previewOnly","toggle","Preview only: a fictional sample shown in the draft preview, never to visitors"]]),
     h("p",{class:"hint",text:"Flow under this section: any flow, as a row, tabs or reveal panels."}),
     fieldsFor(s.flowUnder,[["flowId","flow","Flow under this section"],["display","select","Behaviour",{options:[["","As set on the flow"],...OPT.flowDisplays]}],["align","select","Align",{options:[["start","Start"],["center","Centre"]]}]]),
     h("p",{class:"hint",text:"Background effect: animated SVG behind the section (it runs only while the section is on screen)."}),
-    fieldsFor(s.bgfx,[["type","select","Background effect",{options:[["default","Use global ("+fxName(GF.type||"none")+")"],...OPT.bgfx]}],["color","color","Effect colour",{optional:true,placeholder:"Global",fallback:()=>hexOk(GF.color)?GF.color:T.accent}],
-      ["opacity","number","Strength (0 to 1, empty follows global)",{optional:true,min:0,step:.05,placeholder:String(GF.opacity??.4)}],["speed","number","Speed (1 = normal, empty follows global)",{optional:true,min:.1,step:.1,placeholder:String(GF.speed??1)}]]),
+    fxEditor(s.bgfx,{sec:s}),
+    h("p",{class:"hint",text:"Animation: how this section enters and leaves, and how its pictures are masked and revealed. Empty values follow Design → Global style."}),
+    sectionAnimEditor(s.anim),imageFxEditor(s.imgfx),
     h("p",{class:"hint",text:"Look: spacing, width, background, title and subtitle size and font for this section only."}),
     globalOrCustom(s,"style",{flag:"custom",what:"global section look (Design → Global style → Every section)",body:()=>[fieldsFor(s.style,[["pad","select","Spacing above and below",{options:[["","Global"],...OPT.pads]}],["width","number","Content width in px (empty follows global)",{optional:true,min:640,step:20,placeholder:String(G.width??1320)}],
       ["bg","color","Background colour",{optional:true,placeholder:"None"}],["bgAlpha","range","Background strength",{min:0,max:1,step:.05}],

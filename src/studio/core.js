@@ -34,7 +34,7 @@ function localize(cfg){
   const out=walk(cfg); out.__lang=lang; setDocLang(lang); return out;
 }
 /** Visitor-facing words built into the site (buttons, labels), in Arabic. */
-const UI_AR = {"This site has no pages yet.": "لا توجد صفحات في الموقع بعد.", "On this page": "في هذه الصفحة", "Main": "القائمة الرئيسية", "Menu": "القائمة", "Draft preview": "معاينة المسودة", "Back to studio": "العودة إلى الاستوديو", "Open studio": "فتح الاستوديو", "Featured": "مميز", "Previous slide": "الشريحة السابقة", "Next slide": "الشريحة التالية", "New posts are on the way.": "مقالات جديدة قريبًا.", "All posts": "كل المقالات", "More posts": "مقالات أخرى", "Post not found": "المقال غير موجود", "Browse the other posts": "تصفح المقالات الأخرى", "Close": "إغلاق", "Previous": "السابق", "Next": "التالي", "Pause video": "إيقاف الفيديو مؤقتًا", "Play video": "تشغيل الفيديو", "posts": "مقالات", "items": "عناصر", "Media": "وسائط", "Gallery": "معرض", "Flow": "مسار", "Services": "الخدمات", "Step": "الخطوة", "Blog": "المدونة", "This post isn't available": "هذا المقال غير متاح", "It may have been moved or unpublished.": "ربما نُقل أو أُلغي نشره.", "Explore": "استكشف", "Preview only: fictional sample, not shown to visitors": "للمعاينة فقط: نموذج تجريبي لا يظهر للزوار", "Your name": "الاسم", "Company": "الشركة", "Email": "البريد الإلكتروني", "Phone": "الهاتف", "Service": "الخدمة", "Quantity": "الكمية", "Deadline": "الموعد المطلوب", "Tell us what you need": "أخبرنا بما تحتاج إليه", "Send request": "إرسال الطلب", "Your email app opens with the request ready to send.": "سيفتح تطبيق البريد لديك والطلب جاهز للإرسال.", "Copy the request": "انسخ الطلب", "Copied": "تم النسخ", "Request a Quote": "اطلب عرض سعر", "All": "الكل", "Items are on the way.": "المنتجات قريبًا.", "Quote request": "طلب عرض سعر", "Section": "القسم", "Request a quote for this item": "اطلب عرض سعر لهذا المنتج"};
+const UI_AR = {"This site has no pages yet.": "لا توجد صفحات في الموقع بعد.", "On this page": "في هذه الصفحة", "Main": "القائمة الرئيسية", "Menu": "القائمة", "Draft preview": "معاينة المسودة", "Back to studio": "العودة إلى الاستوديو", "Open studio": "فتح الاستوديو", "Featured": "مميز", "Previous slide": "الشريحة السابقة", "Next slide": "الشريحة التالية", "New posts are on the way.": "مقالات جديدة قريبًا.", "All posts": "كل المقالات", "More posts": "مقالات أخرى", "Post not found": "المقال غير موجود", "Browse the other posts": "تصفح المقالات الأخرى", "Close": "إغلاق", "Previous": "السابق", "Next": "التالي", "Pause video": "إيقاف الفيديو مؤقتًا", "Play video": "تشغيل الفيديو", "posts": "مقالات", "items": "عناصر", "Media": "وسائط", "Gallery": "معرض", "Flow": "مسار", "Services": "الخدمات", "Step": "الخطوة", "Blog": "المدونة", "This post isn't available": "هذا المقال غير متاح", "It may have been moved or unpublished.": "ربما نُقل أو أُلغي نشره.", "Explore": "استكشف", "Preview only: fictional sample, not shown to visitors": "للمعاينة فقط: نموذج تجريبي لا يظهر للزوار", "Your name": "الاسم", "Company": "الشركة", "Email": "البريد الإلكتروني", "Phone": "الهاتف", "Service": "الخدمة", "Quantity": "الكمية", "Deadline": "الموعد المطلوب", "Tell us what you need": "أخبرنا بما تحتاج إليه", "Send request": "إرسال الطلب", "Your email app opens with the request ready to send.": "سيفتح تطبيق البريد لديك والطلب جاهز للإرسال.", "Copy the request": "انسخ الطلب", "Copied": "تم النسخ", "Request a Quote": "اطلب عرض سعر", "All": "الكل", "Items are on the way.": "المنتجات قريبًا.", "Quote request": "طلب عرض سعر", "Section": "القسم", "Request a quote for this item": "اطلب عرض سعر لهذا المنتج", "Switch to light mode": "التبديل إلى الوضع الفاتح", "Switch to dark mode": "التبديل إلى الوضع الداكن"};
 const ui = s => LANG.cur==="ar" ? (UI_AR[s]||s) : s;
 const esc = s => String(plain(s)??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -94,8 +94,31 @@ function loadFonts(names){
     l.href="https://fonts.googleapis.com/css2?family="+n.replace(/ /g,"+")+(w?":wght@"+w:"")+"&display=swap"; document.head.append(l); });
 }
 const fontStack=(n,fb)=>n?`"${n}",${fb}`:null;
-function applyTheme(cfg){
-  const t=cfg.theme, r=document.documentElement.style, ty=t.type||{}, fb=`"${ty.arabic||"IBM Plex Sans Arabic"}","IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif`;
+/* ---------- dark and light mode ----------
+   The theme colours above are the dark mode; theme.light holds the light mode. Visitors start in cfg.colorMode.default
+   (auto follows their device) and, when the header switch is on, their own choice is kept in this browser.
+   Heroes and carousels stay dark in light mode (their text sits on darkened pictures). */
+const MODE_KEY="dorma.siteMode";
+function storedMode(){ try { const v=localStorage.getItem(MODE_KEY); return v==="light"||v==="dark"?v:""; } catch { return ""; } }
+function setSiteMode(m){ try { if (m) localStorage.setItem(MODE_KEY,m); else localStorage.removeItem(MODE_KEY); } catch { /* storage blocked */ } }
+const deviceMode=()=>typeof matchMedia!=="undefined"&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
+function siteMode(cfg){
+  const M=(cfg&&cfg.colorMode)||{}, own=M.toggle!==false?storedMode():"";
+  if (own) return own; const d=M.default||"auto"; return d==="auto"?deviceMode():d==="light"?"light":"dark";
+}
+/** The theme with the light mode colours in place of the dark ones. */
+function lightTheme(t){ const L=t.light||{}, ok=hexOk;
+  return {...t, ink:ok(L.ink)?L.ink:"#f4f6fb", panel:ok(L.panel)?L.panel:"#ffffff", fg:ok(L.fg)?L.fg:"#0b1630", accent:ok(L.accent)?L.accent:"#0072bc", heading:ok(L.heading)?L.heading:"",
+    header:{...(t.header||{}),text:"",link:"",accent:"",bg:ok(L.ink)?L.ink:"#f4f6fb"}, mutedOpacity:Math.max(.62,+t.mutedOpacity||.66), lineOpacity:Math.max(.16,+t.lineOpacity||.14)}; }
+function applyTheme(cfg,{mode="dark"}={}){
+  const dark=cfg.theme, light=mode==="light", root=document.documentElement;
+  root.classList.toggle("mode-light",light); root.classList.toggle("mode-dark",!light); root.style.colorScheme=light?"light":"dark";
+  /* dark copies for parts that stay dark (heroes, carousels, a header over a hero) */
+  { const r=root.style; r.setProperty("--dk-ink",dark.ink); r.setProperty("--dk-panel",dark.panel); r.setProperty("--dk-fg",dark.fg); r.setProperty("--dk-accent",dark.accent);
+    r.setProperty("--dk-muted",rgba(dark.fg,dark.mutedOpacity)); r.setProperty("--dk-faint",rgba(dark.fg,dark.lineOpacity)); r.setProperty("--dk-glass",rgba(dark.fg,.05));
+    r.setProperty("--dk-heading",hexOk(dark.heading)?dark.heading:dark.fg); r.setProperty("--dk-accent-soft",rgba(dark.accent,.12)); r.setProperty("--dk-accent-line",rgba(dark.accent,.55)); r.setProperty("--dk-accent-glow",rgba(dark.accent,.5));
+    const hd=dark.header||{}; setVar(r,"--dk-head-fg",hexOk(hd.text)?hd.text:null); setVar(r,"--dk-head-link",hexOk(hd.link)?hd.link:hexOk(hd.text)?rgba(hd.text,.72):null); setVar(r,"--dk-head-accent",hexOk(hd.accent)?hd.accent:null); }
+  const t=light?lightTheme(dark):dark, r=root.style, ty=t.type||{}, fb=`"${ty.arabic||"IBM Plex Sans Arabic"}","IBM Plex Sans Arabic","Segoe UI",system-ui,sans-serif`;
   r.setProperty("--ink",t.ink); r.setProperty("--panel",t.panel); r.setProperty("--fg",t.fg); r.setProperty("--accent",t.accent);
   r.setProperty("--site-ink",t.ink); r.setProperty("--site-panel",t.panel); r.setProperty("--site-fg",t.fg); r.setProperty("--site-accent",t.accent);
   r.setProperty("--site-muted",rgba(t.fg,t.mutedOpacity)); r.setProperty("--site-faint",rgba(t.fg,t.lineOpacity)); r.setProperty("--site-glass",rgba(t.fg,.05));
@@ -191,6 +214,9 @@ const libraryUrl=p=>libPathOk(p)?LIBRARY_BASE+p.split("/").map(encodeURIComponen
 const BUILTIN_LOGO_WHITE = `${import.meta.env.BASE_URL}brand/dorma-logo-white.png`;
 /** The header logo: a library image chosen in the studio, or the built-in white Dorma logo. */
 function brandLogoUrl(cfg){ const m=cfg&&cfg.site&&cfg.site.logo?mediaItem(cfg,cfg.site.logo):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_WHITE; }
+const BUILTIN_LOGO_COLOUR = `${import.meta.env.BASE_URL}brand/dorma-logo.png`;
+/** The logo on a light header: the light-mode logo chosen in the studio, or the built-in blue Dorma logo. */
+function lightLogoUrl(cfg){ const m=cfg&&cfg.site&&cfg.site.logoLight?mediaItem(cfg,cfg.site.logoLight):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_COLOUR; }
 function mediaUrl(m){ if (m.path) return libraryUrl(m.path); return isMediaUrl(m.url)?m.url:""; }
 function mediaNode(cfg,id,{w=1280,hh=800}={}){
   const m=mediaItem(cfg,id); if (!m) return null;
@@ -462,4 +488,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { loadFonts, sectionVars, modalVars, modalLook, flowBlock, noteIn, hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { siteMode, setSiteMode, storedMode, deviceMode, lightLogoUrl, BUILTIN_LOGO_COLOUR, loadFonts, sectionVars, modalVars, modalLook, flowBlock, noteIn, hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
