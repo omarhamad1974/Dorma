@@ -45,6 +45,8 @@ const STARTER = {
     /* Every modal unless a modal is set to Custom (Flows and modals → Modals → Look). */
     modals: { width: 980, bg: "", bgAlpha: 0.88, corners: true, scan: true, blur: 4, dim: 0.3, titleSize: 1 },
     /* Light mode colours (the colours above are the dark mode). Empty heading/accent follow text/Dorma blue. */
+    /* Header links and the full-screen menu (Design → Global style → Menu). */
+    menu: { mode: "auto", linkStyle: "underline", hover: "fade", upper: false, size: 1, gap: 30, open: "fade", items: "rise", align: "start", itemSize: 1, numbers: false, bg: "", bgAlpha: 0.96, blur: 12, fx: "none", logoBottom: true, logo: "", note: "" },
     light: { ink: "#f4f6fb", panel: "#ffffff", fg: "#0b1630", heading: "", accent: "#0072bc" }
   },
   /* Dark and light mode for visitors: the starting mode and whether the header shows a switch (their choice is remembered). */
@@ -156,6 +158,11 @@ const OPT = {
   fxDirs: [["","Effect default"],["right","Right"],["left","Left"],["up","Up"],["down","Down"],["diag","Diagonal up"],["diag2","Diagonal down"]],
   fxPos: [["","Effect default"],["left","Left"],["center","Centre"],["right","Right"]],
   fxSoften: [["","Effect default"],["side","Fade behind the text side"],["even","Even veil"],["none","No veil (full effect)"]],
+  menuModes: [["auto","Links on computers, menu button on phones"],["overlay","Menu button on every screen"]],
+  menuLinkStyles: [["underline","Underline"],["overline","Line above"],["dot","Dot"],["pill","Pill"],["bracket","[ Brackets ]"],["glow","Glow"],["none","No mark"]],
+  menuHover: [["fade","Brighten"],["line","Line grows"],["lift","Lift"],["glow","Glow"]],
+  menuOpen: [["fade","Fade"],["slide","Slide in from the side"],["drop","Drop from the top"],["circle","Circle from the button"],["curtain","Open from the centre"],["wipe","Wipe down"],["cmyk","CMYK print pass"]],
+  menuItems: [["rise","Rise one by one"],["fade","Fade one by one"],["slide","Slide in one by one"],["scale","Grow one by one"],["blur","Blur into focus"],["none","All at once"]],
   colorModes: [["auto","Follow the visitor's device"],["dark","Dark"],["light","Light"]],
   scrollReveal: [["rise","Rise"],["fade","Fade"],["none","None"]],
   presets: [["rise","Rise"],["fade","Fade"],["scale","Scale"],["blur","Blur"],["slideLeft","Slide from left"],["slideRight","Slide from right"],["flip","Flip"],["pop","Pop"],["none","None"]],
@@ -331,7 +338,7 @@ function migrateFlow(f,g={}){
 /* ================= SAVED STYLES =================
    A saved style is a snapshot of the global layer (colours, type, header, image filter, flow and slide defaults, animation).
    Per-item custom settings are not part of it, so applying a style never wipes a flow or slide that has its own look. */
-const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals","light"];
+const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals","light","menu"];
 const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming","imageFx","sectionFx","modalClose"];
 const pickKeys=(o,ks)=>JSON.parse(JSON.stringify(Object.fromEntries(ks.filter(k=>o&&o[k]!==undefined).map(k=>[k,o[k]]))));
 function snapshotStyle(cfg,name){ return { id:"st-"+Math.random().toString(36).slice(2,8), name:name||"My style", savedAt:new Date().toISOString(), theme:pickKeys(cfg.theme,STYLE_THEME), motion:pickKeys(cfg.motion,STYLE_MOTION) }; }

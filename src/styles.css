@@ -1080,3 +1080,47 @@ html.ta-lock,html.ta-lock body{overflow:hidden}
 .cp-swatch:hover{border-color:var(--accent)}
 .color-row.inherit .cp-swatch{opacity:.45}
 @media (max-width:440px){.cw{width:180px;height:180px}.cw-ring{-webkit-mask:radial-gradient(circle,transparent 71px,#000 72px);mask:radial-gradient(circle,transparent 71px,#000 72px)}.cw-sq{width:96px;height:96px;margin:-48px 0 0 -48px}}
+
+/* ================= MENU: header links and the full-screen menu (Design → Global style → Menu) ================= */
+.site-nav{gap:var(--nav-gap,30px);font-size:calc(.84rem * var(--nav-size,1))}
+.site-head.menu-overlay .site-nav{display:none}
+.site-head.menu-overlay .menu-btn{display:grid}
+.nav-upper .site-nav{text-transform:uppercase;letter-spacing:.14em;font-size:calc(.72rem * var(--nav-size,1))}
+.ls-none .site-nav a[aria-current]::after{display:none}
+.ls-overline .site-nav a[aria-current]::after{bottom:auto;top:-10px}
+.ls-dot .site-nav a[aria-current]::after{left:50%;right:auto;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;bottom:-13px}
+.ls-pill .site-nav{gap:calc(var(--nav-gap,30px) * .35)}
+.ls-pill .site-nav a{padding:8px 15px;border-radius:100px;border:1px solid transparent;transition:color .4s,background-color .4s,border-color .4s}
+.ls-pill .site-nav a[aria-current]{background:var(--accent-soft);border-color:var(--accent-line)}
+.ls-pill .site-nav a:hover{border-color:var(--faint)}
+.ls-pill .site-nav a[aria-current]::after{display:none}
+.ls-bracket .site-nav a[aria-current]::before{content:"[";margin-inline-end:6px;color:var(--head-accent,var(--accent))}
+.ls-bracket .site-nav a[aria-current]::after{content:"]";position:static;display:inline;background:none;height:auto;margin-inline-start:6px;color:var(--head-accent,var(--accent))}
+.ls-glow .site-nav a[aria-current]{text-shadow:0 0 14px var(--accent-glow)}
+.ls-glow .site-nav a[aria-current]::after{height:1px;box-shadow:0 0 10px 1px var(--accent-glow)}
+.lh-line:not(.ls-bracket) .site-nav a::before{content:"";position:absolute;left:0;right:0;bottom:-8px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .45s cubic-bezier(.2,.7,.2,1)}
+.lh-line .site-nav a:hover::before{transform:scaleX(1)}
+.lh-lift .site-nav a{transition:translate .3s,color .6s}
+.lh-lift .site-nav a:hover{translate:0 -2px}
+.lh-glow .site-nav a:hover{text-shadow:0 0 12px var(--accent-glow)}
+.menu-ov{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;gap:24px;overflow:auto;isolation:isolate;color:var(--fg);
+  padding:calc(24px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));
+  background:var(--menu-bg,color-mix(in srgb,var(--ink) var(--menu-a,96%),transparent));backdrop-filter:blur(var(--menu-blur,12px));-webkit-backdrop-filter:blur(var(--menu-blur,12px))}
+.menu-ov[hidden]{display:none}
+.menu-ov .sfx-host{z-index:0}
+.menu-top{position:relative;z-index:1;display:flex;justify-content:flex-end}
+.menu-x{width:46px;height:46px;border-radius:50%;border:1px solid var(--faint);background:var(--glass);display:grid;place-items:center;cursor:pointer;color:var(--fg);transition:border-color .3s,transform .4s}
+.menu-x:hover{border-color:var(--accent);transform:rotate(90deg)}
+.menu-x svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
+.menu-links{position:relative;z-index:1;margin-block:auto;display:flex;flex-direction:column;align-items:flex-start;gap:clamp(8px,2vh,20px);font-family:var(--display);font-size:calc(clamp(1.8rem,5vw,3.4rem) * var(--menu-size,1));letter-spacing:-.03em;line-height:1.05}
+.menu-links a{display:flex;align-items:baseline;gap:14px;text-decoration:none;color:var(--muted);transition:color .3s}
+.menu-links a:hover,.menu-links a[aria-current]{color:var(--fg)}
+.menu-links a[aria-current] .menu-t{box-shadow:inset 0 -.08em 0 var(--accent)}
+.menu-n{font-size:.72rem;letter-spacing:.12em;color:var(--accent)}
+.al-center .menu-links{align-items:center;text-align:center}
+.menu-foot{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:20px;border-top:1px solid var(--faint)}
+.al-center .menu-foot{flex-direction:column;justify-content:center}
+.menu-logo{height:38px;width:auto;display:block}
+.menu-note{margin:0;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+html.menu-open{overflow:hidden}
+.site-nav a,.site-head .pill{white-space:nowrap}

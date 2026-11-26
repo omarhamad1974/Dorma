@@ -825,7 +825,7 @@ function panelStyle(body){
   const D=Store.draft, T=D.theme, M=D.motion;
   T.sections={pad:1,width:1320,bg:"",bgAlpha:0,titleSize:1,subSize:1,...(T.sections||{})}; T.sections.bgfx={...FX_DEFAULTS,...(T.sections.bgfx||{})};
   M.imageFx={reveal:"none",dir:"left",duration:1.2,color:"",shape:"none",hover:"none",...(M.imageFx||{})}; M.sectionFx={in:"none",out:"none",duration:1,...(M.sectionFx||{})}; if (!M.modalClose) M.modalClose="auto";
-  D.colorMode={default:"auto",toggle:true,...(D.colorMode||{})}; T.light={ink:"#f4f6fb",panel:"#ffffff",fg:"#0b1630",heading:"",accent:"#0072bc",...(T.light||{})};
+  D.colorMode={default:"auto",toggle:true,...(D.colorMode||{})}; T.menu={mode:"auto",linkStyle:"underline",hover:"fade",upper:false,size:1,gap:30,open:"fade",items:"rise",align:"start",itemSize:1,numbers:false,bg:"",bgAlpha:.96,blur:12,fx:"none",logoBottom:true,logo:"",note:"",...(T.menu||{})}; T.light={ink:"#f4f6fb",panel:"#ffffff",fg:"#0b1630",heading:"",accent:"#0072bc",...(T.light||{})};
   T.modals={width:980,bg:"",bgAlpha:.88,corners:true,scan:true,blur:4,dim:.3,titleSize:1,...(T.modals||{})};
   T.header={bg:"#040915",bgAlpha:0,text:"",link:"",accent:"",...(T.header||{})}; T.flow={...(T.flow||{})}; T.slide={...(T.slide||{})};
   M.flow={mode:"items",preset:"rise",duration:.8,stagger:.06,delay:0,...(M.flow||{})}; M.slideTiming={...(M.slideTiming||{})}; D.styles=Array.isArray(D.styles)?D.styles:[];
@@ -856,6 +856,14 @@ function panelStyle(body){
     card("Saved styles",h("p",{class:"adm-intro",style:"margin:0",text:"A style keeps every setting on this page plus the fonts, background colours and animation. Applying one never changes items set to Custom."}),list,saveRow),
     card("Text and accent",fieldsFor(T,[["fg","color","Text"],["heading","color","Headings and titles",{optional:true,placeholder:"Text",globalLabel:"Same as text",fallback:()=>T.fg}],["accent","color","Accent (buttons, glow, highlights)"],["mutedOpacity","range","Secondary text strength",{min:.3,max:1,step:.01,theme:true}]])),
     card("Header",h("p",{class:"adm-intro",style:"margin:0",text:"The bar with the logo and menu. Each page can use its own colours (Pages → Header on this page), and each carousel slide can change the header text while it shows."}),headerFields(T.header)),
+    card("Menu",h("p",{class:"adm-intro",style:"margin:0",text:"The menu links in the header and the full-screen menu that opens from the menu button (on phones, or on every screen). The logo and a short line can sit at the bottom of the full-screen menu."}),
+      h("p",{class:"hint",style:"margin:0",text:"Header links"}),
+      fieldsFor(T.menu,[["mode","select","Menu",{options:OPT.menuModes}],["linkStyle","select","Current page mark",{options:OPT.menuLinkStyles}],["hover","select","Hover",{options:OPT.menuHover}],["upper","toggle","Capital letters"],["size","range","Link size",{min:.7,max:1.6,step:.05}],["gap","range","Space between links (px)",{min:8,max:64,step:1}]]),
+      h("p",{class:"hint",style:"margin:0",text:"Full-screen menu"}),
+      fieldsFor(T.menu,[["open","select","Opening",{options:OPT.menuOpen}],["items","select","Links arrive",{options:OPT.menuItems}],["align","select","Align",{options:[["start","Start"],["center","Centre"]]}],["itemSize","range","Link size",{min:.6,max:1.8,step:.05}],["numbers","toggle","Numbers before links"],
+        ["bg","color","Background",{optional:true,placeholder:"Page",globalLabel:"Use page background",fallback:()=>T.ink}],["bgAlpha","range","Background strength",{min:0,max:1,step:.02}],["blur","range","Blur behind (px)",{min:0,max:30,step:1}],
+        ["fx","select","Animated background",{options:FX_OPTIONS}],["logoBottom","toggle","Logo at the bottom"],["logo","media","Logo at the bottom (None uses the header logo)",{allowNone:true}],["note","text","Line at the bottom (e.g. phone or tagline)"]]),
+      h("p",{class:"hint",style:"margin:0",text:"Preview draft and press the menu button to see it (make the window narrow, or choose Menu button on every screen)."})),
     card("Image filter",h("p",{class:"adm-intro",style:"margin:0",text:"A colour or gradient over every image and video. Any Library item, carousel or slide can turn it off or use its own."}),
       overlayEditor(T,"imageOverlay",{preview:true}),
       fieldsFor(T,[["overlayIntensity","range","Filter strength on every image (0 = off)",{min:0,max:1.5,step:.05,theme:true}],["overlay","range","Dark shade on heroes",{min:0,max:1.4,step:.01,theme:true}],["imageBrightness","range","Image brightness",{min:.3,max:1.1,step:.01,theme:true}],["grain","toggle","Film grain on heroes",{theme:true}]])),

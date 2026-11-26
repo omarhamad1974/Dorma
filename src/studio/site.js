@@ -1,12 +1,13 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, lightLogoUrl } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, brandLogoUrl, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, lightLogoUrl, mediaItem, mediaUrl } from './core';
 import { Store } from './store';
 import { A } from './data';
 import { flowBlock, sectionVars, modalLook } from './core';
 import { JUMP, arrive, jumpTo, labelKey } from './jump';
 import { sectionFx } from './fx';
 import { imageFx, sectionMotion, modalIn, modalOut } from './motionfx';
+import { fxPreview } from './fx';
 
 /* ================= SITE RENDERER ================= */
 const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
@@ -48,6 +49,55 @@ function renderSite(cfg,pageId){
   if (Site.preview) app.append(studioPill(cfg));
   requestAnimationFrame(()=>afterRender(cfg,page));
 }
+/* ================= MENU =================
+   Design → Global style → Menu (cfg.theme.menu). The header links (style of the current page mark, letter case, size,
+   spacing, hover) and the full-screen menu opened by the menu button: its background, blur, an optional animated effect,
+   how it opens, how its links arrive, numbers, alignment, and the logo and a line of text at the bottom.
+   "Menu button on every screen" uses the full-screen menu on computers too. */
+const MENU_DEFAULTS={ mode:"auto", linkStyle:"underline", hover:"fade", upper:false, size:1, gap:30, open:"fade", items:"rise", align:"start", itemSize:1, numbers:false,
+  bg:"", bgAlpha:.96, blur:12, fx:"none", logoBottom:true, logo:"", note:"" };
+const menuFor=cfg=>({...MENU_DEFAULTS,...((cfg.theme&&cfg.theme.menu)||{})});
+function menuOverlay(cfg,page,{links,logoUrl}){
+  const M=menuFor(cfg), ov=h("div",{class:`menu-ov al-${M.align==="center"?"center":"start"}`,role:"dialog","aria-modal":"true","aria-label":ui("Menu"),hidden:true});
+  if (hexOk(M.bg)) ov.style.setProperty("--menu-bg",rgba(M.bg,Math.max(0,Math.min(1,+M.bgAlpha))));
+  else ov.style.setProperty("--menu-a",String(Math.round(Math.max(0,Math.min(1,+M.bgAlpha||0))*100))+"%");
+  ov.style.setProperty("--menu-blur",Math.max(0,Math.min(30,+M.blur||0))+"px"); ov.style.setProperty("--menu-size",String(Math.max(.5,Math.min(2,+M.itemSize||1))));
+  const close=h("button",{class:"menu-x",type:"button","aria-label":ui("Close"),html:'<svg viewBox="0 0 16 16"><path d="M3 3l10 10M13 3 3 13"/></svg>',onclick:()=>Site.closeMenu&&Site.closeMenu()});
+  const list=h("nav",{class:"menu-links","aria-label":ui("Main")});
+  links.forEach((l,i)=>{ const a=h("a",{href:l.href,"aria-current":l.current?"page":null},M.numbers?h("span",{class:"mono menu-n",text:pad(i+1)}):null,h("span",{class:"menu-t",text:l.text}));
+    a.addEventListener("click",()=>Site.closeMenu&&Site.closeMenu(true)); list.append(a); });
+  const foot=h("div",{class:"menu-foot"});
+  if (M.logoBottom){ const m=M.logo?mediaItem(cfg,M.logo):null, own=m&&m.kind==="image"&&mediaUrl(m); foot.append(h("img",{class:"menu-logo",src:own||logoUrl(),"data-auto":own?null:"1",alt:cfg.site.brand||""})); }
+  if (M.note) foot.append(h("p",{class:"mono menu-note",text:M.note}));
+  ov.append(h("div",{class:"menu-top"},close),list,foot.children.length?foot:null);
+  return ov;
+}
+function wireMenu(cfg,head,ov,btn){
+  const M=menuFor(cfg); let fxStop=null, tl=null;
+  const links=()=>$$(".menu-links a",ov), extra=()=>$$(".menu-foot > *",ov);
+  const open=()=>{ if (!ov.hidden) return; ov.hidden=false; btn.setAttribute("aria-expanded","true"); document.documentElement.classList.add("menu-open");
+    if (M.fx&&M.fx!=="none"){ fxStop=fxPreview(ov,{...(((cfg.theme||{}).sections||{}).bgfx||{}),type:M.fx,opacity:.35}); }
+    tl&&tl.kill(); tl=gsap.timeline();
+    if (!reduce){ const o=btn.getBoundingClientRect(), at=`${Math.round(o.left+o.width/2)}px ${Math.round(o.top+o.height/2)}px`;
+      const from={fade:{autoAlpha:0},slide:{xPercent:document.documentElement.dir==="rtl"?-100:100},drop:{yPercent:-100},circle:{clipPath:`circle(0% at ${at})`},curtain:{clipPath:"inset(0% 50% 0% 50%)"},wipe:{clipPath:"inset(0% 0% 100% 0%)"}}[M.open];
+      const to={fade:{autoAlpha:1},slide:{xPercent:0},drop:{yPercent:0},circle:{clipPath:`circle(150% at ${at})`},curtain:{clipPath:"inset(0% 0% 0% 0%)"},wipe:{clipPath:"inset(0% 0% 0% 0%)"}}[M.open];
+      if (M.open==="cmyk"){ const bars=["#00aeef","#ed0677","#ffcb08","#0072bc"].map((c,i)=>{ const b=h("i",{class:"md-bar",style:`background:${c};z-index:${30-i}`}); ov.append(b); return b; });
+        tl.fromTo(bars,{scaleX:0},{scaleX:1,transformOrigin:"100% 50%",duration:.35,ease:"expo.in",stagger:.06}).set(bars,{transformOrigin:"0% 50%"}).to(bars,{scaleX:0,duration:.45,ease:"expo.out",stagger:.06,onComplete:()=>bars.forEach(b=>b.remove())}); }
+      else if (from) tl.fromTo(ov,from,{...to,duration:M.open==="fade"?.4:.7,ease:"expo.inOut",clearProps:"clipPath,transform"});
+      const it={rise:[{y:40,autoAlpha:0},{y:0}],fade:[{autoAlpha:0},{}],slide:[{x:document.documentElement.dir==="rtl"?60:-60,autoAlpha:0},{x:0}],scale:[{scale:.7,autoAlpha:0},{scale:1}],blur:[{filter:"blur(12px)",autoAlpha:0},{filter:"blur(0px)"}]}[M.items];
+      if (it) tl.fromTo(links(),it[0],{...it[1],autoAlpha:1,duration:.6,ease:"power3.out",stagger:.06},M.open==="cmyk"?.45:.2);
+      tl.fromTo(extra(),{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.5,stagger:.08},"-=.3"); }
+    setTimeout(()=>{ const c=$(".menu-x",ov); c&&c.focus({preventScroll:true}); },50); };
+  const close=(now)=>{ if (ov.hidden) return; btn.setAttribute("aria-expanded","false"); document.documentElement.classList.remove("menu-open");
+    const done=()=>{ ov.hidden=true; if (fxStop){ fxStop(); fxStop=null; } gsap.set(ov,{clearProps:"all"}); };
+    tl&&tl.kill(); if (now===true||reduce){ done(); return; }
+    tl=gsap.timeline({onComplete:done}).to(links(),{autoAlpha:0,y:-10,duration:.2,stagger:.02}).to(ov,M.open==="circle"||M.open==="curtain"||M.open==="wipe"?{clipPath:M.open==="curtain"?"inset(0% 50% 0% 50%)":M.open==="wipe"?"inset(0% 0% 100% 0%)":"circle(0% at 100% 0%)",duration:.5,ease:"expo.in"}:M.open==="slide"?{xPercent:100,duration:.45,ease:"expo.in"}:M.open==="drop"?{yPercent:-100,duration:.45,ease:"expo.in"}:{autoAlpha:0,duration:.3},.1);
+    btn.focus({preventScroll:true}); };
+  btn.addEventListener("click",()=>ov.hidden?open():close());
+  ov.addEventListener("keydown",e=>{ if (e.key==="Escape") close(); if (e.key==="Tab"){ const f=$$("a,button",ov); const a=f[0], z=f[f.length-1]; if (e.shiftKey&&document.activeElement===a){ e.preventDefault(); z.focus(); } else if (!e.shiftKey&&document.activeElement===z){ e.preventDefault(); a.focus(); } } });
+  Site.closeMenu=close;
+  Site.disposers.push(()=>{ close(true); document.documentElement.classList.remove("menu-open"); });
+}
 const SUN='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const MOON='<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
 /** Light or dark tone for the header and its logo: dark mode, or a header over a hero, keeps the dark look. */
@@ -55,6 +105,7 @@ function toneHeader(cfg,head){
   const light=siteMode(cfg)==="light", dark=!light||head._overHero;
   head.classList.toggle("tone-dark",light&&dark); head.classList.toggle("tone-light",!dark);
   const img=head.querySelector(".brand-logo img"); if (img) img.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
+  const ml=head.querySelector(".menu-logo[data-auto]"); if (ml) ml.src=dark?brandLogoUrl(cfg):lightLogoUrl(cfg);
   const b=head.querySelector(".mode-pill"); if (b){ const l=ui(light?"Switch to dark mode":"Switch to light mode"); b.innerHTML=light?MOON:SUN; b.setAttribute("aria-label",l); b.title=l; }
 }
 /** Switches the site between dark and light in place (no reload) and remembers the visitor's choice. */
@@ -72,13 +123,19 @@ function siteHeader(cfg,page,{overHero=false}={}){
   const home=cfg.site.logoMode==="text"
     ? h("a",{class:"brand",href:"#"+(cfg.site.homePage||"home")},h("span",{class:"mark"}),cfg.site.brand||"")
     : h("a",{class:"brand brand-logo",href:"#"+(cfg.site.homePage||"home"),"aria-label":cfg.site.brand||"Home"},h("img",{src:brandLogoUrl(cfg),alt:cfg.site.brand||"",style:`height:${Math.min(80,Math.max(16,+cfg.site.logoHeight||34))}px`}));
-  const menu=h("button",{class:"menu-btn",type:"button","aria-label":ui("Menu"),html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>',onclick:()=>nav.classList.toggle("open")});
+  const menu=h("button",{class:"menu-btn",type:"button","aria-label":ui("Menu"),"aria-expanded":"false","aria-haspopup":"dialog",html:'<svg viewBox="0 0 16 16"><path d="M2 5h12M2 11h12"/></svg>'});
   const cta=cfg.site.cta&&cfg.site.cta.label?h("button",{class:"pill cta-pill",type:"button",text:cfg.site.cta.label,onclick:()=>runAction(cfg,cfg.site.cta.action)}):null;
   const sp=Site.preview?null:studioPill(cfg);
   const langs=siteLangs(cfg), other=langs.find(l=>l!==cfg.__lang);
   const lang=langs.length>1&&other?h("button",{class:"pill lang-pill",type:"button",lang:other,"aria-label":other==="ar"?"عرض الموقع بالعربية":"View the site in English",text:LANGS[other],onclick:()=>{ setLang(other); dispatchEvent(new HashChangeEvent("hashchange")); }}):null;
   const modeBtn=(cfg.colorMode||{}).toggle!==false?h("button",{class:"pill mode-pill",type:"button",onclick:()=>switchMode(cfg,siteMode(cfg)==="light"?"dark":"light")}):null;
   const head=h("header",{class:"site-head"},h("div",{class:"wrap"},home,nav,h("div",{style:"display:flex;gap:10px;align-items:center"},lang,modeBtn,sp,cta,menu)));
+  /* menu: header link style and the full-screen menu */
+  const MN=menuFor(cfg);
+  head.classList.add("menu-"+(MN.mode==="overlay"?"overlay":"auto"),"ls-"+(MN.linkStyle||"underline"),"lh-"+(MN.hover||"fade")); if (MN.upper) head.classList.add("nav-upper");
+  head.style.setProperty("--nav-size",String(Math.max(.6,Math.min(1.8,+MN.size||1)))); head.style.setProperty("--nav-gap",Math.max(6,Math.min(80,+MN.gap||30))+"px");
+  const ov=menuOverlay(cfg,page,{links:[...nav.querySelectorAll("a")].map(a=>({href:a.getAttribute("href"),text:a.textContent,current:a.hasAttribute("aria-current")})),logoUrl:()=>brandLogoUrl(cfg)});
+  head.append(ov); wireMenu(cfg,head,ov,menu);
   head._overHero=overHero; toneHeader(cfg,head);
   // A page can have its own header colours (Pages → Header on this page); empty values follow the global header.
   const ph=page&&page.header&&page.header.custom?page.header:null;
