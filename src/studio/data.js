@@ -118,7 +118,9 @@ const STARTER = {
     { id:"guides", label:T2("Guides & Insights","الأدلة والمقالات") }
   ],
   posts: POSTS,
-  pages: PAGES
+  pages: PAGES,
+  /* Pictures uploaded from the studio are made smaller in the browser first (studio › Library › Picture optimizing). */
+  uploads: { optimize:true, maxSide:2400, quality:0.85, format:"webp", keepPng:true }
 };
 
 /* ================= FIELD SCHEMAS =================
