@@ -7,6 +7,7 @@ import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
+import { optimizeImage, uploadSettings, fmtBytes, UPLOAD_FORMATS, MAX_UPLOAD_BYTES } from './optimize';
 import { labelKey } from './jump';
 import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
@@ -1181,10 +1182,24 @@ function panelMedia(body){
   const drawNewCat=()=>{ newCat.textContent=""; const sel=categorySelect(NEWCAT.id,v=>{ NEWCAT.id=v; },{required:true}); sel.setAttribute("aria-label","Category for new items"); newCat.append(h("span",{class:"mono",text:"New items go into"}),sel); };
   const needCat=()=>{ if (NEWCAT.id && D.categories.some(c=>c.id===NEWCAT.id)) return NEWCAT.id; toast("Choose a category for the new item first."); const s=$("select",newCat); if (s){ s.focus(); s.classList.add("need"); setTimeout(()=>s.classList.toggle("need",false),1600); } return ""; };
   const up=h("input",{type:"file",accept:"image/*,video/mp4,video/webm",multiple:true,hidden:true});
-  up.addEventListener("change",async()=>{ const cat=needCat(); if (!cat){ up.value=""; return; } for (const f of up.files){ try { toast("Uploading "+f.name); const r=await assetsApi.upload(f); const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:cat,tags:[],alt:""}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); toast("Uploaded "+f.name); } catch(e){ toast("Upload failed: "+(e&&e.message||"try a smaller file")); } } up.value=""; });
+  up.addEventListener("change",async()=>{ const cat=needCat(); if (!cat){ up.value=""; return; }
+    const files=[...up.files]; up.value=""; const keep=UPL.original; UPL.original=false; const results=[];
+    for (const f of files){ try {
+      toast((keep?"Uploading ":"Optimizing ")+f.name);
+      const o=await optimizeImage(f,D.uploads,{keepOriginal:keep});
+      if (o.file.size>MAX_UPLOAD_BYTES){ toast(f.name+" is "+fmtBytes(o.file.size)+", over the 25 MB limit."+(f.type.startsWith("video")?" Compress the video first (HandBrake is free).":"")); results.push({name:f.name,o,error:"over 25 MB"}); continue; }
+      toast("Uploading "+o.file.name+(o.changed?" ("+fmtBytes(o.before)+" → "+fmtBytes(o.after)+")":""));
+      const r=await assetsApi.upload(o.file);
+      const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:cat,tags:[],alt:"",bytes:o.file.size};
+      if (o.changed) m.origBytes=o.before; if (o.width){ m.w=o.width; m.h=o.height; }
+      D.media.push(m); Admin.sel.media=m.id; results.push({name:f.name,o}); touch(); draw();
+      toast(o.changed?"Uploaded "+f.name+": "+fmtBytes(o.before)+" → "+fmtBytes(o.after)+" ("+savedPct(o)+" smaller)":"Uploaded "+f.name+" ("+fmtBytes(o.after)+(o.note?", "+o.note:"")+")");
+    } catch(e){ results.push({name:f.name,error:e&&e.message||"failed"}); toast("Upload failed: "+(e&&e.message||"try a smaller file")); } }
+    UPL.last=results; draw(); });
   const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},
     h("button",{class:"btn primary",type:"button",html:IC.up+"Check GitHub for new files",onclick:async()=>{ await syncLibrary(false); touch(); draw(); }}),
-    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub",onclick:()=>{ if (needCat()) up.click(); }}):null,
+    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub. Pictures are optimized first (see Picture optimizing below).",onclick:()=>{ if (needCat()) up.click(); }}):null,
+    assetsApi?h("label",{class:"toggle",title:"Skip optimizing for the next upload only"},h("input",{type:"checkbox",checked:UPL.original,onchange:e=>{ UPL.original=e.target.checked; }}),"Keep originals"):null,
     h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New article",kind:"article",category:cat,tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
     importLink("library","Import names and tags from a file"),h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:cat,tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up,newCat);
   const kinds=h("div",{class:"lib-kinds",role:"group","aria-label":"Type"});
@@ -1215,7 +1230,7 @@ function panelMedia(body){
     else if (m.kind==="article") schema=common.concat([["summary","area","Summary",{wide:true}],["link","text","Link (https://…), if it lives on another site",{wide:true}],["cover","media","Cover image",{wide:true,allowNone:true}]]);
     else schema=common.concat([["alt","text","Description for screen readers",{wide:true}]]);
     const src=m.path?h("p",{class:"mono",style:"overflow-wrap:anywhere"},"GitHub: public/library/"+m.path+" · ",h("a",{href:ghFile(m.path),target:"_blank",rel:"noopener",text:"open on GitHub"}),libMissing(m)?h("b",{style:"color:var(--bad)",text:" · not found in the latest site build"}):null)
-      :m.url?h("p",{class:"mono",text:"Stored in Supabase Storage"}):null;
+      :m.url?h("p",{class:"mono",text:"Stored in Supabase Storage"+sizeNote(m)}):null;
     const del=m.path
       ?h("button",{class:"btn sm",type:"button",text:m.hidden?"Show in library again":"Hide from library",onclick:()=>{ m.hidden=!m.hidden; touch(); drawGrid(); drawDetail(); }})
       :h("button",{class:"btn danger sm",type:"button",text:"Delete",onclick:e=>confirmInline(e.currentTarget,"Remove this from the library? Places that use it will show nothing.",()=>{ D.media.splice(D.media.indexOf(m),1); touch(); drawGrid(); drawDetail(); })});
@@ -1229,8 +1244,10 @@ function panelMedia(body){
       overlayEditor(m,"overlay",{allowDefault:true,onChange:()=>{ redraw(); drawGrid(); }})));
     redraw();
   };
-  const draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
-  body.append(bar,filters,countEl,grid,det,githubCard(),categoriesCard(()=>draw()));
+  let draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
+  const optSlot=h("div"); const drawOpt=()=>optSlot.replaceChildren(optimizeCard(drawOpt));
+  const draw0=draw; draw=()=>{ draw0(); drawOpt(); };
+  body.append(bar,filters,countEl,grid,det,optSlot,githubCard(),categoriesCard(()=>draw()));
   draw();
   syncLibrary(true).then(n=>{ if (n){ touch(); draw(); } });
 }
@@ -1271,6 +1288,36 @@ function panelMissing(body){
   if (!libIndex) syncLibrary(true).then(()=>{ if (Admin.panel==="missing") draw(); });
 }
 
+/* ---------- picture optimizing (settings live in cfg.uploads; see optimize.js) ---------- */
+const UPL={ original:false, last:null, gh:[] };
+const savedPct=o=>Math.max(0,Math.round(100*(1-o.after/o.before)))+"%";
+const sizeNote=m=>(m.bytes?" · "+fmtBytes(m.bytes):"")+(m.w?" · "+m.w+"×"+m.h+" px":"")+(m.origBytes?" (was "+fmtBytes(m.origBytes)+")":"");
+function resultRows(list,{download=false}={}){
+  return h("ul",{class:"opt-results"},...list.map(r=>h("li",{},
+    h("b",{text:r.name}),
+    r.error&&!r.o?h("span",{class:"bad",text:" · "+r.error}):h("span",{text:r.o.changed?" · "+fmtBytes(r.o.before)+" → "+fmtBytes(r.o.after)+" ("+savedPct(r.o)+" smaller, "+r.o.width+"×"+r.o.height+" px, "+r.o.note+")":" · "+fmtBytes(r.o.after)+" · "+r.o.note+(r.error?" · "+r.error:"")}),
+    download&&r.url?h("a",{class:"btn sm",href:r.url,download:r.o.file.name,html:IC.up+"Download "+r.o.file.name}):null)));
+}
+function optimizeCard(redraw){
+  const D=Store.draft; D.uploads=uploadSettings(D); const U=D.uploads;
+  const fields=h("div",{class:"fields"},
+    F(U,"optimize","toggle","Optimize pictures before upload",{hint:"Makes every picture smaller in your browser before it is stored. Free, nothing runs on a server."}),
+    F(U,"maxSide","number","Longest side (pixels)",{min:320,step:100,hint:"Bigger pictures are scaled down to this. 2400 is sharp on large screens; 1600 for smaller files."}),
+    F(U,"quality","range","Quality",{min:.5,max:1,step:.01,hint:"0.85 looks the same as the original to the eye. Higher keeps more detail and makes bigger files."}),
+    F(U,"format","select","Save as",{options:UPLOAD_FORMATS}),
+    F(U,"keepPng","toggle","Pictures with transparency stay PNG (logos, cut-outs)"));
+  const pick=h("input",{type:"file",accept:"image/*",multiple:true,hidden:true});
+  pick.addEventListener("change",async()=>{ const files=[...pick.files]; pick.value=""; UPL.gh.forEach(r=>r.url&&URL.revokeObjectURL(r.url)); UPL.gh=[];
+    for (const f of files){ try { toast("Optimizing "+f.name); const o=await optimizeImage(f,U); UPL.gh.push({name:f.name,o,url:URL.createObjectURL(o.file)}); } catch(e){ UPL.gh.push({name:f.name,error:e&&e.message||"failed"}); } }
+    toast("Ready: download the files below, then upload them on GitHub."); redraw(); });
+  return card("Picture optimizing",
+    h("p",{class:"adm-intro",text:"Quick upload makes pictures lighter before storing them: big photos are scaled down, saved as WebP at high quality, and logos with transparency stay PNG. Tick Keep originals next to the upload button to skip it once. GIFs, SVGs and videos are never changed."}),
+    fields,
+    UPL.last&&UPL.last.length?h("div",{},h("p",{class:"mono",text:"Last upload"}),resultRows(UPL.last)):null,
+    h("p",{class:"adm-intro",text:"Adding pictures on GitHub instead? Optimize them here first with the same settings, download the results, then upload those on GitHub."}),
+    h("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},h("button",{class:"btn",type:"button",html:IC.up+"Optimize files for GitHub",onclick:()=>pick.click()}),pick),
+    UPL.gh.length?resultRows(UPL.gh,{download:true}):null);
+}
 function githubCard(){
   const D=Store.draft, rows=h("div",{class:"gh-rows"});
   D.categories.forEach(c=>{ const has=!libIndex||libIndex.folders.includes(c.id);

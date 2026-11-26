@@ -1140,3 +1140,7 @@ html.menu-open{overflow:hidden}
 .lib-used{margin:4px 0 10px;font-size:.84rem}
 .lib-used ul{margin:6px 0 0;padding-inline-start:18px;color:var(--muted)}
 .lib-used.is-free{color:#1f9d55}
+.opt-results{margin:6px 0 12px;padding-inline-start:18px;font-size:.84rem;display:grid;gap:6px}
+.opt-results li span{color:var(--muted)}
+.opt-results .bad{color:var(--bad)}
+.opt-results .btn{margin-inline-start:8px}
