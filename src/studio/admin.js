@@ -4,7 +4,7 @@ import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
-import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides } from './data';
+import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, slotCategory } from './data';
 import Sortable from 'sortablejs';
 import { imageUrl, markHtml, previewLoader } from '../loader';
 import { labelKey } from './jump';
@@ -35,9 +35,9 @@ const IC={
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser. */
@@ -102,7 +102,7 @@ function openPanel(k){
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
+  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -169,7 +169,7 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
         const ed=h("button",{class:"btn sm",type:"button",text:"Edit",title:"Open this flow under Flows",onclick:()=>{ if (!obj[key]){ toast("Pick a flow first."); return; } Admin.sel.flows=obj[key]; openPanel("flows"); }});
         wrap.append(h("div",{class:"pick-row"},s,mk,ed));
       } else wrap.append(s); break; }
-    case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category"}); s.id=id; wrap.append(s); break; }
+    case "category": { const s=categorySelect(obj[key]||"",v=>set(v),{allLabel:opts.allowAll?"All categories":"No category",required:!!opts.required}); s.id=id; wrap.append(s); break; }
     case "date": { const i=h("input",{id,type:"date",value:obj[key]||""}); i.addEventListener("change",()=>set(i.value)); wrap.append(i); break; }
     case "prose": wrap.classList.add("wide"); wrap.append(proseField(obj,key,id,v=>set(v),opts.groupLabel?opts.groupLabel+" · "+label:label)); break;
     case "media": wrap.append(mediaPicker(obj,key,opts,()=>{ onChange(obj[key]); touch(); })); lab.removeAttribute("for"); break;
@@ -263,34 +263,66 @@ function actionEditor(a,onChange){
   return row;
 }
 function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
-/* Image picker: compact thumbnails (size remembered per browser), category + search filters shared by every picker this session */
+/* Image picker. The field shows the current image large and clear, with a + that opens the library on the same category
+   as that image (filters and search still work). Thumbnail size is remembered per browser; filters are shared by every picker. */
 const PICK={ cat:"", q:"" };
 const PICK_SIZES=[["s","Small",56],["m","Medium",84],["l","Large",130]];
-const pickSize=()=>{ try { const v=localStorage.getItem("dorma.pickSize"); return PICK_SIZES.some(z=>z[0]===v)?v:"s"; } catch { return "s"; } };
+const pickSize=()=>{ try { const v=localStorage.getItem("dorma.pickSize"); return PICK_SIZES.some(z=>z[0]===v)?v:"m"; } catch { return "m"; } };
 function setPickSize(v){ try { localStorage.setItem("dorma.pickSize",v); } catch { /* storage blocked */ } }
-function mediaPicker(obj,key,opts,onChange){
-  const D=Store.draft, outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), countEl=h("span",{class:"media-pick-count"});
+const KIND_NAME={ image:"Image", video:"Video", scene:"Placeholder scene", article:"Article" };
+/** What is wrong with the image a field points at, in words ("" when it is fine). */
+function mediaState(id){ const D=Store.draft; if (!id) return "empty"; const m=D.media.find(x=>x.id===id); if (!m) return "missing"; if (m.kind==="scene") return "placeholder"; if (libMissing(m)) return "file"; return ""; }
+const STATE_TEXT={ empty:"No image yet", missing:"Picked image was removed from the library", placeholder:"Placeholder: replace with a real photo", file:"File not found on GitHub" };
+/** Library browser: filters, thumbnails, and either one pick (onPick) or several (multi, onAdd). */
+function libBrowser({ current="", multi=false, onPick, onAdd, onClose, addLabel="Add" }={}){
+  const D=Store.draft, outer=h("div",{class:"media-pick-wrap"}), g=h("div",{class:"media-pick"}), countEl=h("span",{class:"media-pick-count"}), chosen=[];
   const pool=()=>libFilter(D.media,{kinds:["image","video","scene"]});
   const applySize=v=>{ const z=PICK_SIZES.find(x=>x[0]===v)||PICK_SIZES[0]; g.style.setProperty("--pick",z[2]+"px"); g.dataset.size=z[0]; };
   const cats=h("select",{"aria-label":"Category"});
   const fillCats=()=>{ cats.textContent=""; const all=pool(); cats.append(h("option",{value:"",text:"All categories ("+all.length+")"}));
-    D.categories.forEach(c=>{ const n=all.filter(m=>m.category===c.id).length; if (!n && PICK.cat!==c.id) return; const o=h("option",{value:c.id,text:c.label+" ("+n+")"}); if (c.id===PICK.cat) o.selected=true; cats.append(o); });
-    const un=all.filter(m=>!m.category).length; if (un){ const o=h("option",{value:"_none",text:"No category ("+un+")"}); if (PICK.cat==="_none") o.selected=true; cats.append(o); }
+    D.categories.forEach(c=>{ const n=all.filter(m=>m.category===c.id).length; if (!n && PICK.cat!==c.id) return; const o=h("option",{value:c.id,text:plain(c.label)+" ("+n+")"}); if (c.id===PICK.cat) o.selected=true; cats.append(o); });
     if (cats.value!==PICK.cat) PICK.cat=cats.value; };
   cats.addEventListener("change",()=>{ PICK.cat=cats.value; draw(); });
   const q=h("input",{type:"search",placeholder:"Search name or tag","aria-label":"Search images",value:PICK.q}); q.addEventListener("input",()=>{ PICK.q=q.value; draw(); });
   const sizes=h("div",{class:"media-pick-size",role:"group","aria-label":"Thumbnail size"});
   const drawSizes=()=>{ sizes.textContent=""; const cur=pickSize(); PICK_SIZES.forEach(([v,l])=>sizes.append(h("button",{type:"button",class:cur===v?"on":"",text:v.toUpperCase(),title:l+" thumbnails","aria-label":l+" thumbnails","aria-pressed":String(cur===v),onclick:()=>{ setPickSize(v); applySize(v); drawSizes(); }}))); };
+  const addBtn=multi?h("button",{class:"btn sm primary",type:"button",disabled:true,onclick:()=>{ if (chosen.length) onAdd(chosen.slice()); }}):null;
+  const syncAdd=()=>{ if (!addBtn) return; addBtn.disabled=!chosen.length; addBtn.innerHTML=IC.plus+(chosen.length?addLabel+" ("+chosen.length+")":"Pick one or more images"); };
   outer.append(h("div",{class:"media-pick-filters"},cats,q,sizes,countEl));
   const draw=()=>{ g.textContent=""; fillCats();
-    if (opts.allowNone) g.append(h("button",{type:"button",class:"none"+(!obj[key]?" on":""),text:"None",title:"No image",onclick:()=>{ obj[key]=""; draw(); onChange(); }}));
-    const all=pool(), list=PICK.cat==="_none"?libFilter(all.filter(m=>!m.category),{q:PICK.q}):libFilter(all,{cat:PICK.cat,q:PICK.q});
+    const all=pool(), found=libFilter(all,{cat:PICK.cat,q:PICK.q}), list=[...found.filter(m=>m.kind!=="scene"),...found.filter(m=>m.kind==="scene")]; // real photos first, placeholders last
     countEl.textContent=list.length===all.length?all.length+" items":list.length+" of "+all.length;
-    const cur=D.media.find(m=>m.id===obj[key]); if (cur && !list.includes(cur)) list.unshift(cur);
-    list.forEach(m=>{ const b=h("button",{type:"button",class:obj[key]===m.id?"on":"",title:m.label,"aria-label":m.label},mediaThumb(m.id),h("span",{text:m.label}));
-      b.addEventListener("click",()=>{ obj[key]=m.id; draw(); onChange(); }); g.append(b); });
+    list.forEach(m=>{ const n=chosen.indexOf(m.id), on=multi?n>=0:current===m.id;
+      const b=h("button",{type:"button",class:(on?"on":"")+(m.kind==="scene"?" is-ph":""),title:plain(m.label)+(m.kind==="scene"?" (placeholder)":""),"aria-label":plain(m.label),"aria-pressed":String(on)},mediaThumb(m.id),h("span",{text:plain(m.label)}),multi&&on?h("i",{class:"pick-n",text:String(n+1)}):null);
+      b.addEventListener("click",()=>{ if (!multi){ onPick(m); return; } const k=chosen.indexOf(m.id); if (k>=0) chosen.splice(k,1); else chosen.push(m.id); syncAdd(); draw(); }); g.append(b); });
     if (!list.length) g.append(h("p",{class:"media-pick-empty",text:"Nothing matches. Try another category or clear the search."})); };
-  applySize(pickSize()); drawSizes(); draw(); outer.append(h("div",{class:"media-pick-scroll"},g)); return outer;
+  applySize(pickSize()); drawSizes(); syncAdd(); draw(); outer.append(h("div",{class:"media-pick-scroll"},g));
+  outer.append(h("div",{class:"mp-foot"},addBtn,onClose?h("button",{class:"btn sm",type:"button",text:multi?"Cancel":"Close",onclick:onClose}):null));
+  return outer;
+}
+function mediaPicker(obj,key,opts,onChange){
+  const D=Store.draft, outer=h("div",{class:"mp"}), cur=h("div",{class:"mp-cur"}), drawer=h("div",{class:"mp-drawer",hidden:true});
+  let open=false;
+  const close=()=>{ open=false; drawer.hidden=true; drawer.textContent=""; drawCur(); };
+  const toggle=()=>{ if (open){ close(); return; } open=true;
+    const c=slotCategory(D,obj[key]); if (c) PICK.cat=c; else if (opts.cat) PICK.cat=opts.cat; PICK.q="";
+    drawer.textContent=""; drawer.append(libBrowser({ current:obj[key], onPick:m=>{ obj[key]=m.id; onChange(); close(); }, onClose:close })); drawer.hidden=false; drawCur(); };
+  const drawCur=()=>{ cur.textContent=""; const id=obj[key], m=id?D.media.find(x=>x.id===id):null, st=mediaState(id);
+    const pv=h("button",{type:"button",class:"mp-pv"+(m?"":" empty")+(st?" st-"+st:""),title:"Choose from the library","aria-label":(m?"Change "+plain(m.label):"Choose an image")+" from the library","aria-expanded":String(open)});
+    pv.addEventListener("click",toggle);
+    if (m){ pv.append(m.kind==="article"?docThumb(m):(mediaNode(D,m.id,{w:640,hh:360})||h("span",{class:"mp-empty",text:"Can't show this file"}))); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); }
+    else pv.append(h("span",{class:"mp-empty",text:id?"Missing":"No image"}));
+    pv.append(h("span",{class:"mp-plus",html:open?IC.x:IC.plus,"aria-hidden":"true"}));
+    const info=h("div",{class:"mp-info"},
+      h("b",{text:m?plain(m.label):id?"Missing image":"No image yet"}),
+      h("small",{text:m?[KIND_NAME[m.kind]||m.kind,categoryLabel(D,m.category)].filter(Boolean).join(" · "):"Press + to pick one from the library"}),
+      st&&st!=="empty"?h("span",{class:"mp-flag",text:STATE_TEXT[st]}):null,
+      h("div",{class:"mp-actions"},
+        h("button",{class:"btn sm"+(open?"":" primary"),type:"button",html:(open?IC.x:IC.plus)+(open?"Close library":m?"Change from library":"Choose from library"),"aria-expanded":String(open),onclick:toggle}),
+        opts.allowNone&&id?h("button",{class:"btn sm",type:"button",text:"Remove",onclick:()=>{ obj[key]=""; onChange(); close(); }}):null,
+        m?h("button",{class:"btn sm",type:"button",text:"Open in Library",title:"Edit its name, category and overlay",onclick:()=>{ Admin.sel.media=m.id; LIB.cat=""; LIB.kind=""; LIB.q=""; openPanel("media"); }}):null));
+    cur.append(pv,info); };
+  drawCur(); outer.append(cur,drawer); return outer;
 }
 function iconPicker(obj,key,onChange){
   const g=h("div",{class:"icon-pick"});
@@ -301,28 +333,41 @@ function iconPicker(obj,key,onChange){
 /* sortable list of sub-objects, each collapsible */
 function listEditor(obj,key,opts,onChange){
   const arr=obj[key]=obj[key]||[], box=h("div",{class:"sub-list"});
+  /* Lists whose items carry a picture (slides, chapters, catalog items, cards…) show it on each row and can be filled from the library in one go */
+  const mf=(opts.fields||[]).find(f=>f[1]==="media"), mk=mf&&mf[0];
+  const thumb=mk?it=>{ const st=mediaState(it[mk]); return it[mk]&&st!=="missing"?h("span",{class:"sub-thumb"+(st?" st-"+st:""),title:st?STATE_TEXT[st]:""},mediaThumb(it[mk])):h("span",{class:"sub-thumb st-"+(st||"empty"),title:STATE_TEXT[st||"empty"],html:IC.plus}); }:null;
+  const addFromLib=()=>{ const tray=h("div",{class:"lib-tray"});
+    const c=slotCategory(Store.draft,(arr.find(it=>it&&slotCategory(Store.draft,it[mk]))||{})[mk]); if (c) PICK.cat=c; PICK.q="";
+    tray.append(h("p",{class:"hint",style:"margin:0",text:"Pick the pictures in the order you want them. Each one becomes a new "+(opts.itemName||"item")+" at the end of the list."}),
+      libBrowser({ multi:true, addLabel:"Add as "+(opts.itemName||"item")+"s", onClose:()=>tray.remove(), onAdd:ids=>{
+        ids.forEach(id=>{ const it=opts.blank?opts.blank():{}; it[mk]=id; arr.push(it); }); draw(); onChange(); touch();
+        toast(ids.length===1?"Added 1 "+(opts.itemName||"item")+" from the library.":"Added "+ids.length+" "+(opts.itemName||"item")+"s from the library."); } }));
+    return tray; };
   const draw=()=>{ box.textContent="";
-    arr.forEach((it,i)=>box.append(subCard(it,{title:()=>plain(it[opts.title])||"Item "+(i+1),kind:opts.kindLabel?opts.kindLabel(it):"",open:false,
+    arr.forEach((it,i)=>box.append(subCard(it,{title:()=>plain(it[opts.title])||"Item "+(i+1),kind:opts.kindLabel?opts.kindLabel(it):"",open:false,thumb:thumb?()=>thumb(it):null,
       onToggleHidden:opts.hideable?()=>{ it.hidden=!it.hidden; onChange(); touch(); }:null,
       body:()=>fieldsFor(it,opts.fields,onChange),onRemove:()=>{ arr.splice(i,1); draw(); onChange(); touch(); },
       onDuplicate:()=>{ arr.splice(i+1,0,clone(it)); draw(); box.children[i+1]?._open?.(); onChange(); touch(); }})));
-    box.append(h("button",{class:"btn sm",type:"button",html:IC.plus+"Add",onclick:()=>{ arr.push(opts.blank?opts.blank():{}); draw(); const last=box.children[box.children.length-2]; last&&last.classList.remove("closed"); onChange(); touch(); }}));
+    const addRow=h("div",{class:"sub-add"},h("button",{class:"btn sm",type:"button",html:IC.plus+"Add",onclick:()=>{ arr.push(opts.blank?opts.blank():{}); draw(); const last=box.querySelectorAll(".sub-item"); last.length&&last[last.length-1]._open?.(); onChange(); touch(); }}),
+      mk?h("button",{class:"btn sm primary",type:"button",html:IC.plus+"Add from library",title:"Pick several pictures; each becomes a new "+(opts.itemName||"item"),onclick:e=>{ const r=e.currentTarget.parentNode; if (r.nextSibling&&r.nextSibling.classList?.contains("lib-tray")){ r.nextSibling.remove(); return; } r.after(addFromLib()); }}):null);
+    box.append(addRow);
     sortable(box,arr,()=>{ draw(); onChange(); touch(); }); };
   draw(); return box;
 }
-function subCard(item,{title,kind,body,onRemove,open,onDuplicate,onToggleHidden}){
+function subCard(item,{title,kind,body,onRemove,open,onDuplicate,onToggleHidden,thumb}){
   const card=h("div",{class:"sub-item"+(open?"":" closed")+(item&&item.hidden?" is-hidden":"")}), t=h("span",{class:"t",text:title()});
   /* Shown / Hidden switch: one tap, and the state is written on it */
   const hideBtn=onToggleHidden?h("button",{class:"vis-pill",type:"button"}):null;
   const syncHide=()=>{ if (!hideBtn) return; const hid=!!item.hidden; card.classList.toggle("is-hidden",hid); hideBtn.innerHTML=(hid?IC.eyeOff:IC.eye)+"<span>"+(hid?"Hidden":"Shown")+"</span>";
     hideBtn.setAttribute("aria-label",hid?"Hidden from visitors. Tap to show it":"Shown to visitors. Tap to hide it"); hideBtn.title=hid?"Hidden from visitors. Tap to show":"Shown to visitors. Tap to hide"; hideBtn.setAttribute("aria-pressed",hid?"true":"false"); };
   if (hideBtn){ hideBtn.addEventListener("click",e=>{ e.stopPropagation(); onToggleHidden(); syncHide(); }); syncHide(); card._syncHide=syncHide; }
-  const head=h("div",{class:"sub-head"},h("span",{class:"handle",html:IC.grip,"aria-hidden":"true"}),kind?h("span",{class:"k",text:kind}):null,t,
+  let th=thumb?thumb():null; const syncThumb=()=>{ if (!thumb) return; const n=thumb(); th.replaceWith(n); th=n; };
+  const head=h("div",{class:"sub-head"},h("span",{class:"handle",html:IC.grip,"aria-hidden":"true"}),th,kind?h("span",{class:"k",text:kind}):null,t,
     hideBtn,
     onDuplicate?h("button",{class:"x",type:"button","aria-label":"Duplicate",title:"Duplicate",html:IC.copy,onclick:e=>{ e.stopPropagation(); onDuplicate(); }}):null,
     h("button",{class:"x",type:"button","aria-label":"Remove",title:"Remove",html:IC.x,onclick:e=>{ e.stopPropagation(); confirmInline(card,"Remove this item?",onRemove); }}));
   let built=false; const b=h("div",{class:"sub-body"});
-  const build=()=>{ if (built) return; built=true; b.append(body()); b.addEventListener("input",()=>{ t.textContent=title(); }); b.addEventListener("change",()=>{ t.textContent=title(); }); };
+  const build=()=>{ if (built) return; built=true; b.append(body()); b.addEventListener("input",()=>{ t.textContent=title(); }); b.addEventListener("change",()=>{ t.textContent=title(); }); b.addEventListener("click",()=>setTimeout(syncThumb)); };
   head.addEventListener("click",e=>{ if (e.target.closest(".handle")) return; card.classList.toggle("closed"); if (!card.classList.contains("closed")) build(); });
   if (open) build();
   card.append(head,b); card._open=()=>{ card.classList.remove("closed"); build(); };
@@ -879,7 +924,7 @@ function panelCarousels(body){
   // Timing boxes show the global slide timing in grey, so an empty box says what it will use.
   const G=M.slideTiming||{}, withGlobal=f=>f[1]!=="timing"?f:[f[0],f[1],f[2],{...f[3],parts:f[3].parts.map(([k,d])=>[k,k==="duration"?(+M.slideDuration||7):(G[k]??d)])}];
   const T=SECTION_TYPES.heroCarousel, setF=T.fields.filter(f=>f[0]!=="slides").map(withGlobal), sf=T.fields.find(f=>f[0]==="slides"), slidesF=[sf[0],sf[1],sf[2],{...sf[3],fields:sf[3].fields.map(withGlobal)}];
-  masterDetail(body,{items:all,selKey:"carousels",label:x=>secTitle(x.s),kind:x=>(x.p.title||x.p.id)+(x.s.hidden?" · hidden":""),
+  masterDetail(body,{items:all,selKey:"carousels",label:x=>secTitle(x.s),kind:x=>(plain(x.p.title)||x.p.id)+(x.s.hidden?" · hidden":""),
     detail:({s,p},redraw)=>{
       if (s.autoplay===undefined) s.autoplay=true;
       return [
@@ -920,6 +965,7 @@ function panelPages(body){
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
 const LIB={ cat:"", kind:"", q:"", hidden:false };
+const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
 const slugify=s=>String(plain(s)||"").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g,"").replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,60);
@@ -936,7 +982,7 @@ async function syncLibrary(quiet){
   let files=0;
   (libIndex.folders||[]).forEach(f=>{ if (/^[a-z0-9][a-z0-9-]{0,40}$/.test(f) && !D.categories.some(c=>c.id===f)) D.categories.push({id:f,label:prettyName(f)}); });
   (libIndex.files||[]).forEach(f=>{ if (!libPathOk(f.path) || D.media.some(m=>m.path===f.path)) return;
-    D.media.push({id:uid("m"),label:prettyName(f.path),kind:f.kind,path:f.path,category:f.category||"",tags:[],alt:"",summary:"",link:"",cover:""}); files++; });
+    D.media.push({id:uid("m"),label:prettyName(f.path),kind:f.kind,path:f.path,category:ensureCategory(D,f.category||defaultCategory({kind:f.kind})),tags:[],alt:"",summary:"",link:"",cover:""}); files++; });
   if (files){ scheduleSave(); toast(files===1?"1 new file from GitHub added to the library":files+" new files from GitHub added to the library"); }
   else if (!quiet) toast("The library is up to date with GitHub.");
   return files;
@@ -946,9 +992,11 @@ function libFilter(list,{kinds,cat,q,hidden}){
   return list.filter(m=>(!kinds||kinds.includes(m.kind))&&(!cat||m.category===cat)&&(hidden||!m.hidden)
     &&(!qq||[m.label,m.alt,m.summary,m.path,...(m.tags||[])].join(" ").toLowerCase().includes(qq)));
 }
-function categorySelect(value,onChange,{allLabel="All categories",style=""}={}){
-  const s=h("select",{"aria-label":"Category",style}); s.append(h("option",{value:"",text:allLabel}));
-  Store.draft.categories.forEach(c=>{ const o=h("option",{value:c.id,text:c.label}); if (c.id===value) o.selected=true; s.append(o); });
+function categorySelect(value,onChange,{allLabel="All categories",style="",required=false,placeholder="Choose a category…"}={}){
+  const s=h("select",{"aria-label":"Category",style});
+  if (!required) s.append(h("option",{value:"",text:allLabel}));
+  else if (!value) s.append(h("option",{value:"",text:placeholder,disabled:true,selected:true}));
+  Store.draft.categories.forEach(c=>{ const o=h("option",{value:c.id,text:plain(c.label)}); if (c.id===value) o.selected=true; s.append(o); });
   s.addEventListener("change",()=>onChange(s.value)); return s;
 }
 const DOC_ICON='<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/></svg>';
@@ -957,13 +1005,17 @@ function docThumb(m){ const D=Store.draft; if (m.cover){ const n=mediaNode(D,m.c
 function panelMedia(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"Every image, video, background and article in one place, sorted into categories. Anything here can be picked wherever the studio asks for an image, and articles can be opened from any button."}));
+  /* Every new item needs a category: uploads, articles and scenes go into the one chosen here (the GitHub folder decides for GitHub files). */
+  const newCat=h("span",{class:"cat-new"});
+  const drawNewCat=()=>{ newCat.textContent=""; const sel=categorySelect(NEWCAT.id,v=>{ NEWCAT.id=v; },{required:true}); sel.setAttribute("aria-label","Category for new items"); newCat.append(h("span",{class:"mono",text:"New items go into"}),sel); };
+  const needCat=()=>{ if (NEWCAT.id && D.categories.some(c=>c.id===NEWCAT.id)) return NEWCAT.id; toast("Choose a category for the new item first."); const s=$("select",newCat); if (s){ s.focus(); s.classList.add("need"); setTimeout(()=>s.classList.toggle("need",false),1600); } return ""; };
   const up=h("input",{type:"file",accept:"image/*,video/mp4,video/webm",multiple:true,hidden:true});
-  up.addEventListener("change",async()=>{ for (const f of up.files){ try { toast("Uploading "+f.name); const r=await assetsApi.upload(f); const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:LIB.cat||"",tags:[],alt:""}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); toast("Uploaded "+f.name); } catch(e){ toast("Upload failed: "+(e&&e.message||"try a smaller file")); } } up.value=""; });
-  const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+  up.addEventListener("change",async()=>{ const cat=needCat(); if (!cat){ up.value=""; return; } for (const f of up.files){ try { toast("Uploading "+f.name); const r=await assetsApi.upload(f); const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:cat,tags:[],alt:""}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); toast("Uploaded "+f.name); } catch(e){ toast("Upload failed: "+(e&&e.message||"try a smaller file")); } } up.value=""; });
+  const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},
     h("button",{class:"btn primary",type:"button",html:IC.up+"Check GitHub for new files",onclick:async()=>{ await syncLibrary(false); touch(); draw(); }}),
-    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub",onclick:()=>up.click()}):null,
-    h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const m={id:uid("m"),label:"New article",kind:"article",category:LIB.cat||"articles",tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
-    importLink("library","Import names and tags from a file"),h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:LIB.cat||"backgrounds",tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up);
+    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub",onclick:()=>{ if (needCat()) up.click(); }}):null,
+    h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New article",kind:"article",category:cat,tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
+    importLink("library","Import names and tags from a file"),h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:cat,tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up,newCat);
   const kinds=h("div",{class:"lib-kinds",role:"group","aria-label":"Type"});
   const search=h("input",{type:"search",placeholder:"Search titles, tags, files","aria-label":"Search the library",value:LIB.q});
   search.addEventListener("input",()=>{ LIB.q=search.value; drawGrid(); });
@@ -982,7 +1034,7 @@ function panelMedia(body){
   };
   const drawDetail=()=>{ det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
     const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); };
-    const common=[["label","text",m.kind==="article"?"Title":"Name"],["category","category","Category"],["tags","strings","Tags (one per line)"]];
+    const common=[["label","text",m.kind==="article"?"Title":"Name"],["category","category","Category (required)",{required:true}],["tags","strings","Tags (one per line)"]];
     let schema=common;
     if (m.kind==="scene") schema=common.concat([["scene","select","Scene",{options:OPT.scenes}],["fx","range","Focus left–right",{min:0,max:1,step:.01}],["fy","range","Focus top–bottom",{min:0,max:1,step:.01}],["zoom","range","Crop zoom",{min:1,max:3,step:.05}],["animate","toggle","Plays as a video (slow motion loop)"]]);
     else if (m.kind==="article") schema=common.concat([["summary","area","Summary",{wide:true}],["link","text","Link (https://…), if it lives on another site",{wide:true}],["cover","media","Cover image",{wide:true,allowNone:true}]]);
@@ -1000,11 +1052,48 @@ function panelMedia(body){
       overlayEditor(m,"overlay",{allowDefault:true,onChange:()=>{ redraw(); drawGrid(); }})));
     redraw();
   };
-  const draw=()=>{ drawFilters(); drawGrid(); drawDetail(); };
+  const draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
   body.append(bar,filters,countEl,grid,det,githubCard(),categoriesCard(()=>draw()));
   draw();
   syncLibrary(true).then(n=>{ if (n){ touch(); draw(); } });
 }
+/* ================= MISSING IMAGES =================
+   One list of every place on the site whose picture still needs attention: nothing picked, a placeholder scene,
+   an item removed from the library, or a GitHub file that isn't there. Each row is fixed right here with the
+   same + picker (opening on the same category), or "Go there" opens the page, carousel, modal, flow or post. */
+const MISS={ state:"", hidden:false };
+const MISS_STATES=[["","Everything"],["empty","No image"],["placeholder","Placeholders"],["missing","Removed from library"],["file","File not on GitHub"]];
+function missingSlots(){ return mediaSlots(Store.draft,{all:true}).map(x=>({...x,state:x.state==="empty"?"empty":mediaState(x.obj[x.key])})).filter(x=>x.state&&!(x.optional&&x.state==="empty")); }
+function goToSlot(go){ if (go.sel) Admin.sel[go.panel]=go.sel; Admin.openSec=go.section||""; openPanel(go.panel); }
+function panelMissing(body){
+  const D=Store.draft;
+  body.append(h("p",{class:"adm-intro",text:"Every place on the site where a picture is still missing or is a placeholder: pages, sections, carousel slides, modals, flows, blog posts and the logo. Press + on a row to choose from the library (it opens on the right category), or Go there to edit it in place."}));
+  const chips=h("div",{class:"lib-kinds",role:"group","aria-label":"Show"}), sum=h("p",{class:"mono"}), list=h("div",{class:"miss-list"});
+  const hid=h("label",{class:"toggle"},h("input",{type:"checkbox",checked:MISS.hidden,onchange:e=>{ MISS.hidden=e.target.checked; draw(); }}),"Include hidden sections, drafts and old pages");
+  const draw=()=>{ const all=missingSlots(), shown=all.filter(x=>MISS.hidden||!x.hidden);
+    chips.textContent=""; MISS_STATES.forEach(([v,l])=>{ const n=v?shown.filter(x=>x.state===v).length:shown.length; if (v&&!n&&MISS.state!==v) return;
+      chips.append(h("button",{type:"button",class:"chip"+(MISS.state===v?" on":""),text:l+" ("+n+")",onclick:()=>{ MISS.state=v; draw(); }})); });
+    const rows=shown.filter(x=>!MISS.state||x.state===MISS.state), off=all.length-shown.length;
+    sum.textContent=rows.length?rows.length+" to complete"+(off&&!MISS.hidden?" · "+off+" more in hidden places":""):"";
+    list.textContent="";
+    if (!rows.length){ list.append(h("div",{class:"miss-done"},h("b",{text:"Nothing missing here."}),h("span",{text:off&&!MISS.hidden?" "+off+" more in hidden sections, drafts or old pages. Tick the box above to see them.":" Every picture on the site comes from the library."}))); return; }
+    const groups=new Map(); rows.forEach(x=>{ const g=x.where[0]; if (!groups.has(g)) groups.set(g,[]); groups.get(g).push(x); });
+    groups.forEach((items,g)=>{ const go=items[0].go;
+      list.append(card(h("span",{class:"grow"},g+" · "+items.length),h("button",{class:"btn sm",type:"button",html:IC.eye+"Go there",onclick:()=>goToSlot({panel:go.panel,sel:go.sel})}),
+        ...items.map(x=>{ const badge=h("span",{class:"miss-badge st-"+x.state,text:{empty:"No image",placeholder:"Placeholder",missing:"Removed",file:"File missing"}[x.state]});
+          const row=h("div",{class:"miss-row"+(x.hidden?" is-hidden":"")},
+            h("div",{class:"miss-where"},h("b",{text:x.where.slice(1).join(" › ")||g}),h("span",{},badge,x.hidden?h("span",{class:"mono",text:" · hidden from visitors"}):null),
+              h("button",{class:"btn sm",type:"button",text:"Go there",onclick:()=>goToSlot(x.go)})),
+            mediaPicker(x.obj,x.key,{allowNone:x.optional},()=>{ touch(); const st=mediaState(x.obj[x.key]); const ok=!st||(x.optional&&st==="empty");
+              badge.className="miss-badge "+(ok?"st-ok":"st-"+st); badge.textContent=ok?"Done":{empty:"No image",placeholder:"Placeholder",missing:"Removed",file:"File missing"}[st]; row.classList.toggle("is-done",ok); updateTop(); }));
+          return row; })));
+    });
+  };
+  body.append(h("div",{class:"lib-filters"},chips,hid),sum,list);
+  draw();
+  if (!libIndex) syncLibrary(true).then(()=>{ if (Admin.panel==="missing") draw(); });
+}
+
 function githubCard(){
   const D=Store.draft, rows=h("div",{class:"gh-rows"});
   D.categories.forEach(c=>{ const has=!libIndex||libIndex.folders.includes(c.id);
@@ -1016,16 +1105,29 @@ function githubCard(){
 }
 function categoriesCard(onChange){
   const D=Store.draft, rows=h("div",{class:"fields"});
-  const used=id=>D.media.some(m=>m.category===id)||D.posts.some(p=>p.category===id);
+  const count=id=>D.media.filter(m=>m.category===id).length, posts=id=>D.posts.filter(p=>p.category===id).length;
   const draw=()=>{ rows.textContent="";
-    D.categories.forEach((c,i)=>{ const inp=F(c,"label","text","Name"); inp.style.flex="1";
-      rows.append(h("div",{class:"field wide",style:"flex-direction:row;align-items:center;gap:10px"},inp,h("code",{class:"mono",text:c.id}),
-        used(c.id)?h("span",{class:"mono",text:"in use"}):h("button",{class:"btn sm danger",type:"button",text:"Remove",onclick:()=>{ D.categories.splice(i,1); touch(); draw(); onChange(); }}))); });
+    D.categories.forEach(c=>{ const inp=F(c,"label","text","Name",{},()=>onChange()); inp.style.flex="1";
+      const n=count(c.id), np=posts(c.id), row=h("div",{class:"field wide cat-row"},inp,h("code",{class:"mono",text:c.id}),h("span",{class:"mono",text:n+" item"+(n===1?"":"s")+(np?" · "+np+" post"+(np===1?"":"s"):"")}));
+      const others=D.categories.filter(x=>x!==c);
+      row.append(h("button",{class:"btn sm danger",type:"button",text:"Remove",onclick:e=>{
+        if (!n && !np){ confirmInline(e.currentTarget,"Remove the category "+plain(c.label)+"?",()=>{ D.categories.splice(D.categories.indexOf(c),1); touch(); draw(); onChange(); }); return; }
+        if (!others.length){ toast("Add another category first, so its items have somewhere to go."); return; }
+        // In use: every item keeps a category, so its items move to another one first
+        const to=h("select",{"aria-label":"Move to"}); others.forEach(x=>to.append(h("option",{value:x.id,text:plain(x.label)})));
+        const box=h("div",{class:"confirm"},h("span",{text:"Move its "+(n?n+" library item"+(n===1?"":"s"):"")+(n&&np?" and ":"")+(np?np+" post"+(np===1?"":"s"):"")+" to"}),to,
+          h("button",{class:"btn sm danger",type:"button",text:"Move and remove",onclick:()=>{ const t=to.value; if (!t) return;
+            D.media.forEach(m=>{ if (m.category===c.id) m.category=t; }); D.posts.forEach(p=>{ if (p.category===c.id) p.category=t; });
+            D.categories.splice(D.categories.indexOf(c),1); if (NEWCAT.id===c.id) NEWCAT.id=t; if (LIB.cat===c.id) LIB.cat=""; if (PICK.cat===c.id) PICK.cat="";
+            touch(); draw(); onChange(); toast("Moved to "+categoryLabel(D,t)+" and removed "+plain(c.label)+"."); }}),
+          h("button",{class:"btn sm",type:"button",text:"Keep",onclick:()=>box.replaceWith()}));
+        row.after(box); }}));
+      rows.append(row); });
     const name=h("input",{type:"text",placeholder:"New category name","aria-label":"New category name"});
-    rows.append(h("div",{class:"field wide",style:"flex-direction:row;gap:10px"},name,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add category",onclick:()=>{ const id=slugify(name.value); if (!id||D.categories.some(c=>c.id===id)){ toast("Pick a new, different name."); return; } D.categories.push({id,label:name.value.trim()}); touch(); draw(); onChange(); toast("Added. Create its folder on GitHub from the list above."); }})));
+    rows.append(h("div",{class:"field wide",style:"flex-direction:row;gap:10px"},name,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add category",onclick:()=>{ const id=slugify(name.value); if (!id||D.categories.some(c=>c.id===id)){ toast("Pick a new, different name."); return; } D.categories.push({id,label:name.value.trim()}); NEWCAT.id=id; touch(); draw(); onChange(); toast("Added. Create its folder on GitHub from the list above."); }})));
   };
   draw();
-  return card("Categories",h("p",{class:"adm-intro",text:"Categories sort the library and the blog. Each one matches a folder on GitHub with the name shown in grey; renaming here changes only the label."}),rows);
+  return card("Categories",h("p",{class:"adm-intro",text:"Every image, video and article belongs to one of these, and the image pickers open on the category of the picture you're replacing. Add or rename categories here (with Arabic when the site has it). Each one matches a folder on GitHub, shown in grey; renaming changes only the label. A category in use can be removed after moving its items to another."}),rows);
 }
 
 /* ================= BLOG ================= */
@@ -1130,6 +1232,9 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
     sortable(secs,list,()=>{ drawSecs(); touch(); });
   };
   drawSecs();
+  /* Arriving from Missing images: open that section and bring it into view */
+  if (Admin.openSec){ const i=list.findIndex(s=>s.id===Admin.openSec); Admin.openSec=""; const el=i>=0?[...secs.querySelectorAll(":scope > .sub-item")][i]:null;
+    if (el){ el._open?.(); setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60); } }
   return {el:secs,visBar,draw:drawSecs};
 }
 /** What every section can have: a label, a flow under it, its own look, a background effect, preview only. */
@@ -1154,4 +1259,4 @@ function sectionExtras(s){
       ["titleFont","select","Title font",{options:[["","Global"],...OPT.fonts]}],["title","color","Title colour",{optional:true,placeholder:"Global"}],["text","color","Text colour",{optional:true,placeholder:"Global"}],["accent","color","Accent",{optional:true,placeholder:"Global"}]])]}));
   return box;
 }
-export { makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
