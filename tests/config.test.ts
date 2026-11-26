@@ -45,6 +45,77 @@ describe('normalize', () => {
   });
 });
 
+describe('content update v3 (bilingual handoff and new site map)', () => {
+  const old = () => ({
+    site: { languages: 'en', cta: { label: 'Tell us your challenge', action: { type: 'modal', target: 'md-contact' } } },
+    modals: [{ id: 'md-contact', name: 'Mine', type: 1 }],
+    flows: [{ id: 'f-hero', name: 'Mine', items: [] }],
+    pages: [
+      { id: 'home', title: 'Home', nav: false, sections: [{ id: 's-hc', type: 'heroCarousel', slides: [{ title: 'Mine' }] }] },
+      { id: 'about', title: 'About', nav: true, sections: [{ id: 'c1', type: 'hero', title: 'My about' }] },
+      { id: 'work', title: 'Selected Work', nav: true, sections: [] },
+    ],
+  });
+
+  it('puts the new site map first and keeps every earlier page out of the menu', () => {
+    const out = normalize(old());
+    const ids = out.pages.map((p: Obj) => p.id);
+    expect(ids.slice(0, 5)).toEqual(['home', 'about', 'agency', 'print', 'news']);
+    expect(ids).toContain('home-previous');
+    expect(ids).toContain('about-previous');
+    expect(ids).toContain('work');
+    expect(out.pages.filter((p: Obj) => p.nav).map((p: Obj) => p.id)).toEqual(['home', 'about', 'agency', 'print', 'news']);
+    const prev = out.pages.find((p: Obj) => p.id === 'about-previous');
+    expect(prev.sections[0].title).toBe('My about');
+    expect(prev.title).toBe('About (previous)');
+    expect(out.contentVersion).toBe(3);
+  });
+
+  it('adds the service pages, catalogs, modals and flows, keeping existing ones', () => {
+    const out = normalize(old());
+    for (const id of ['creative-design', 'booth-production', 'business-giveaways', 'personalized-gifts']) expect(out.pages.some((p: Obj) => p.id === id), id).toBe(true);
+    expect(out.modals.find((m: Obj) => m.id === 'md-contact').name).toBe('Mine');
+    expect(out.modals.some((m: Obj) => m.id === 'md-quote')).toBe(true);
+    expect(out.flows.map((f: Obj) => f.id)).toEqual(['f-hero', 'f-process', 'f-services', 'f-agency-tabs', 'f-mvv']);
+    expect(out.site.languages).toBe('both');
+    expect(out.site.cta.action.target).toBe('md-quote');
+  });
+
+  it('runs once: a saved v3 site is left as the editor left it', () => {
+    const once = normalize(old());
+    once.pages = once.pages.filter((p: Obj) => p.id !== 'packaging');
+    once.site.languages = 'en';
+    const again = normalize(once);
+    expect(again.pages.some((p: Obj) => p.id === 'packaging')).toBe(false);
+    expect(again.site.languages).toBe('en');
+  });
+});
+
+describe('handoff content rules', () => {
+  const words = (t: unknown) => String(t).trim().split(/\s+/).filter(Boolean).length;
+  it('keeps slider titles to seven words and flows to five items of two words, in both languages', () => {
+    const hc = S.pages[0].sections[0];
+    for (const sl of hc.slides) for (const l of ['en', 'ar']) expect(words(sl.title[l]), sl.title[l]).toBeLessThanOrEqual(7);
+    for (const f of S.flows) {
+      expect(f.items.length, f.id).toBeLessThanOrEqual(5);
+      for (const it of f.items) for (const l of ['en', 'ar']) expect(words(it.label[l]), it.label[l]).toBeLessThanOrEqual(2);
+    }
+  });
+  it('writes every visitor text in English and Arabic', () => {
+    walk([S.pages, S.modals, S.flows], (o) => {
+      for (const k of ['title', 'lede', 'eyebrow', 'label']) {
+        const v = o[k];
+        if (v && typeof v === 'object' && 'en' in (v as Obj)) { const t = v as Obj; if (t.en) expect(t.ar, String(t.en)).toBeTruthy(); }
+      }
+    });
+  });
+  it('only shows the fictional clients and testimonials in the preview', () => {
+    const about = S.pages.find((p: Obj) => p.id === 'about');
+    for (const s of about.sections.filter((x: Obj) => x.type === 'clients' || x.type === 'quotes')) expect(s.previewOnly).toBe(true);
+    for (const p of S.posts) expect(p.published).toBe(false);
+  });
+});
+
 describe('starter template', () => {
   const ids = (list: Array<{ id: string }>) => new Set(list.map((x) => x.id));
   const pages = ids(S.pages), modals = ids(S.modals), flows = ids(S.flows), media = ids(S.media), icons = ids(S.icons);

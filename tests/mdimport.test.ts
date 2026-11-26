@@ -56,12 +56,15 @@ describe('content import templates', () => {
   it('imports modals of every type, with inline flows', () => {
     const cfg = fresh(), before = cfg.modals.length, flowsBefore = cfg.flows.length;
     const r = buildModals(cfg, modals, { knownPaths: new Set(['exhibitions/booth-01.jpg']) });
-    expect(cfg.modals.length).toBe(before + 3);
-    const [a, b, c] = cfg.modals.slice(-3);
+    expect(cfg.modals.length).toBe(before + 4);
+    const [a, b, c, d] = cfg.modals.slice(-4);
     expect(a).toMatchObject({ name: 'Booths', type: 1, kicker: 'Exhibitions & Booths', caption: ['Concept', 'Construction', 'Finish'], more: { label: 'See production services', action: { type: 'page', target: 'production' } } });
     expect(a.media.length).toBe(1);
     expect(b.type).toBe(2);
     expect(c.type).toBe(3); expect(c.flowId).toBeTruthy();
+    expect(d.type).toBe(4);
+    expect(d.services.map((x: Any) => x.title)).toEqual(['Creative and Visualization', 'Digital Marketing']);
+    expect(d.services[1]).toMatchObject({ text: 'Website design, content creation, and social media management.', link: { label: 'Open Digital Marketing', action: { type: 'page', target: 'digital-marketing' } } });
     expect(cfg.flows.length).toBe(flowsBefore + 1);
     // two gallery files are not on GitHub in this test
     expect(allWarnings(r).filter((w: string) => /isn't in the Library/.test(w)).length).toBe(2);
@@ -95,7 +98,7 @@ describe('content import templates', () => {
     const ch = p.sections.find((s: Any) => s.type === 'chapters');
     expect(ch.items[0]).toMatchObject({ bullets: ['Booth design and build', 'Graphics and displays'], caption: ['Concept', 'Build'], more: { label: 'See our booths' } });
     expect(p.sections.find((s: Any) => s.type === 'stats').items[0]).toMatchObject({ label: 'Years since 2000', value: 26, meter: 65 });
-    expect(p.sections.find((s: Any) => s.type === 'grid').items[0].action).toEqual({ type: 'modal', target: 'md-gifts' });
+    expect(p.sections.find((s: Any) => s.type === 'grid').items[0].action).toEqual({ type: 'modal', target: 'md-giveaways' });
     expect(p.sections.find((s: Any) => s.type === 'timeline').flowId).toBe('f-process');
     expect(p.sections.find((s: Any) => s.type === 'article').body).toContain('## Before you start');
     expect(p.sections.find((s: Any) => s.type === 'blog')).toMatchObject({ category: 'exhibitions', limit: 6, filters: false, style: 'grid' });

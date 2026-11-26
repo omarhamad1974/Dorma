@@ -218,7 +218,8 @@ function buildFlows(cfg,text,opts={}){
 
 /* Modals */
 const MODAL_FIELDS=[["name","text","Name",{aka:["modal","name in the studio"]}],["type","select","Type",{options:OPT.modalTypes}],["kicker","text","Small label",{aka:["kicker","eyebrow"]}],["title","text","Title"],["text","area","Text",{aka:["paragraph","short paragraph"]}],
-  ["media","media","Media",{aka:["image","images","video","gallery"]}],["caption","strings","Captions",{aka:["caption","caption items"]}],["flowId","flow","Flow"],["more","button","More",{aka:["more button","button"]}]];
+  ["media","media","Media",{aka:["image","images","video","gallery"]}],["caption","strings","Captions",{aka:["caption","caption items"]}],["flowId","flow","Flow"],["more","button","More",{aka:["more button","button"]}],
+  ["services","list","Services",{ title:"title", fields:[["title","text","Title"],["text","area","Brief",{aka:["text"]}],["link","button","Link"]], blank:()=>({title:"",text:"",link:{label:"",action:A()}}) }]];
 function buildModals(cfg,text,opts={}){
   cfg.modals=cfg.modals||[]; const counts={added:0,updated:0}, test=keyTest(MODAL_FIELDS);
   const r=eachBlock(text,b=>parseBlock(b,{known:test}),(entries,w)=>{
@@ -230,6 +231,7 @@ function buildModals(cfg,text,opts={}){
     m.media=refs.map(ref=>{ const id=mediaOf(cfg,ref,ctx); if (!id) w.push(`Image "${ref}" isn't in the Library yet. Pick it on the modal later.`); return id; }).filter(Boolean);
     const need=+m.type===2?3:1; if (m.media.length<need) w.push(+m.type===2?"Type 2 shows three images; the studio fills the missing ones from the Library.":"No image yet; the studio uses the first Library image.");
     if (+m.type===3 && !m.flowId) w.push("Type 3 needs a flow. Add Flow: with its items.");
+    if (+m.type===4 && !(m.services||[]).length) w.push("Type 4 lists services. Add Services: with one item per service.");
     m.name=plainTx(m.name)||plainTx(m.title)||"Imported modal";
     const same=opts.mode==="update"&&cfg.modals.find(x=>norm(x.name)===norm(m.name));
     if (same){ assignGiven(same,m,[...present(entries,MODAL_FIELDS),"name"]); counts.updated++; } else { cfg.modals.push(m); counts.added++; }

@@ -1,17 +1,20 @@
-
+import { FLOWS, MODALS, PAGES, POSTS, SITE_MAP } from './content';
 /* ================= STARTER TEMPLATE =================
    The site renders entirely from one settings object. This is the starter
    template the studio falls back to before anything has been saved. */
 const A = (type="none",target="") => ({type,target});
+const T2 = (en,ar) => ({en,ar});
 const STARTER = {
   version: 1,
+  contentVersion: 3,   // bump with a migration in normalize() when the starter structure changes
   site: {
     brand: "Dorma Advertising",
     homePage: "home",
-    cta: { label: "Tell us your challenge", action: A("modal","md-contact") },
-    footer: "© 2026 Dorma Advertising · Agency | Printing & Production",
+    cta: { label: T2("Request a Quote","اطلب عرض سعر"), action: A("modal","md-quote") },
+    quoteEmail: "",      // where quote requests go (the visitor's email app opens with the request filled in)
+    footer: T2("© 2026 Dorma Advertising · Agency | Print & Production","© 2026 دورما للإعلان · خدمات الوكالة | الطباعة والإنتاج"),
     showStudioLink: true,
-    languages: "en",
+    languages: "both",
     defaultLang: "en",
     showNumbers: false,
     logoMode: "image",
@@ -34,7 +37,13 @@ const STARTER = {
     overlayIntensity: 1,          // multiplies every colour overlay on images (0 = off)
     header: { bg: "#040915", bgAlpha: 0, text: "", link: "", accent: "" },
     flow: { text: "", accent: "", sep: "" },        // every flow unless the flow has its own colours
-    slide: { title: "", text: "", accent: "", headerText: "" } // every carousel slide unless the carousel or slide has its own
+    slide: { title: "", text: "", accent: "", headerText: "" }, // every carousel slide unless the carousel or slide has its own
+    /* Type: sizes are multipliers of the built-in sizes (1 = as designed). Empty fonts follow Headings / Body above. */
+    type: { titleSize: 1, headingSize: 1, headingWeight: 500, subFont: "", subSize: 1, bodySize: 1, labelFont: "", labelSize: 1, arabic: "IBM Plex Sans Arabic", hand: "Caveat", handAr: "Aref Ruqaa" },
+    /* Every section unless a section is set to Custom (Pages → section → Look). */
+    sections: { pad: 1, width: 1320, bg: "", bgAlpha: 0, titleSize: 1, subSize: 1, bgfx: { type: "none", color: "", opacity: 0.4, speed: 1 } },
+    /* Every modal unless a modal is set to Custom (Flows and modals → Modals → Look). */
+    modals: { width: 980, bg: "", bgAlpha: 0.88, corners: true, scan: true, blur: 4, dim: 0.3, titleSize: 1 }
   },
   motion: {
     speed: 1, ease: "expo",
@@ -70,84 +79,16 @@ const STARTER = {
     { id:"i-care", label:"Care", svg:'<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>' },
     { id:"i-check", label:"Commitment", svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>' },
     { id:"i-link", label:"Collaboration", svg:'<svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4.5"/><circle cx="16" cy="12" r="4.5"/></svg>' },
-    { id:"i-arrow", label:"Arrow", svg:'<svg viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></svg>' }
+    { id:"i-arrow", label:"Arrow", svg:'<svg viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></svg>' },
+    { id:"i-truck", label:"Delivery", svg:'<svg viewBox="0 0 24 24"><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>' },
+    { id:"i-box", label:"Packaging", svg:'<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9"/></svg>' },
+    { id:"i-sign", label:"Signage", svg:'<svg viewBox="0 0 24 24"><path d="M12 3v18M5 6h12l2 2.5L17 11H5zM19 13H8l-2 2.5L8 18h11z"/></svg>' },
+    { id:"i-store", label:"Store", svg:'<svg viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 4h18l-1.5 6h-15z"/><path d="M9 20v-5h6v5"/></svg>' },
+    { id:"i-gear", label:"Fabrication", svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>' },
+    { id:"i-pen", label:"Writing", svg:'<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="m14 7 3 3"/></svg>' }
   ],
-  flows: [
-    { id:"f-hero", name:"Home: what's your challenge", separator:"dots3", size:"m", progress:true,
-      anim:{ mode:"items", preset:"rise", duration:.8, stagger:.06, delay:.9 },
-      items:[
-        { id:"h1", kind:"button", label:"Your challenge", icon:"", svg:"", showIndex:true, detail:"", action:A("modal","md-intro"), anim:null },
-        { id:"h2", kind:"text", label:"Agency", icon:"", svg:"", showIndex:false, detail:"", action:A("modal","md-agency"), anim:null },
-        { id:"h3", kind:"icon", label:"Printing & Production", icon:"i-print", svg:"", showIndex:false, detail:"", action:A("modal","md-production"), anim:{ preset:"pop", duration:.9, delay:0 } },
-        { id:"h4", kind:"button", label:"Let's talk", icon:"", svg:"", showIndex:true, detail:"", action:A("modal","md-contact"), anim:null }
-      ] },
-    { id:"f-agency", name:"Agency services", separator:"dots3", size:"s", progress:false,
-      anim:{ mode:"items", preset:"rise", duration:.6, stagger:.05, delay:0 },
-      items:[
-        { id:"g1", kind:"button", label:"Concepts", icon:"", svg:"", showIndex:true, detail:"Give your idea a clear direction: creative concepts, brand storytelling, logo and visual identity.", action:A("modal","md-concepts"), anim:null },
-        { id:"g2", kind:"text", label:"Content", icon:"", svg:"", showIndex:false, detail:"Design, photography, video and sound shaped around your message, audience and channels.", action:A("modal","md-content"), anim:null },
-        { id:"g3", kind:"text", label:"Events", icon:"", svg:"", showIndex:false, detail:"Planning, creative development, coordination and production support for events and activations.", action:A("modal","md-events"), anim:null },
-        { id:"g4", kind:"icon", label:"Exhibitions", icon:"i-booth", svg:"", showIndex:false, detail:"Booth concepts, construction, graphics and displays built around your exhibition objectives.", action:A("modal","md-booths"), anim:null },
-        { id:"g5", kind:"button", label:"Digital", icon:"", svg:"", showIndex:true, detail:"Website design, content creation and social media management for a consistent presence.", action:A("modal","md-digital"), anim:null }
-      ] },
-    { id:"f-production", name:"Printing & Production", separator:"dots3", size:"s", progress:false,
-      anim:{ mode:"items", preset:"rise", duration:.6, stagger:.05, delay:0 },
-      items:[
-        { id:"r1", kind:"button", label:"Print", icon:"", svg:"", showIndex:true, detail:"Digital, offset and large-format printing, stationery, brochures, labels and packaging.", action:A("page","production"), anim:null },
-        { id:"r2", kind:"text", label:"Signage", icon:"", svg:"", showIndex:false, detail:"Indoor, outdoor and illuminated signs, vehicle branding, window and vinyl graphics.", action:A("page","production"), anim:null },
-        { id:"r3", kind:"text", label:"Fabrication", icon:"", svg:"", showIndex:false, detail:"Acrylic and woodwork, promotional counters and desks, product displays and custom branded elements.", action:A("page","production"), anim:null },
-        { id:"r4", kind:"text", label:"Booths", icon:"", svg:"", showIndex:false, detail:"Booth construction and custom fabrication, counters, displays, signage and lighting.", action:A("modal","md-booths"), anim:null },
-        { id:"r5", kind:"icon", label:"Gifts & Displays", icon:"i-gift", svg:"", showIndex:false, detail:"Corporate gifts, merchandise and display products suited to your audience, occasion and budget.", action:A("modal","md-gifts"), anim:null }
-      ] },
-    { id:"f-process", name:"How we bring it together", separator:"dots3", size:"m", progress:false,
-      anim:{ mode:"items", preset:"slideLeft", duration:.7, stagger:.08, delay:0 },
-      items:[
-        { id:"p1", kind:"button", label:"Understand", icon:"", svg:"", showIndex:true, detail:"Clarify your objectives, audience, requirements, and budget.", action:A(), anim:null },
-        { id:"p2", kind:"button", label:"Shape", icon:"", svg:"", showIndex:true, detail:"Develop the approach and agree on the scope, materials, and schedule.", action:A(), anim:null },
-        { id:"p3", kind:"button", label:"Deliver", icon:"", svg:"", showIndex:true, detail:"Coordinate the creative work, production, and delivery required by the brief.", action:A(), anim:null }
-      ] },
-    { id:"f-values", name:"Our values", separator:"dots3", size:"m", progress:false,
-      anim:{ mode:"items", preset:"pop", duration:.7, stagger:.08, delay:0 },
-      items:[
-        { id:"v1", kind:"icon", label:"Understanding", icon:"i-ear", svg:"", showIndex:false, detail:"We listen, ask questions, and clarify the brief.", action:A(), anim:null },
-        { id:"v2", kind:"icon", label:"Creativity", icon:"i-spark", svg:"", showIndex:false, detail:"We develop ideas with a clear purpose.", action:A(), anim:null },
-        { id:"v3", kind:"icon", label:"Care", icon:"i-care", svg:"", showIndex:false, detail:"We pay attention to materials, details, and finish.", action:A(), anim:null },
-        { id:"v4", kind:"icon", label:"Commitment", icon:"i-check", svg:"", showIndex:false, detail:"We work to agreed scopes, timelines, and budgets.", action:A(), anim:null },
-        { id:"v5", kind:"icon", label:"Collaboration", icon:"i-link", svg:"", showIndex:false, detail:"We keep communication clear throughout the project.", action:A(), anim:null }
-      ] }
-  ],
-  modals: [
-    { id:"md-intro", name:"Introducing Dorma", type:1, kicker:"Introducing Dorma", title:"You bring the challenge. We bring it together.",
-      text:"Established in 2000, Dorma Advertising brings together creative services, digital communication, event management, printing, and production. We connect the right capabilities around your brief, from a single requirement to a coordinated project.",
-      media:["m-nebula-2"], caption:["Since 2000","Agency","Printing & Production"], flowId:"", more:{ label:"About Dorma", action:A("page","about") } },
-    { id:"md-agency", name:"Agency", type:3, kicker:"Agency", title:"Develop the idea, shape the message, plan the experience.",
-      text:"Concepts, design, content, events and digital, connected around what you want to achieve.",
-      media:["m-ridges-2"], caption:["Division 01","Agency"], flowId:"f-agency", more:{ label:"Explore the Agency", action:A("page","agency") } },
-    { id:"md-production", name:"Printing & Production", type:3, kicker:"Printing & Production", title:"Turn the idea into things people can see and hold.",
-      text:"Printed materials, branded spaces, displays, and products, produced with attention to materials, details, and finish.",
-      media:["m-city-2"], caption:["Division 02","Printing & Production"], flowId:"f-production", more:{ label:"Explore Printing & Production", action:A("page","production") } },
-    { id:"md-contact", name:"Contact", type:1, kicker:"Let's bring it to life", title:"What are you planning next?",
-      text:"A new identity. A product launch. An exhibition. A stronger digital presence. Or one essential item you need produced well. Tell us what you want to achieve, and we'll help bring the right ideas, services, and products together around your brief. [Phone] · [Email] · [Address]",
-      media:["m-ocean-2"], caption:["[Phone]","[Email]","[Website]"], flowId:"", more:{ label:"[Email us]", action:A() } },
-    { id:"md-concepts", name:"Concepts & Brand Identity", type:1, kicker:"Concepts & Brand Identity", title:"We have an idea. Where do we start?",
-      text:"Give your idea a clear direction. We help define the central idea, shape its message, and develop the design language that carries it across your brand materials.",
-      media:["m-nebula-2"], caption:["04","From the first thought","to a consistent visual expression"], flowId:"", more:{ label:"More about the Agency", action:A("page","agency") } },
-    { id:"md-content", name:"Creative Content", type:2, kicker:"Creative Content", title:"We have something to say. How do we make it connect?",
-      text:"The right image can explain. A film can tell a story. Music can set the mood. We bring design, photography, video, and sound together around your message, audience, and channels.",
-      media:["m-ridges-2","m-ocean-2","m-city-2"], caption:["Photography","Video","Motion & sound"], flowId:"", more:{ label:"More about the Agency", action:A("page","agency") } },
-    { id:"md-events", name:"Events & Brand Activation", type:1, kicker:"Events & Brand Activation", title:"We need to bring people together. Who connects all the details?",
-      text:"People, materials, timing, and logistics all need to work in step. We bring together planning, creative development, coordination, and production support for exhibitions, conferences, launches, concerts, and promotional activations.",
-      media:["m-city-2"], caption:["06","A coordinated experience","from preparation to delivery"], flowId:"", more:{ label:"More about the Agency", action:A("page","agency") } },
-    { id:"md-booths", name:"Exhibitions & Booths", type:2, kicker:"Exhibitions & Booths", title:"We have a space at an exhibition. How do we make it count?",
-      text:"Your booth should help visitors understand who you are, what you offer, and why they should stop and speak with you. We connect the concept, construction, graphics, displays, and presentation materials.",
-      media:["m-city","m-ridges-2","m-nebula-2"], caption:["Concept","Construction","Finish"], flowId:"", more:{ label:"See production services", action:A("page","production") } },
-    { id:"md-digital", name:"Digital Presence", type:1, kicker:"Digital Presence", title:"Our customers are online. How should we show up?",
-      text:"Your website and social channels should help people understand your business and take the next step. We combine website design, content creation, and social media management for a clear and consistent presence.",
-      media:["m-ocean-2"], caption:["08","Connected content","Consistent communication"], flowId:"", more:{ label:"More about the Agency", action:A("page","agency") } },
-    { id:"md-gifts", name:"Corporate Gifts & Display Products", type:1, kicker:"Corporate Gifts & Display Products", title:"What can we give people that they'll actually use?",
-      text:"A thoughtful promotional product starts with the person receiving it. We help you choose gifts, merchandise, and display products suited to your audience, occasion, and budget. Ask for our dedicated catalogues to explore available options.",
-      media:["m-ridges-2"], caption:["10","Give your brand","a useful place"], flowId:"", more:{ label:"Ask for the catalogues", action:A("modal","md-contact") } }
-  ],
+  flows: FLOWS,
+  modals: MODALS,
   /* Library and blog categories. Each one matches a folder in public/library/ on GitHub. */
   categories: [
     { id:"brand", label:"Brand & Identity" },
@@ -159,94 +100,12 @@ const STARTER = {
     { id:"signage", label:"Signage & Fabrication" },
     { id:"gifts", label:"Gifts & Displays" },
     { id:"backgrounds", label:"Backgrounds & Textures" },
-    { id:"articles", label:"Articles & Guides" }
+    { id:"articles", label:"Articles & Guides" },
+    { id:"news", label:T2("Projects & News","المشاريع والأخبار") },
+    { id:"guides", label:T2("Guides & Insights","الأدلة والمقالات") }
   ],
-  posts: [
-    { id:"p-exhibition", slug:"make-your-exhibition-space-count", title:"From an allocated space to a considered presence", date:"2026-11-24", category:"exhibitions", tags:["Exhibitions","Booths"], author:"Dorma Advertising", cover:"m-city", published:true,
-      excerpt:"Your booth should help visitors understand who you are, what you offer, and why they should stop and speak with you.",
-      body:"You have a space at an exhibition. How do you make it count?\n\nYour booth should help visitors understand who you are, what you offer, and why they should stop and speak with you. That only happens when the concept, construction, graphics, displays, and presentation materials are planned around the same objectives.\n\n## What a complete booth brings together\n\n- Booth concepts and graphic design\n- Booth construction and custom fabrication\n- Counters, desks, and product displays\n- Signage and lighting elements\n- Presentation films and digital content\n- Brochures, promotional materials, and giveaways\n- Team preparation\n\n[[m-city-2|Placeholder image: replace with a completed booth from the library]]\n\n## Start with the objective\n\nBefore choosing materials or layouts, agree on what the space needs to achieve: who you want to reach, what they should remember, and what the team on the stand needs to do their job well.\n\n> From an allocated space to a considered presence.\n\nTell us about your next exhibition and we'll help shape the way forward." },
-    { id:"p-process", slug:"understand-shape-deliver", title:"Understand, shape, deliver: how we bring a brief together", date:"2026-11-20", category:"brand", tags:["Process"], author:"Dorma Advertising", cover:"m-ridges", published:true,
-      excerpt:"Every brief has its own audience, priorities, and practical considerations. We start by understanding those differences.",
-      body:"Different businesses have individual requirements. Every brief has its own audience, priorities, and practical considerations, so we start by understanding those differences.\n\n## Understand\n\nClarify your objectives, audience, requirements, and budget.\n\n## Shape\n\nDevelop the approach and agree on the scope, materials, and schedule.\n\n## Deliver\n\nCoordinate the creative work, production, and delivery required by the brief.\n\n> Clear communication connects every stage.\n\nWhether you need a single item produced well or a coordinated project across both of our divisions, the same three stages keep everyone working toward **what you want to achieve**." }
-  ],
-  pages: [
-    { id:"home", title:"Home", nav:false, layout:"cinematic", sections:[
-      { id:"s-hc", type:"heroCarousel", flowId:"f-hero", hud:true, timing:{}, replayFlow:false, slides:[
-        { eyebrow:"Dorma Advertising", title:"What's your next challenge?", lede:"Let's bring it to life. Ideas, experiences, and production solutions shaped around your business.", media:"m-nebula" },
-        { flowId:"f-agency", eyebrow:"Agency", title:"Give your idea a clear direction", lede:"Develop the idea, shape the message, and plan the experience: concepts, design, content, events, and digital.", media:"m-ridges" },
-        { flowId:"f-production", eyebrow:"Printing & Production", title:"Put your brand where people experience it", lede:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city" },
-        { eyebrow:"Let's talk", title:"What are you planning next?", lede:"Tell us what you want to achieve. We'll help shape the way forward.", media:"m-ocean" }
-      ] },
-      { id:"s-intro", type:"about", num:"01", eyebrow:"Introducing Dorma", text:"You may be launching a product, preparing for an exhibition, refreshing your brand, or looking for a better way to connect with customers. Whatever comes next, it starts with *understanding what you need*.", media:"m-ridges-2", link:{ label:"About Dorma", action:A("page","about") } },
-      { id:"s-divisions", type:"chapters", items:[
-        { title:"Agency", text:"Develop the idea, shape the message, and plan the experience.", bullets:["Concepts and brand identity","Creative content","Events and brand activation","Exhibitions and booths","Digital presence"], media:"m-ridges", caption:["Division 01","Concepts · Design · Content · Events · Digital"], more:{ label:"Explore the Agency", action:A("page","agency") } },
-        { title:"Printing & Production", text:"Turn the idea into printed materials, branded spaces, displays, and products.", bullets:["Print and packaging","Signage and brand applications","Custom fabrication","Corporate gifts and display products"], media:"m-city", caption:["Division 02","Print · Signage · Fabrication · Booths · Gifts & Displays"], more:{ label:"Explore Printing & Production", action:A("page","production") } }
-      ] },
-      { id:"s-process", type:"timeline", num:"02", eyebrow:"How we bring it together", text:"Every brief has its own audience, priorities, and practical considerations. Clear communication connects every stage.", flowId:"f-process" },
-      { id:"s-cta", type:"cta", title:"Tell us what you want to achieve. We'll help shape the way forward.", button:{ label:"Start the conversation", action:A("modal","md-contact") } }
-    ] },
-    { id:"agency", title:"Agency", nav:true, layout:"cinematic", sections:[
-      { id:"a1", type:"hero", num:"01", eyebrow:"Agency", title:"Develop the idea. Shape the message. Plan the experience.", lede:"Concepts, design, content, events, and digital, connected around your brief.", media:"m-nebula", height:"tall", flowId:"f-agency" },
-      { id:"a2", type:"chapters", items:[
-        { title:"We have an idea. Where do we start?", text:"Give your idea a clear direction. A new business, campaign, or product needs a concept that people can understand and a visual identity they can recognize. We help define the central idea, shape its message, and develop the design language that carries it across your brand materials.", bullets:["Creative concepts and campaign themes","Brand storytelling and key messages","Logo and visual identity design","Graphic design and campaign artwork","Packaging and business material design"], media:"m-ridges", caption:["Concepts & Brand Identity","From the first thought to a consistent visual expression"], more:{ label:"More on concepts", action:A("modal","md-concepts") } },
-        { title:"We have something to say. How do we make it connect?", text:"Give your message its best expression. Whether you need a product shoot, a company film, social content, or event coverage, we shape the production around its intended use.", bullets:["Graphic design","Product, corporate, and event photography","Videography and video production","Video editing and motion graphics","Music production"], media:"m-ocean", caption:["Creative Content","One message. The right creative expression."], more:{ label:"More on content", action:A("modal","md-content") } },
-        { title:"We need to bring people together. Who connects all the details?", text:"Make every element work together. Events and activations depend on more than how they look: people, materials, timing, and logistics all need to work in step.", bullets:["Event and activation concepts","Planning, logistics, and coordination","Event branding and production","Promotional material and sample distribution","Activation team and usher training and supervision","Photography and video coverage"], media:"m-city", caption:["Events & Brand Activation","A coordinated experience, from preparation to delivery"], more:{ label:"More on events", action:A("modal","md-events") } },
-        { title:"We have a space at an exhibition. How do we make it count?", text:"Turn your space into a brand experience. We connect the concept, construction, graphics, displays, and presentation materials around your exhibition objectives.", bullets:["Booth concepts and graphic design","Booth construction and custom fabrication","Counters, desks, and product displays","Signage and lighting elements","Presentation films and digital content","Brochures, giveaways, and team preparation"], media:"m-nebula-2", caption:["Exhibitions & Booths","From an allocated space to a considered presence"], more:{ label:"More on exhibitions", action:A("modal","md-booths") } },
-        { title:"Our customers are online. How should we show up?", text:"Build a presence that feels like your brand. We combine website design, content creation, and social media management to give your brand a clear and consistent digital presence.", bullets:["Website design","Social media planning and management","Graphic content and campaign visuals","Photography and short-form video","Content adapted for different channels"], media:"m-ocean-2", caption:["Digital Presence","Connected content. Consistent communication."], more:{ label:"More on digital", action:A("modal","md-digital") } }
-      ] },
-      { id:"a3", type:"cta", title:"We have an idea. Where do we start? With you.", button:{ label:"Tell us your challenge", action:A("modal","md-contact") } }
-    ] },
-    { id:"production", title:"Printing & Production", nav:true, layout:"index", sections:[
-      { id:"r1", type:"hero", num:"02", eyebrow:"Printing & Production", title:"How do we make our brand visible beyond the screen?", lede:"On a storefront, across a vehicle, inside a workplace, or in a customer's hands, every application contributes to how your brand is seen.", media:"m-city", height:"compact", flowId:"f-production" },
-      { id:"r2", type:"grid", title:"Different materials. A consistent identity.", filters:true, items:[
-        { code:"PR-01", tag:"Print", title:"Print & Packaging", text:"Digital and offset printing, large-format printing, stationery and brochures, labels and packaging.", media:"m-ridges-2", action:A() },
-        { code:"SG-02", tag:"Signage", title:"Signage & Brand Applications", text:"Indoor and outdoor signage, illuminated signs, vehicle branding, window and vinyl graphics.", media:"m-city-2", action:A() },
-        { code:"FB-03", tag:"Fabrication", title:"Custom Fabrication", text:"Acrylic and woodwork, promotional counters and desks, product displays, custom branded elements.", media:"m-nebula-2", action:A("modal","md-booths") },
-        { code:"GF-04", tag:"Gifts", title:"Everyday & Office Essentials", text:"Notebooks, pens, and desk accessories.", media:"m-ocean", action:A("modal","md-gifts") },
-        { code:"GF-05", tag:"Gifts", title:"Drinkware", text:"Mugs, bottles, and travel cups.", media:"m-ridges", action:A("modal","md-gifts") },
-        { code:"GF-06", tag:"Gifts", title:"Apparel & Bags", text:"T-shirts, caps, and tote bags.", media:"m-city", action:A("modal","md-gifts") },
-        { code:"GF-07", tag:"Gifts", title:"Gifts & Recognition", text:"Gift sets, awards, and commemorative items.", media:"m-nebula", action:A("modal","md-gifts") },
-        { code:"DS-08", tag:"Displays", title:"Display Products", text:"Portable stands, roll-ups, flags, promotional counters, and related display solutions.", media:"m-ocean-2", action:A("modal","md-gifts") }
-      ] },
-      { id:"r3", type:"about", num:"03", eyebrow:"Corporate gifts", text:"A thoughtful promotional product starts with *the person receiving it*. Ask for our dedicated catalogues to explore available options.", media:"m-ridges-2", link:{ label:"Ask for the catalogues", action:A("modal","md-contact") } },
-      { id:"r4", type:"cta", title:"Put your brand where people experience it.", button:{ label:"Tell us what you need produced", action:A("modal","md-contact") } }
-    ] },
-    { id:"work", title:"Selected Work", nav:true, layout:"cinematic", sections:[
-      { id:"w1", type:"hero", num:"03", eyebrow:"Selected work", title:"Different businesses. Individual requirements.", lede:"Projects that show several capabilities working together. [Case studies to be completed with verified briefs and outcomes.]", media:"m-ocean", height:"compact", flowId:"" },
-      { id:"w2", type:"accordion", num:"01", eyebrow:"Projects", items:[
-        { title:"[Client / Project Name]: Brand launch", tags:["Launch","[Services delivered]"], text:"We're launching something new. Can you bring the pieces together? The challenge: [what was launching, who it needed to reach, the main requirement]. Our response: [the idea and how Dorma connected the creative, digital, event, or production elements]. What we delivered: [only the services and materials actually delivered]. The result: [the completed outcome; add figures only where verified].", media:"m-ridges", more:{ label:"Plan your launch", action:A("modal","md-contact") } },
-        { title:"[Client / Event / Exhibition Name]: Event or exhibition", tags:["Exhibition","[Services delivered]"], text:"How do we make our presence feel complete? The challenge: [the space, audience, objectives, and practical constraints]. Our response: [the concept, layout, production approach, and coordination involved]. What we delivered: [booth, displays, signage, content, print, staffing support, or other delivered elements]. The result: [how the completed project met the brief].", media:"m-city", more:{ label:"Plan your exhibition", action:A("modal","md-booths") } }
-      ] },
-      { id:"w3", type:"clients", num:"02", eyebrow:"Selected clients", style:"grid", items:[
-        { name:"[Client logo]", sector:"[Sector]", since:"", work:"" },{ name:"[Client logo]", sector:"[Sector]", since:"", work:"" },
-        { name:"[Client logo]", sector:"[Sector]", since:"", work:"" },{ name:"[Client logo]", sector:"[Sector]", since:"", work:"" },
-        { name:"[Client logo]", sector:"[Sector]", since:"", work:"" },{ name:"[Client logo]", sector:"[Sector]", since:"", work:"" },
-        { name:"[Client logo]", sector:"[Sector]", since:"", work:"" },{ name:"[Client logo]", sector:"[Sector]", since:"", work:"" }
-      ] },
-      { id:"w4", type:"timeline", num:"03", eyebrow:"How we bring it together", text:"Every brief has its own audience, priorities, and practical considerations. We start by understanding those differences.", flowId:"f-process" }
-    ] },
-    { id:"blog", title:"Blog", nav:true, layout:"cinematic", sections:[
-      { id:"b1", type:"hero", num:"05", eyebrow:"Blog", title:"Ideas, guides and work in progress", lede:"Notes from the Agency and the production floor.", media:"m-nebula", height:"compact", flowId:"" },
-      { id:"b2", type:"blog", title:"Latest posts", category:"", limit:12, filters:true, style:"grid" }
-    ] },
-    { id:"about", title:"About", nav:true, layout:"console", sections:[
-      { id:"c1", type:"hero", num:"04", eyebrow:"About Dorma", title:"Your objectives give our work direction.", lede:"", media:"m-ridges", height:"tall", flowId:"" },
-      { id:"c2", type:"about", num:"01", eyebrow:"Mission", text:"To understand each client's needs and bring together *creative thinking and practical execution* to deliver purposeful brand solutions.", media:"", link:{ label:"", action:A() } },
-      { id:"c3", type:"about", num:"02", eyebrow:"Vision", text:"To be the partner businesses turn to when they need to *connect an idea with its execution*.", media:"", link:{ label:"", action:A() } },
-      { id:"c4", type:"timeline", num:"03", eyebrow:"Values", text:"Five values, and what each one means in practice.", flowId:"f-values" },
-      { id:"c5", type:"stats", num:"04", eyebrow:"Dorma at a glance", style:"meters", items:[
-        { label:"Years since 2000", value:26, suffix:"", decimals:0, meter:65 },
-        { label:"Divisions", value:2, suffix:"", decimals:0, meter:30 },
-        { label:"Agency service areas", value:5, suffix:"", decimals:0, meter:50 },
-        { label:"Gift product groups", value:4, suffix:"", decimals:0, meter:40 }
-      ] },
-      { id:"c6", type:"accordion", num:"05", eyebrow:"Two divisions", items:[
-        { title:"Agency", tags:["Concepts","Design","Content","Events","Digital"], text:"Develop the idea, shape the message, and plan the experience.", media:"m-ridges-2", more:{ label:"Explore the Agency", action:A("page","agency") } },
-        { title:"Printing & Production", tags:["Print","Signage","Fabrication","Booths","Gifts & Displays"], text:"Turn the idea into printed materials, branded spaces, displays, and products.", media:"m-city-2", more:{ label:"Explore Printing & Production", action:A("page","production") } }
-      ] },
-      { id:"c7", type:"cta", title:"What are you planning next? Let's bring it to life.", button:{ label:"Contact Dorma", action:A("modal","md-contact") } }
-    ] }
-  ]
+  posts: POSTS,
+  pages: PAGES
 };
 
 /* ================= FIELD SCHEMAS =================
@@ -265,7 +124,13 @@ const OV_PRESETS = [
 const OPT = {
   overlayModes: [["none","No overlay"],["solid","Solid colour"],["linear","Linear gradient"],["radial","Radial gradient (centre to edges)"]],
   blends: [["normal","Normal"],["multiply","Multiply (darken, keep detail)"],["screen","Screen (lighten)"],["overlay","Overlay (contrast)"],["soft-light","Soft light"],["hard-light","Hard light"],["color","Colour (recolour the image)"],["luminosity","Luminosity"],["color-burn","Colour burn"],["color-dodge","Colour dodge"],["darken","Darken"],["lighten","Lighten"],["hue","Hue"],["saturation","Saturation"]],
-  fonts: ["Sora","Space Grotesk","Manrope","Unbounded","Inter"],
+  fonts: ["Sora","Space Grotesk","Manrope","Unbounded","Inter","Outfit","Syne","Archivo","Poppins","Fraunces","Playfair Display","DM Serif Display"],
+  arabicFonts: ["IBM Plex Sans Arabic","Cairo","Tajawal","Noto Kufi Arabic","Readex Pro","Almarai","Alexandria"],
+  handFonts: ["Caveat","Kalam","Reenie Beanie","Gochi Hand","Patrick Hand","Nanum Pen Script"],
+  handArFonts: ["Aref Ruqaa","Marhey","Lalezar","Reem Kufi Ink"],
+  flowDisplays: [["row","Row: each item runs its own action"],["reveal","Reveal: each item reveals its part of the section"],["tabs","Tabs: items switch the visible panel"]],
+  bgfx: [["none","None"],["contours","Contour lines (drawn, drifting)"],["orbits","Orbits (rings and a travelling dot)"],["grid","Spotlight grid (masked, follows the pointer)"],["goo","Liquid colour (CMYK blobs)"],["stripes","CMYK stripes (masked reveal on scroll)"],["waves","Waves (layered lines)"],["reveal","Circle mask reveal on scroll"],["type","Outline word (drawn behind the section)"]],
+  pads: [[.5,"Tight"],[.75,"Compact"],[1,"Normal"],[1.3,"Roomy"],[1.6,"Airy"]],
   monos: ["JetBrains Mono","IBM Plex Mono"],
   ease: [["expo","Expo (sharp, cinematic)"],["power3","Power (smooth)"],["sine","Sine (gentle)"],["back","Back (overshoot)"],["elastic","Elastic (springy)"]],
   transition: [["wipe","Light wipe"],["fade","Crossfade"],["slide","Slide"],["zoom","Zoom through"]],
@@ -275,14 +140,14 @@ const OPT = {
   presets: [["rise","Rise"],["fade","Fade"],["scale","Scale"],["blur","Blur"],["slideLeft","Slide from left"],["slideRight","Slide from right"],["flip","Flip"],["pop","Pop"],["none","None"]],
   separators: [["dots3","Three dots"],["dot","Single dot"],["line","Line"],["chevron","Chevron"],["none","None"]],
   libKinds: [["","All"],["image","Images"],["video","Videos"],["article","Articles"],["scene","Scenes"]],
-  kinds: [["button","Button"],["text","Plain text"],["icon","Icon"],["svg","Custom SVG"]],
+  kinds: [["button","Button"],["text","Text (optional icon before it)"],["icon","Icon only"],["note","Animated note (icon and handwriting)"],["svg","Custom SVG"]],
   sizes: [["s","Small"],["m","Medium"],["l","Large"]],
   actions: [["none","Nothing"],["modal","Open modal"],["page","Go to page"],["post","Open blog post"],["doc","Open library article"],["slide","Go to slide"],["url","Open link"]],
   layouts: [["cinematic","Cinematic"],["index","Index"],["console","Console (side menu)"]],
   heights: [["full","Full screen"],["tall","Tall"],["compact","Compact"]],
   statStyles: [["band","Band"],["hud","HUD tiles"],["meters","Meters"]],
   clientStyles: [["grid","Logo grid"],["marquee","Scrolling logos"],["table","Table"]],
-  modalTypes: [[1,"Type 1 · Media"],[2,"Type 2 · Gallery"],[3,"Type 3 · Flow"]],
+  modalTypes: [[1,"Type 1 · Media"],[2,"Type 2 · Gallery"],[3,"Type 3 · Flow"],[4,"Type 4 · Service list"],[5,"Type 5 · Sections (any page sections, each with a label)"]],
   scenes: [["nebula","Nebula"],["ridges","Ridges"],["city","City"],["ocean","Ocean"]]
 };
 const ACTION_FIELDS = [["action","action","Action"]];
@@ -296,7 +161,7 @@ const SECTION_TYPES = {
     ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
     ["slides","list","Slides",{ title:"title", hideable:true, fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on",{aka:["stay on this slide"]}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
-  hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
+  hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["button","button","Button (empty label hides it)"],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
   chapters: { label:"Chapters", fields:[["items","list","Chapters",{ title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
   stats: { label:"Numbers", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["style","select","Style",{options:OPT.statStyles}],["items","list","Figures",{ title:"label", fields:[["label","text","Label"],["value","number","Value"],["suffix","text","Suffix"],["decimals","number","Decimals"],["meter","range","Meter %",{min:0,max:100,step:1}]], blank:()=>({label:"New figure",value:10,suffix:"",decimals:0,meter:50}) }]] },
   about: { label:"About", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement (wrap words in *stars* to highlight)",{wide:true}],["link","button","Link"],["media","media","Image (optional)",{wide:true,allowNone:true}]] },
@@ -306,7 +171,16 @@ const SECTION_TYPES = {
   timeline: { label:"Timeline", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement",{wide:true}],["flowId","flow","Timeline flow (each item's detail text shows on click)"],["timing","timing","Timing",{parts:[["eyebrow",0],["text",.1],["flow",.2],["detail",.5]]}]] },
   flowStrip: { label:"Flow strip", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["flowId","flow","Flow"],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["flow",.2]]}]] },
   banner: { label:"Wide banner", fields:[["caption","strings","Caption items (one per line)",{wide:true}],["media","media","Image",{wide:true}]] },
+  division: { label:"Division (image, text, button and linked items)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["button","button","Button (e.g. open a modal; empty label hides it)"],["flip","toggle","Image on the right"],
+    ["items","list","Linked items (each opens a page, modal or link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["action","action","On click"]], blank:()=>({title:"New item",text:"",action:A()}) }],
+    ["media","media","Image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["text",.2],["more",.3],["flow",.4],["stagger",.08]],hint:"Seconds from when the section comes into view. \"Flow\" is the linked items, \"Gap between flow items\" the time between them."}]] },
   cta: { label:"Call to action", fields:[["title","text","Heading",{wide:true}],["button","button","Button"]] },
+  features: { label:"Feature list (grid of items with icons)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["cols","select","Columns",{options:[[2,"2"],[3,"3"],[4,"4"]]}],
+    ["items","list","Items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Text (optional)",{wide:true}],["icon","icon","Icon (optional)",{wide:true}]], blank:()=>({title:"New item",text:"",icon:""}) }]] },
+  quotes: { label:"Testimonials", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Quotes",{ title:"name", hideable:true, fields:[["quote","area","Quote",{wide:true}],["name","text","Name"],["role","text","Role or company"]], blank:()=>({quote:"",name:"",role:""}) }]] },
+  quote: { label:"Quote request form", fields:[["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["service","text","Service (filled in on the form)"],["hint","area","Note under the form (optional)",{wide:true}]] },
+  catalog: { label:"Catalog (items with filters and quote requests)", fields:[["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["filters","strings","Filter names, one per line (1: item type, 2: package type, 3: price range)",{wide:true}],
+    ["items","list","Catalog items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}]], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
   blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
@@ -318,7 +192,12 @@ const SECTION_BLANK = {
   clients:()=>({num:"",eyebrow:"Clients",style:"grid",items:[]}), grid:()=>({title:"Cards",filters:true,items:[]}),
   accordion:()=>({num:"",eyebrow:"",items:[]}), timeline:()=>({num:"",eyebrow:"Story",text:"",flowId:""}),
   flowStrip:()=>({num:"",eyebrow:"",title:"",flowId:""}), banner:()=>({caption:[],media:"m-ocean"}),
+  division:()=>({num:"",eyebrow:"Division",title:"New division",text:"",media:"m-ridges",flip:false,button:{label:"",action:A()},items:[]}),
   cta:()=>({title:"Have a project in mind?",button:{label:"Get in touch",action:A()}}),
+  features:()=>({num:"",eyebrow:"",title:"What's included",text:"",cols:3,items:[]}),
+  quotes:()=>({num:"",eyebrow:"Testimonials",items:[]}),
+  quote:()=>({anchor:"quote",eyebrow:"Request a Quote",title:"Request a Quote",text:"",service:"",hint:""}),
+  catalog:()=>({anchor:"catalog",title:"Catalog",text:"",filters:["Item Type","Package Type","Price Range"],items:[]}),
   blog:()=>({title:"Latest posts",category:"",limit:12,filters:true,style:"grid"}),
   article:()=>({num:"",eyebrow:"",title:"",body:"Write here. Leave an empty line between paragraphs."})
 };
@@ -334,7 +213,35 @@ function normalize(c){
     else out[k]=c[k];
   }
   (out.flows||[]).forEach(f=>migrateFlow(f,out.motion.flow));
+  migrateContent(out,c);
   return out;
+}
+/* Content updates for sites saved before a new starter structure. Nothing is deleted.
+   v3 (the bilingual content handoff): the new site map (Home, About Dorma, Agency, Print & Production, News & Insights), the service
+   pages, catalogs, service modals, quote request, flows and posts. A saved page with the same address as a new one is kept as
+   "<address>-previous" (out of the menu, still editable under Pages); every other earlier page stays, out of the menu. */
+function migrateContent(out,saved){
+  const from=+saved.contentVersion||1;
+  if (from<3 && Array.isArray(saved.pages) && saved.pages.length){
+    const S=JSON.parse(JSON.stringify(STARTER)), has=(list,id)=>list.some(x=>x&&x.id===id);
+    const taken=new Set([...out.pages.map(p=>p&&p.id),...S.pages.map(p=>p.id)]);
+    const kept=out.pages.filter(p=>p&&typeof p==="object").map(p=>{
+      if (has(S.pages,p.id)){ let id=p.id+"-previous", k=2; while (taken.has(id)) id=p.id+"-previous-"+(k++); taken.add(id); p.id=id;
+        const t=p.title; p.title=t&&typeof t==="object"?{en:(t.en||"")+" (previous)",ar:t.ar||""}:String(t||p.id)+" (previous)"; }
+      p.nav=false; return p; });
+    out.pages=[...S.pages,...kept];
+    out.site.homePage=S.site.homePage;
+    S.modals.forEach(m=>{ if (!has(out.modals,m.id)) out.modals.push(m); });
+    S.flows.forEach(f=>{ if (!has(out.flows,f.id)) out.flows.push(f); });
+    S.posts.forEach(x=>{ if (!has(out.posts,x.id)) out.posts.push(x); });
+    S.icons.forEach(x=>{ if (!has(out.icons,x.id)) out.icons.push(x); });
+    S.categories.forEach(x=>{ if (!has(out.categories,x.id)) out.categories.push(x); });
+    const sv=saved.site||{}, lbl=sv.cta&&sv.cta.label;
+    if (!sv.cta || lbl==="Tell us your challenge" || (sv.cta.action&&sv.cta.action.target==="md-contact")) out.site.cta=S.site.cta;
+    if (!sv.languages || sv.languages==="en") out.site.languages=S.site.languages;
+    if (!sv.footer || sv.footer==="© 2026 Dorma Advertising · Agency | Printing & Production") out.site.footer=S.site.footer;
+  }
+  out.contentVersion=Math.max(from,STARTER.contentVersion);
 }
 /* Flows made before global styles keep their look: a flow whose animation differs from the global one becomes "custom". */
 function migrateFlow(f,g={}){
@@ -347,7 +254,7 @@ function migrateFlow(f,g={}){
 /* ================= SAVED STYLES =================
    A saved style is a snapshot of the global layer (colours, type, header, image filter, flow and slide defaults, animation).
    Per-item custom settings are not part of it, so applying a style never wipes a flow or slide that has its own look. */
-const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide"];
+const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals"];
 const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming"];
 const pickKeys=(o,ks)=>JSON.parse(JSON.stringify(Object.fromEntries(ks.filter(k=>o&&o[k]!==undefined).map(k=>[k,o[k]]))));
 function snapshotStyle(cfg,name){ return { id:"st-"+Math.random().toString(36).slice(2,8), name:name||"My style", savedAt:new Date().toISOString(), theme:pickKeys(cfg.theme,STYLE_THEME), motion:pickKeys(cfg.motion,STYLE_MOTION) }; }
@@ -369,4 +276,4 @@ function resetOverrides(cfg,{flows=true,slides=true}={}){
 STARTER.flows.forEach(f=>migrateFlow(f,STARTER.motion.flow));
 STARTER.styles=[{ ...snapshotStyle(STARTER,"Dorma starter"), id:"st-starter", savedAt:"" }];
 
-export { normalize, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+export { SITE_MAP, normalize, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };

@@ -55,4 +55,4 @@ Image: Placeholder · City
 Title: What are you planning next?
 Subtitle: Tell us what you want to achieve.
 Flow:
-- [Let's talk](modal:md-contact)
+- [Let's talk](modal:md-quote)
