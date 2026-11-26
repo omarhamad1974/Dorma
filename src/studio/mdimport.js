@@ -8,7 +8,7 @@
    build(cfg, text, opts) changes cfg and reports what it did, so the studio runs it on a copy for the preview
    and on the draft for the real import. Pure functions, no DOM: easy to test. */
 import { parseFlowLine, resolveImage, parseSlidesMd, applySlidesImport } from './mdslides';
-import { OPT, SECTION_TYPES, SECTION_BLANK, A } from './data';
+import { OPT, SECTION_TYPES, SECTION_BLANK, A, defaultCategory, ensureCategory } from './data';
 
 const rid = () => Math.random().toString(36).slice(2,8);
 const norm = s => String(s??"").toLowerCase().replace(/[’'`]/g,"").replace(/[\s_]+/g," ").replace(/\s*:\s*$/,"").trim();
@@ -257,6 +257,7 @@ function buildLibrary(cfg,text,opts={}){
       if (!m.category && path.includes("/")) m.category=categoryOf(cfg,path.split("/")[0],ctx); }
     else if (isUrl){ if (m.kind==="article") m.link=m.link||file; else m.url=file; }
     if (m.kind==="scene" && !m.scene) m.scene="nebula";
+    if (!m.category) m.category=ensureCategory(cfg,defaultCategory(m)); // every library item has a category
     if (m.kind==="article"){ m.summary=m.summary||""; m.link=m.link||""; m.cover=m.cover||""; }
     m.label=plainTx(m.label)||(path||file).split("/").pop()||"Imported item";
     const same=cfg.media.find(x=>(path&&x.path===path)||(m.url&&x.url===m.url)||(((!path&&!m.url)||opts.mode==="update")&&x.kind===m.kind&&norm(x.label)===norm(m.label)));

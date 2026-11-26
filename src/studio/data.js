@@ -159,15 +159,15 @@ const SECTION_TYPES = {
     ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. Empty follows the global slide timing (Design → Global style), shown in grey. Each slide can override these below."}],
     ["look","look","Colours and filter for this carousel",{level:"carousel"}],
     ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
-    ["slides","list","Slides",{ title:"title", hideable:true, fields:[["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on",{aka:["stay on this slide"]}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}],["media","media","Background image",{wide:true}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
+    ["slides","list","Slides",{ itemName:"slide", title:"title", hideable:true, fields:[["media","media","Background image",{wide:true}],["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on",{aka:["stay on this slide"]}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
   hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["button","button","Button (empty label hides it)"],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
-  chapters: { label:"Chapters", fields:[["items","list","Chapters",{ title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
+  chapters: { label:"Chapters", fields:[["items","list","Chapters",{ itemName:"chapter", title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
   stats: { label:"Numbers", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["style","select","Style",{options:OPT.statStyles}],["items","list","Figures",{ title:"label", fields:[["label","text","Label"],["value","number","Value"],["suffix","text","Suffix"],["decimals","number","Decimals"],["meter","range","Meter %",{min:0,max:100,step:1}]], blank:()=>({label:"New figure",value:10,suffix:"",decimals:0,meter:50}) }]] },
   about: { label:"About", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement (wrap words in *stars* to highlight)",{wide:true}],["link","button","Link"],["media","media","Image (optional)",{wide:true,allowNone:true}]] },
   clients: { label:"Clients", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["style","select","Style",{options:OPT.clientStyles}],["items","list","Clients",{ title:"name", fields:[["name","text","Name"],["sector","text","Sector"],["since","text","Since"],["work","text","Work"]], blank:()=>({name:"New client",sector:"",since:"",work:""}) }]] },
-  grid: { label:"Card grid", fields:[["title","text","Heading"],["filters","toggle","Show tag filters as a flow"],["items","list","Cards",{ title:"title", fields:[["code","text","Code"],["tag","text","Tag"],["title","text","Title"],["text","area","Text",{wide:true}],["action","action","On click"],["media","media","Image",{wide:true}]], blank:()=>({code:"X-00",tag:"Tag",title:"New card",text:"",media:"m-city",action:A()}) }]] },
-  accordion: { label:"Accordion", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Rows",{ title:"title", fields:[["title","text","Title"],["tags","strings","Tags (one per line)"],["text","area","Text",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New row",tags:[],text:"",media:"m-ocean",more:{label:"More",action:A()}}) }]] },
+  grid: { label:"Card grid", fields:[["title","text","Heading"],["filters","toggle","Show tag filters as a flow"],["items","list","Cards",{ itemName:"card", title:"title", fields:[["code","text","Code"],["tag","text","Tag"],["title","text","Title"],["text","area","Text",{wide:true}],["action","action","On click"],["media","media","Image",{wide:true}]], blank:()=>({code:"X-00",tag:"Tag",title:"New card",text:"",media:"m-city",action:A()}) }]] },
+  accordion: { label:"Accordion", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Rows",{ itemName:"row", title:"title", fields:[["title","text","Title"],["tags","strings","Tags (one per line)"],["text","area","Text",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New row",tags:[],text:"",media:"m-ocean",more:{label:"More",action:A()}}) }]] },
   timeline: { label:"Timeline", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement",{wide:true}],["flowId","flow","Timeline flow (each item's detail text shows on click)"],["timing","timing","Timing",{parts:[["eyebrow",0],["text",.1],["flow",.2],["detail",.5]]}]] },
   flowStrip: { label:"Flow strip", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["flowId","flow","Flow"],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["flow",.2]]}]] },
   banner: { label:"Wide banner", fields:[["caption","strings","Caption items (one per line)",{wide:true}],["media","media","Image",{wide:true}]] },
@@ -180,7 +180,7 @@ const SECTION_TYPES = {
   quotes: { label:"Testimonials", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Quotes",{ title:"name", hideable:true, fields:[["quote","area","Quote",{wide:true}],["name","text","Name"],["role","text","Role or company"]], blank:()=>({quote:"",name:"",role:""}) }]] },
   quote: { label:"Quote request form", fields:[["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["service","text","Service (filled in on the form)"],["hint","area","Note under the form (optional)",{wide:true}]] },
   catalog: { label:"Catalog (items with filters and quote requests)", fields:[["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["filters","strings","Filter names, one per line (1: item type, 2: package type, 3: price range)",{wide:true}],
-    ["items","list","Catalog items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}]], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
+    ["items","list","Catalog items",{ itemName:"catalog item", title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}]], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
   blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
@@ -214,8 +214,64 @@ function normalize(c){
   }
   (out.flows||[]).forEach(f=>migrateFlow(f,out.motion.flow));
   migrateContent(out,c);
+  migrateMedia(out);
   return out;
 }
+/* ================= LIBRARY CATEGORIES =================
+   Every image, video, scene and article belongs to a category the admin manages (Library › Categories).
+   An item without one goes to its GitHub folder, or a sensible default for its kind; a category an item names
+   but the list lacks is added back, so nothing is ever lost or left uncategorised. */
+const KIND_CATEGORY={ image:"content", video:"content", scene:"backgrounds", article:"articles" };
+const prettyCat=id=>String(id).replace(/[-_]+/g," ").trim().replace(/^./,c=>c.toUpperCase());
+function defaultCategory(m){
+  if (m && typeof m.path==="string" && m.path.includes("/")) return m.path.split("/")[0];
+  return KIND_CATEGORY[m&&m.kind]||"content";
+}
+function ensureCategory(cfg,id){
+  cfg.categories=Array.isArray(cfg.categories)?cfg.categories:[];
+  if (!cfg.categories.some(c=>c&&c.id===id)){ const known=STARTER.categories.find(c=>c.id===id); cfg.categories.push(known?JSON.parse(JSON.stringify(known)):{id,label:prettyCat(id)}); }
+  return id;
+}
+function migrateMedia(cfg){
+  (cfg.media||[]).forEach(m=>{ if (!m || typeof m!=="object") return;
+    const c=typeof m.category==="string"&&m.category.trim()?m.category.trim():defaultCategory(m);
+    m.category=ensureCategory(cfg,c); });
+}
+
+/* ================= IMAGE SLOTS =================
+   Every place on the site that shows a library image, for the Missing images dashboard. Each slot says where it is
+   (path of labels), how to reach it in the studio (go), and its state:
+   empty (nothing picked), missing (picked item is gone from the library), placeholder (a generated scene). */
+function mediaSlots(cfg,{all=false}={}){
+  const out=[], lib=new Map((cfg.media||[]).map(m=>[m&&m.id,m])), P=v=>v&&typeof v==="object"?(v.en||v.ar||""):String(v??"");
+  const add=(obj,key,where,go,o={})=>{ const id=obj[key], m=id?lib.get(id):null;
+    const state=!id?(o.optional?"":"empty"):!m?"missing":m.kind==="scene"?"placeholder":"";
+    if (state || (all && id)) out.push({obj,key,where,go,state,hidden:!!o.hidden,optional:!!o.optional,note:o.note||""}); };
+  const walkFields=(obj,fields,where,go,hidden)=>{ (fields||[]).forEach(([key,kind,label,o={}])=>{
+    if (kind==="media") add(obj,key,[...where,label],go,{optional:!!o.allowNone,hidden,note:o.note});
+    else if (kind==="list" && Array.isArray(obj[key])) obj[key].forEach((it,i)=>{ if (it&&typeof it==="object")
+      walkFields(it,o.fields,[...where,(P(it[o.title])||label+" "+(i+1))],go,hidden||!!it.hidden); }); }); };
+  const walkSections=(list,where,go,hidden)=>(list||[]).forEach(s=>{ if (!s||typeof s!=="object") return; const T=SECTION_TYPES[s.type]; if (!T) return;
+    const name=P(s.title)||P(s.eyebrow)||T.label, g={...go,section:s.id};
+    if (s.type==="heroCarousel"){ const cg={panel:"carousels",sel:s.id};
+      if (s.defaultMedia) add(s,"defaultMedia",[...where,name,"Default image"],cg,{hidden:hidden||s.hidden});
+      (s.slides||[]).forEach((x,i)=>{ if (!x||typeof x!=="object") return; const sw=[...where,name,P(x.title)||"Slide "+(i+1)];
+        if (!x.media && s.defaultMedia) return; // an empty slide shows the carousel's default image
+        add(x,"media",[...sw,"Background image"],cg,{hidden:hidden||s.hidden||x.hidden}); });
+      return; }
+    walkFields(s,T.fields,[...where,name],g,hidden||!!s.hidden); });
+  (cfg.pages||[]).forEach(p=>{ if (!p||typeof p!=="object") return; walkSections(p.sections,["Page: "+(P(p.title)||p.id)],{panel:"pages",sel:p.id},p.nav===false&&/-previous/.test(p.id)); });
+  (cfg.modals||[]).forEach(m=>{ if (!m||typeof m!=="object") return; const w=["Modal: "+(m.name||P(m.title)||m.id)], go={panel:"modals",sel:m.id};
+    if (m.type===4){ /* service list: no picture */ } else if (m.type===5) walkSections(m.sections,w,go,false);
+    else { const n=m.type===2?3:1; m.media=Array.isArray(m.media)?m.media:[]; for (let k=0;k<n;k++){ add(m.media,k,[...w,n>1?"Gallery item "+(k+1):"Image or video"],go); } } });
+  (cfg.flows||[]).forEach(f=>{ if (!f||typeof f!=="object") return; (f.items||[]).forEach((it,i)=>{ if (it&&typeof it==="object"&&it.media) add(it,"media",["Flow: "+(f.name||f.id),P(it.label)||"Item "+(i+1),"Panel image"],{panel:"flows",sel:f.id},{optional:true}); }); });
+  (cfg.posts||[]).forEach(p=>{ if (!p||typeof p!=="object") return; add(p,"cover",["Blog: "+(P(p.title)||p.slug||p.id),"Cover image"],{panel:"blog",sel:p.id},{optional:!p.published,hidden:!p.published}); });
+  (cfg.media||[]).forEach(m=>{ if (m&&m.kind==="article"&&m.cover) add(m,"cover",["Library article: "+P(m.label),"Cover image"],{panel:"media",sel:m.id},{optional:true}); });
+  if (cfg.site&&cfg.site.logo) add(cfg.site,"logo",["Site header","Logo image"],{panel:"site"},{optional:true});
+  return out;
+}
+/** The category a slot's picker opens on: the current image's, else the category most used by its neighbours. */
+function slotCategory(cfg,id){ const m=(cfg.media||[]).find(x=>x&&x.id===id); return m&&m.kind!=="scene"?m.category||"":""; }
 /* Content updates for sites saved before a new starter structure. Nothing is deleted.
    v3 (the bilingual content handoff): the new site map (Home, About Dorma, Agency, Print & Production, News & Insights), the service
    pages, catalogs, service modals, quote request, flows and posts. A saved page with the same address as a new one is kept as
@@ -276,4 +332,4 @@ function resetOverrides(cfg,{flows=true,slides=true}={}){
 STARTER.flows.forEach(f=>migrateFlow(f,STARTER.motion.flow));
 STARTER.styles=[{ ...snapshotStyle(STARTER,"Dorma starter"), id:"st-starter", savedAt:"" }];
 
-export { SITE_MAP, normalize, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+export { SITE_MAP, normalize, defaultCategory, ensureCategory, migrateMedia, mediaSlots, slotCategory, KIND_CATEGORY, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
