@@ -213,10 +213,72 @@ const libPathOk=p=>typeof p==="string" && /^[\w\-. ()&+,]+(\/[\w\-. ()&+,]+)*$/.
 const libraryUrl=p=>libPathOk(p)?LIBRARY_BASE+p.split("/").map(encodeURIComponent).join("/"):"";
 const BUILTIN_LOGO_WHITE = `${import.meta.env.BASE_URL}brand/dorma-logo-white.png`;
 /** The header logo: a library image chosen in the studio, or the built-in white Dorma logo. */
-function brandLogoUrl(cfg){ const m=cfg&&cfg.site&&cfg.site.logo?mediaItem(cfg,cfg.site.logo):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_WHITE; }
+function brandLogoUrl(cfg){ const L=cfg&&cfg.site&&cfg.site.logos; if (L&&L.white){ const u=versionUrl(cfg,(L.versions||[]).find(v=>v&&v.id===L.white)); if (u) return u; } const m=cfg&&cfg.site&&cfg.site.logo?mediaItem(cfg,cfg.site.logo):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_WHITE; }
 const BUILTIN_LOGO_COLOUR = `${import.meta.env.BASE_URL}brand/dorma-logo.png`;
 /** The logo on a light header: the light-mode logo chosen in the studio, or the built-in blue Dorma logo. */
-function lightLogoUrl(cfg){ const m=cfg&&cfg.site&&cfg.site.logoLight?mediaItem(cfg,cfg.site.logoLight):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_COLOUR; }
+function lightLogoUrl(cfg){ const L=cfg&&cfg.site&&cfg.site.logos; if (L&&L.colour){ const u=versionUrl(cfg,(L.versions||[]).find(v=>v&&v.id===L.colour)); if (u) return u; } const m=cfg&&cfg.site&&cfg.site.logoLight?mediaItem(cfg,cfg.site.logoLight):null; return (m&&m.kind==="image"&&mediaUrl(m))||BUILTIN_LOGO_COLOUR; }
+import { SILVER_PRESETS, LOGO_DEFAULTS } from './logos';
+/* ================= LOGO VERSIONS AND PLACES =================
+   Design → Logo (cfg.site.logos). Versions: the white logo (dark backgrounds), the colour logo (light backgrounds),
+   a silver one made from another version with a gradient mask (works with PNG and SVG alike), and any SVG or library
+   image added in the studio. Each place (header, header over a hero, full-screen menu, footer, loader) picks a version
+   for dark and light backgrounds and has its own size on computers and on phones. "auto" = white on dark, colour on light. */
+const LOGO_PLACES=["header","menu","footer","loader"];
+const logosOf=cfg=>(cfg&&cfg.site&&cfg.site.logos)||LOGO_DEFAULTS;
+/** Cleans an uploaded SVG logo for use as an image: no scripts, event handlers or embedded objects. Returns "" if it isn't an SVG. */
+function cleanLogoSvg(src){
+  if (!src || typeof src!=="string" || src.length>400000) return "";
+  let doc; try { doc=new DOMParser().parseFromString(src.trim(),"image/svg+xml"); } catch(e){ return ""; }
+  const root=doc.documentElement;
+  if (!root || root.nodeName.toLowerCase()!=="svg" || doc.querySelector("parsererror")) return "";
+  root.querySelectorAll("script,foreignObject,iframe,object,embed").forEach(n=>n.remove());
+  [root,...root.querySelectorAll("*")].forEach(el=>[...el.attributes].forEach(a=>{ if (/^on/i.test(a.name) || (/href$/i.test(a.name) && !/^#|^data:image\//i.test(a.value.trim()))) el.removeAttribute(a.name); }));
+  if (!root.getAttribute("xmlns")) root.setAttribute("xmlns","http://www.w3.org/2000/svg");
+  return new XMLSerializer().serializeToString(root);
+}
+const svgDataUrl=svg=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+/** The picture of one added version: its SVG as a data URL, or its library image. */
+function versionUrl(cfg,v){
+  if (!v) return "";
+  if (typeof v.svg==="string" && v.svg.trim().startsWith("<")) return svgDataUrl(v.svg);
+  const m=v.image?mediaItem(cfg,v.image):null; return (m&&m.kind==="image"&&mediaUrl(m))||"";
+}
+const findVersion=(cfg,id)=>(logosOf(cfg).versions||[]).find(v=>v&&v.id===id);
+/** The URL of a plain version: "white", "colour" or an added version's id (silver is built on top of these). */
+function logoVersionUrl(cfg,id){
+  if (id==="colour") return lightLogoUrl(cfg);
+  if (id && id!=="white"){ const u=versionUrl(cfg,findVersion(cfg,id)); if (u) return u; }
+  return brandLogoUrl(cfg);
+}
+/** The CSS gradient for the silver logo. */
+function silverCss(cfg){
+  const S={...LOGO_DEFAULTS.silver,...(logosOf(cfg).silver||{})};
+  let c=SILVER_PRESETS[S.preset];
+  if (!c){ const d=hexOk(S.dark)?S.dark:"#7b8087", l=hexOk(S.light)?S.light:"#f4f5f7"; c=[d,l,d,l,d]; }
+  const a=Math.max(0,Math.min(360,+S.angle||0));
+  return `linear-gradient(${a}deg,${c[0]} 0%,${c[1]} 30%,${c[2]} 50%,${c[3]} 70%,${c[4]} 100%)`;
+}
+/** What a place shows on a tone ("dark", "light" or "hero"): {src, silver (gradient or ""), shine, size, phone}. */
+function logoFor(cfg,place,tone="dark"){
+  const L=logosOf(cfg), P={...LOGO_DEFAULTS.places[place],...((L.places||{})[place]||{})};
+  let id=P[tone]||"auto";
+  if (tone==="hero" && id==="auto") id=P.dark||"auto";
+  if (id==="auto") id=tone==="light"?"colour":"white";
+  const size=+(place==="loader"?P.width:P.height)||LOGO_DEFAULTS.places[place][place==="loader"?"width":"height"];
+  const out={ src:"", silver:"", shine:"none", shineTime:4, size, phone:+P.phone||0 };
+  if (id==="silver"){ const S={...LOGO_DEFAULTS.silver,...(L.silver||{})};
+    out.src=logoVersionUrl(cfg,S.from==="silver"?"white":S.from); out.silver=silverCss(cfg); out.shine=["once","loop"].includes(S.shine)?S.shine:"none"; out.shineTime=Math.max(1,Math.min(20,+S.shineTime||4)); }
+  else out.src=logoVersionUrl(cfg,id);
+  return out;
+}
+/** The logo as HTML: an <img> in a wrapper; the silver version paints a gradient through the logo's shape. */
+function logoHtml(spec,{alt="",sizeVar="--lh"}={}){
+  const s=spec||{}, cls="logo-mk"+(s.silver?" is-silver":"")+(s.silver&&s.shine!=="none"?" shine-"+s.shine:"");
+  const vars=[s.size?`${sizeVar}:${Math.round(s.size)}px`:"",s.phone?`${sizeVar}-ph:${Math.round(s.phone)}px`:"",
+    s.silver?`--logo-mask:url(&quot;${esc(String(s.src).replace(/"/g,"%22"))}&quot;);--silver:${esc(s.silver)};--shine-t:${s.shineTime||4}s`:""].filter(Boolean).join(";");
+  return `<span class="${cls}"${vars?` style="${vars}"`:""}><img src="${esc(s.src||BUILTIN_LOGO_WHITE)}" alt="${esc(alt)}"></span>`;
+}
+function logoNode(cfg,place,tone,{alt="",cls=""}={}){ const t=document.createElement("template"); t.innerHTML=logoHtml(logoFor(cfg,place,tone),{alt}); const n=t.content.firstElementChild; if (cls) n.classList.add(...cls.split(" ")); n.dataset.place=place; return n; }
 function mediaUrl(m){ if (m.path) return libraryUrl(m.path); return isMediaUrl(m.url)?m.url:""; }
 function mediaNode(cfg,id,{w=1280,hh=800}={}){
   const m=mediaItem(cfg,id); if (!m) return null;
@@ -488,4 +550,4 @@ function renderProse(cfg,text){
 const fmtDate=d=>{ const t=Date.parse(d); return isNaN(t)?"":new Date(t).toLocaleDateString(LANG.cur==="ar"?"ar-u-nu-latn":"en-GB",{day:"numeric",month:"short",year:"numeric"}); };
 const categoryLabel=(cfg,id)=>plain(((cfg.categories||[]).find(c=>c.id===id)||{}).label)||"";
 
-export { siteMode, setSiteMode, storedMode, deviceMode, lightLogoUrl, BUILTIN_LOGO_COLOUR, loadFonts, sectionVars, modalVars, modalLook, flowBlock, noteIn, hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };
+export { LOGO_PLACES, SILVER_PRESETS, LOGO_DEFAULTS, cleanLogoSvg, svgDataUrl, versionUrl, logoVersionUrl, silverCss, logoFor, logoHtml, logoNode, siteMode, setSiteMode, storedMode, deviceMode, lightLogoUrl, BUILTIN_LOGO_COLOUR, loadFonts, sectionVars, modalVars, modalLook, flowBlock, noteIn, hexOk, accentVars, headerVars, flowColors, flowAnim, slideLook, setVar, ui, LANGS, LANG, isTx, txt, plain, siteLangs, pickLang, setLang, setDocLang, localize, NUM, pn, TIMING_PARTS, cue, BUILTIN_LOGO_WHITE, brandLogoUrl, libPathOk, libraryUrl, inlineMd, renderProse, fmtDate, categoryLabel, $, $$, pad, clone, uid, esc, reduce, h, ARROW_SVG, svgEl, SVG_TAGS, SVG_ATTRS, sanitizeSvg, iconSvg, hexRgb, rgba, applyTheme, EASES, ease, ioEase, sceneCache, sceneCanvas, mediaItem, mediaUrl, mediaNode, isMoving, mediaBox, OV_BLENDS, overlayFor, overlayCss, overlayEl, sepEl, captionEl, PRESETS, TO, presetTween, flowItemEl, renderFlow, animateFlow, runAction, buttonEl, eyebrowEl, emphasize, splitTitle, revealTitle };

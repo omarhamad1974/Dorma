@@ -1,12 +1,12 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid } from './core';
+import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
 import Sortable from 'sortablejs';
-import { imageUrl, markHtml, previewLoader } from '../loader';
+import { loaderLogo, markHtml, previewLoader } from '../loader';
 import { labelKey } from './jump';
 import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
@@ -37,9 +37,9 @@ const IC={
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -104,7 +104,7 @@ function openPanel(k){
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
@@ -425,8 +425,7 @@ function panelSite(body){
     fieldsFor(D.site,[["quoteEmail","text","Send quote requests to (email)",{placeholder:"name@company.com"}]])));
   body.append(card("Languages and numbering",h("p",{class:"adm-intro",text:"Choose the languages visitors can read. With both, a switch in the header lets them change language. When Arabic is on, every text box in the studio shows English and Arabic side by side. A language left empty shows the other language's text."}),
     fieldsFor(D.site,[["languages","select","Site languages",{options:[["en","English only"],["ar","Arabic only"],["both","English and Arabic"]]}],["defaultLang","select","Language for first-time visitors",{options:[["en","English"],["ar","العربية"]]}],["showNumbers","toggle","Show numbering (01, 02… counters, steps and badges)"]],(v,k)=>{ if (k==="languages") openPanel("site"); })));
-  body.append(card("Logo",h("p",{class:"adm-intro",text:"The logo in the site header. Leave the image on None to use the built-in white Dorma logo, or pick any image from the Library (a transparent PNG or SVG with light colours works best on the dark header)."}),
-    fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}],["logoHeight","range","Logo height (px)",{min:20,max:64,step:1}],["logo","media","Logo image (None uses the white Dorma logo)",{allowNone:true}],["logoLight","media","Logo on light pages, light mode (None uses the blue Dorma logo)",{allowNone:true}]])));
+  body.append(card("Logo",h("p",{class:"adm-intro",style:"margin:0"},"The logo versions (white, colour, silver and your SVGs) and their sizes in the header, menu, footer and loader are under ",h("button",{type:"button",class:"linkish",text:"Design → Logo",onclick:()=>openPanel("logo")}),".")));
   body.append(loaderCard());
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(plain(p.title)||p.id)+" in menu")); });
@@ -441,17 +440,112 @@ function panelSite(body){
   var area;
   if (Store.mode==="db") body.append(versionsCard());
 }
+/* ---------- Design → Logo ----------
+   Versions (white, colour, silver, added SVGs or library images) and the places that use them, each with a version for
+   dark and light backgrounds and its own size on computers and phones. Data: cfg.site.logos (see core.js logoFor). */
+const LOGO_PLACE_INFO={
+  header:{title:"Header",intro:"The logo at the top of every page.",tones:[["dark","On dark pages"],["light","On light pages (light mode)"],["hero","Over a hero image or carousel"]],size:["height","Height (px)",16,120]},
+  menu:{title:"Full-screen menu",intro:"At the bottom of the menu that opens from the menu button. It follows the header: dark or light.",tones:[["dark","On the dark menu"],["light","On the light menu"]],size:["height","Height (px)",16,140]},
+  footer:{title:"Footer",intro:"An optional logo at the bottom of every page, above the footer text.",tones:[["dark","On dark pages"],["light","On light pages"]],size:["height","Height (px)",16,160]},
+  loader:{title:"Page loader",intro:"Shown while the site loads, when Loader → Show is set to Logo image. Its background and animation are under Site and titles → Loader.",tones:[["dark","On the dark background"],["light","On the white background"]],size:["width","Width (px)",80,480]}
+};
+function logoVersionOptions(D,{auto=true,silver=true}={}){
+  const L=D.site.logos;
+  return [...(auto?[["auto","Automatic (white on dark, colour on light)"]]:[]),["white","White logo"],["colour","Colour logo"],...(silver?[["silver","Silver logo"]]:[]),
+    ...L.versions.map(v=>[v.id,(v.name||"Added version")+(v.svg?" (SVG)":"")])];
+}
+const LOGO_BG={dark:"Dark",light:"Light",hero:"Over a picture"};
+function logoPreview(D,place,tones){
+  const box=h("div",{class:"logo-prev"});
+  tones.forEach(([t])=>{ const n=logoNode(D,place,t,{alt:""});
+    if (place==="loader"){ const sz=logoFor(D,"loader",t).size; n.style.width=`min(${sz}px,100%)`; n.querySelector("img").style.cssText="width:100%;height:auto"; } // the loader is sized by width
+    box.append(h("div",{class:"lp lp-"+t},n,h("small",{text:LOGO_BG[t]}))); });
+  return box;
+}
+function versionPreview(D,id){
+  const box=h("div",{class:"logo-prev"}); const tmp={site:{...D.site,logos:{...D.site.logos,places:{...D.site.logos.places,header:{dark:id,light:id,hero:id,height:40}}}},media:D.media};
+  ["dark","light"].forEach(t=>box.append(h("div",{class:"lp lp-"+t},logoNode(tmp,"header",t,{alt:""}),h("small",{text:LOGO_BG[t]}))));
+  return box;
+}
+function panelLogo(body){
+  const D=Store.draft, L=D.site.logos, S=L.silver;
+  const redraw=()=>openPanel("logo");
+  const keepScroll=fn=>()=>{ const y=scrollY; fn(); requestAnimationFrame(()=>scrollTo(0,y)); };
+  body.append(h("p",{class:"adm-intro",text:"Every version of the logo and where each one shows. Pick a version for dark and light backgrounds in each place, and set its size on computers and phones. The silver version is made from another version, so it works with the PNG logo now and with an SVG once you add one."}));
+
+  /* --- where each version shows --- */
+  const places=h("div",{class:"logo-places"});
+  LOGO_PLACES.forEach(k=>{
+    const I=LOGO_PLACE_INFO[k], P=L.places[k], prev=h("div");
+    const draw=()=>prev.replaceChildren(logoPreview(D,k,I.tones));
+    const opts=logoVersionOptions(D);
+    const schema=[...(k==="footer"?[["show","toggle","Show a logo in the footer"]]:[]),
+      ...I.tones.map(([t,l])=>[t,"select",l,{options:t==="hero"?[["auto","Same as on dark pages"],...opts.slice(1)]:opts}]),
+      [I.size[0],"range",I.size[1],{min:I.size[2],max:I.size[3],step:1}],["phone","range",(I.size[0]==="width"?"Width":"Height")+" on phones (0 = same)",{min:0,max:I.size[3],step:1}]];
+    const extra=k==="header"?fieldsFor(D.site,[["logoMode","select","Header shows",{options:[["image","Logo image"],["text","Brand name as text"]]}]]):k==="menu"?fieldsFor(D.theme.menu,[["logoBottom","toggle","Logo at the bottom of the menu"]]):null;
+    draw();
+    places.append(card(I.title,h("p",{class:"adm-intro",style:"margin:0",text:I.intro}),prev,extra,fieldsFor(P,schema,draw),
+      k==="loader"?h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},h("button",{class:"btn",type:"button",text:"Preview loader",onclick:()=>previewLoader(D)}),h("button",{class:"btn",type:"button",text:"Loader settings",onclick:()=>openPanel("site")})):null));
+  });
+  body.append(h("h2",{class:"logo-h",text:"Where each version shows"}),places);
+
+  /* --- versions --- */
+  body.append(h("h2",{class:"logo-h",text:"Versions"}));
+  const added=()=>[["","Built-in Dorma logo, or the library image below"],...L.versions.map(v=>[v.id,v.name||"Added version"])];
+  body.append(card("White logo",h("p",{class:"adm-intro",style:"margin:0",text:"For dark backgrounds. Use an added SVG version, a library image, or leave both empty for the built-in white Dorma logo."}),versionPreview(D,"white"),
+    fieldsFor(L,[["white","select","Use this version",{options:added()}]],keepScroll(redraw)),
+    L.white?null:fieldsFor(D.site,[["logo","media","Library image (None uses the built-in white logo)",{allowNone:true}]],keepScroll(redraw))));
+  body.append(card("Colour logo",h("p",{class:"adm-intro",style:"margin:0",text:"For light backgrounds (light mode, the white loader). Use an added SVG version, a library image, or leave both empty for the built-in blue Dorma logo."}),versionPreview(D,"colour"),
+    fieldsFor(L,[["colour","select","Use this version",{options:added()}]],keepScroll(redraw)),
+    L.colour?null:fieldsFor(D.site,[["logoLight","media","Library image (None uses the built-in colour logo)",{allowNone:true}]],keepScroll(redraw))));
+  const sPrev=h("div"), sDraw=()=>sPrev.replaceChildren(versionPreview(D,"silver"));
+  const custom=h("div",{hidden:S.preset!=="custom"},fieldsFor(S,[["dark","color","Shadow colour"],["light","color","Highlight colour"]],sDraw));
+  sDraw();
+  body.append(card("Silver logo",h("p",{class:"adm-intro",style:"margin:0",text:"A brushed-silver gradient painted through the shape of another version, for dark sections, the menu or the loader. Pick it in any place above. With an SVG, the edges stay sharp at every size."}),sPrev,
+    fieldsFor(S,[["from","select","Made from",{options:logoVersionOptions(D,{auto:false,silver:false})}],["preset","select","Finish",{options:[["classic","Classic silver"],["bright","Bright platinum"],["steel","Dark steel"],["custom","My colours"]]}],
+      ["angle","range","Gradient angle (°)",{min:0,max:180,step:1}],["shine","select","Shine",{options:[["none","None"],["once","One sweep when it appears"],["loop","Sweeps now and then"]]}],["shineTime","range","Time between sweeps (seconds)",{min:2,max:12,step:.5}]],
+      (v,k)=>{ if (k==="preset") custom.hidden=S.preset!=="custom"; sDraw(); }),custom));
+
+  /* --- added versions --- */
+  const file=h("input",{type:"file",accept:".svg,image/svg+xml",multiple:true,hidden:true});
+  file.addEventListener("change",async()=>{ const fs=[...(file.files||[])]; let n=0;
+    for (const f of fs){ const svg=cleanLogoSvg(await f.text()); if (!svg){ toast(f.name+" isn't a valid SVG."); continue; }
+      L.versions.push({id:uid("lv"),name:f.name.replace(/\.svg$/i,"").replace(/[-_]+/g," "),svg,image:""}); n++; }
+    file.value=""; if (n){ touch(); toast(n===1?"SVG added. Pick it in a place above, or use it as the white or colour logo.":`${n} SVGs added.`); keepScroll(redraw)(); } });
+  const list=h("div",{class:"sub-list"});
+  L.versions.forEach((v,i)=>{
+    const vp=h("div"), vd=()=>vp.replaceChildren(versionPreview(D,v.id));
+    const code=h("div",{class:"fields"},F(v,"svg","code","SVG code",{wide:true,hint:"Paste the SVG from your design app, or upload the file. Clear it to use a library image instead."},()=>{ const c=cleanLogoSvg(v.svg); if (v.svg&&c){ v.svg=c; } vd(); }));
+    const uses=[L.white===v.id?"white logo":"",L.colour===v.id?"colour logo":"",S.from===v.id?"silver":"",...LOGO_PLACES.filter(k=>Object.values(L.places[k]).includes(v.id)).map(k=>LOGO_PLACE_INFO[k].title.toLowerCase())].filter(Boolean);
+    list.append(subCard(v,{title:()=>v.name||"Added version",kind:v.svg?"SVG":"Image",open:false,thumb:()=>{ const n=logoNode({site:{logos:{...L,places:{header:{dark:v.id}}}},media:D.media},"header","dark"); n.classList.add("lp-thumb"); return n; },
+      onRemove:()=>{ L.versions.splice(i,1); [ "white","colour"].forEach(k=>{ if (L[k]===v.id) L[k]=""; }); if (S.from===v.id) S.from="white";
+        LOGO_PLACES.forEach(k=>Object.keys(L.places[k]).forEach(t=>{ if (L.places[k][t]===v.id) L.places[k][t]="auto"; })); touch(); keepScroll(redraw)(); },
+      body:()=>{ vd(); return h("div",{style:"display:flex;flex-direction:column;gap:14px"},vp,
+        h("p",{class:"hint",style:"margin:0",text:uses.length?"Used as: "+uses.join(", "):"Not used yet. Pick it in a place above, or below."}),
+        fieldsFor(v,[["name","text","Name"]]),code,
+        v.svg?null:fieldsFor(v,[["image","media","Library image",{allowNone:true}]],vd),
+        h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+          h("button",{class:"btn sm",type:"button",text:"Use as white logo",onclick:()=>{ L.white=v.id; touch(); toast("Now the white logo everywhere it's used."); keepScroll(redraw)(); }}),
+          h("button",{class:"btn sm",type:"button",text:"Use as colour logo",onclick:()=>{ L.colour=v.id; touch(); toast("Now the colour logo everywhere it's used."); keepScroll(redraw)(); }}),
+          h("button",{class:"btn sm",type:"button",text:"Make silver from it",onclick:()=>{ S.from=v.id; touch(); toast("The silver logo is now made from this version."); keepScroll(redraw)(); }}))); }}));
+  });
+  body.append(card("Added versions",h("p",{class:"adm-intro",style:"margin:0",text:"Upload SVG files of the logo (for example white, colour, the mark alone or a stacked version), or add a library image. Each one can be used in any place above, as the white or colour logo, or as the shape for the silver logo."}),
+    list.children.length?list:h("p",{class:"hint",style:"margin:0",text:"No added versions yet. The built-in PNG logos are used until you add one."}),
+    h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+      h("button",{class:"btn primary",type:"button",html:IC.upload+"Upload SVG",onclick:()=>file.click()}),
+      h("button",{class:"btn",type:"button",html:IC.plus+"Add a library image",onclick:()=>{ L.versions.push({id:uid("lv"),name:"Logo version "+(L.versions.length+1),svg:"",image:""}); touch(); keepScroll(redraw)(); }}),file)));
+}
 function loaderCard(){
   const D=Store.draft, L=D.loader;
   const thumb=h("div",{class:"ld-thumb"}), note=h("span",{class:"hint"});
-  const redraw=()=>{ const bad=L.logo && !sanitizeSvg(L.logo); note.textContent=bad?"That text isn't a valid SVG, so the wordmark is shown instead.":""; thumb.dataset.bg=L.bg; thumb.innerHTML=markHtml({...L,logo:bad?"":L.logo},imageUrl(L,D)); };
+  const redraw=()=>{ const bad=L.logo && !sanitizeSvg(L.logo); note.textContent=bad?"That text isn't a valid SVG, so the wordmark is shown instead.":""; thumb.dataset.bg=L.bg; thumb.innerHTML=markHtml({...L,logo:bad?"":L.logo},loaderLogo(L,D)); };
   const file=h("input",{type:"file",accept:".svg,image/svg+xml",hidden:true});
   file.addEventListener("change",async()=>{ const f=file.files&&file.files[0]; if (!f) return; const txt=await f.text(); if (!sanitizeSvg(txt)){ toast("That file isn't a valid SVG."); return; } L.logo=txt; L.mark="svg"; touch(); openPanel("site"); });
   const c=card("Loader",
-    h("p",{class:"adm-intro",text:"Shown while the site loads. By default it uses the header logo on the dark site background. You can also pick another library image, a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the white Dorma logo."}),
+    h("p",{class:"adm-intro",text:"Shown while the site loads. By default it uses the white logo on the dark site background (choose the version under Design → Logo). You can also show a typed wordmark, or an SVG logo (needed for the Draw animation). Visitors see your published choice from their second visit; the very first visit shows the white Dorma logo."}),
     thumb,
     fieldsFor(L,[["enabled","toggle","Show the loader"],["mark","select","Show",{options:[["image","Logo image"],["wordmark","Typed wordmark"],["svg","SVG logo"]]}],["bg","select","Background",{options:[["theme","Site background (dark)"],["light","White (uses the colour logo)"]]}],["style","select","Animation",{options:[["reveal","Reveal: logo wipes in, colour line sweeps"],["draw","Draw: outlines draw, then fill"],["pulse","Pulse: soft glow"]]}],["exit","select","Exit",{options:[["wipe","Wipe up"],["fade","Fade"]]}],["minTime","range","Minimum time on screen (seconds)",{min:0,max:4,step:.1}],["text","text","Wordmark"],["sub","text","Line under the wordmark (not shown with a logo image)"]],redraw),
-    h("div",{class:"fields"},F(L,"image","media","Logo image (None uses the header logo)",{allowNone:true},redraw)),
+    h("p",{class:"hint",style:"margin:0"},"The logo version and its size on each background are set under ",h("button",{type:"button",class:"linkish",text:"Design → Logo",onclick:()=>openPanel("logo")}),"."),
     h("div",{class:"fields"},F(L,"logo","code","Logo SVG (optional, replaces the wordmark)",{wide:true,hint:"Paste SVG code, or upload a file. Simple outlined shapes work best with the Draw animation."},redraw)),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),
@@ -876,7 +970,7 @@ function panelStyle(body){
       h("p",{class:"hint",style:"margin:0",text:"Full-screen menu"}),
       fieldsFor(T.menu,[["open","select","Opening",{options:OPT.menuOpen}],["items","select","Links arrive",{options:OPT.menuItems}],["align","select","Align",{options:[["start","Start"],["center","Centre"]]}],["itemSize","range","Link size",{min:.6,max:1.8,step:.05}],["numbers","toggle","Numbers before links"],
         ["bg","color","Background",{optional:true,placeholder:"Page",globalLabel:"Use page background",fallback:()=>T.ink}],["bgAlpha","range","Background strength",{min:0,max:1,step:.02}],["blur","range","Blur behind (px)",{min:0,max:30,step:1}],
-        ["fx","select","Animated background",{options:FX_OPTIONS}],["logoBottom","toggle","Logo at the bottom"],["logo","media","Logo at the bottom (None uses the header logo)",{allowNone:true}],["note","text","Line at the bottom (e.g. phone or tagline)"]]),
+        ["fx","select","Animated background",{options:FX_OPTIONS}],["logoBottom","toggle","Logo at the bottom (version and size: Design → Logo)"],["note","text","Line at the bottom (e.g. phone or tagline)"]]),
       h("p",{class:"hint",style:"margin:0",text:"Preview draft and press the menu button to see it (make the window narrow, or choose Menu button on every screen)."})),
     card("Image filter",h("p",{class:"adm-intro",style:"margin:0",text:"A colour or gradient over every image and video. Any Library item, carousel or slide can turn it off or use its own."}),
       overlayEditor(T,"imageOverlay",{preview:true}),
@@ -911,7 +1005,7 @@ function panelStyle(body){
       fieldsFor(D.colorMode,[["default","select","Visitors start in",{options:OPT.colorModes}],["toggle","toggle","Show the switch in the header"]]),
       h("p",{class:"hint",style:"margin:0",text:"Light mode colours"}),
       fieldsFor(T.light,[["ink","color","Page background"],["panel","color","Panels and modals"],["fg","color","Text"],["heading","color","Headings",{optional:true,placeholder:"Text",globalLabel:"Same as text",fallback:()=>T.light.fg}],["accent","color","Accent (buttons, glow, highlights)"]]),
-      h("p",{class:"hint",style:"margin:0"},"The header logo on light pages is set under ",h("button",{type:"button",class:"linkish",text:"Site and titles",onclick:()=>openPanel("site")}),". ",
+      h("p",{class:"hint",style:"margin:0"},"The header logo on light pages is set under ",h("button",{type:"button",class:"linkish",text:"Design → Logo",onclick:()=>openPanel("logo")}),". ",
         h("button",{type:"button",class:"linkish",text:"Preview the site in light mode",onclick:()=>{ try { localStorage.setItem("dorma.siteMode","light"); } catch(e){ /* storage blocked */ } previewDraft(); }}),"."))
   );
 }

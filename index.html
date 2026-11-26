@@ -17,7 +17,9 @@
 #loader .ld-word i{display:inline-block;overflow:hidden;font-style:normal;padding:.04em 0}
 #loader .ld-word b{display:inline-block;font-weight:inherit;transform:translateY(110%);animation:ldUp .9s cubic-bezier(.16,1,.3,1) forwards;animation-delay:calc(.12s + var(--i) * .08s)}
 #loader[data-bg="light"]{--ld-bg:#ffffff!important;--ld-fg:#0b1630!important}
-#loader .ld-img{position:relative;width:min(238px,62vw);clip-path:inset(0 100% 0 0);animation:ldWipe 1.1s .15s cubic-bezier(.77,0,.18,1) forwards}
+#loader .ld-img{position:relative;width:min(var(--ld-w,238px),62vw);clip-path:inset(0 100% 0 0);animation:ldWipe 1.1s .15s cubic-bezier(.77,0,.18,1) forwards}
+#loader .ld-img .logo-mk{display:block;width:100%}
+@media (max-width:700px){#loader .ld-img{width:min(var(--ld-w-ph,var(--ld-w,238px)),62vw)}}
 #loader .ld-img img{display:block;width:100%;height:auto;animation:ldSettle 1.6s .15s cubic-bezier(.16,1,.3,1) both}
 #loader[data-style="pulse"] .ld-img{clip-path:none;animation:ldFade .9s both,ldBreathe 2.4s 1s ease-in-out infinite}
 #loader .ld-logo{width:clamp(120px,32vw,260px);animation:ldFade .8s .1s both}

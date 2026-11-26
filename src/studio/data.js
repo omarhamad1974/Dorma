@@ -1,4 +1,5 @@
 import { FLOWS, MODALS, PAGES, POSTS, SITE_MAP } from './content';
+import { LOGO_DEFAULTS } from './logos';
 /* ================= STARTER TEMPLATE =================
    The site renders entirely from one settings object. This is the starter
    template the studio falls back to before anything has been saved. */
@@ -19,7 +20,8 @@ const STARTER = {
     showNumbers: false,
     logoMode: "image",
     logo: "",
-    logoHeight: 34
+    logoHeight: 34,
+    logos: JSON.parse(JSON.stringify(LOGO_DEFAULTS))   // Design → Logo: versions (white, colour, silver, added SVGs) and where each is used
   },
   loader: { enabled: true, mark: "image", image: "", bg: "theme", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {
@@ -243,7 +245,26 @@ function normalize(c){
   (out.flows||[]).forEach(f=>migrateFlow(f,out.motion.flow));
   migrateContent(out,c);
   migrateMedia(out);
+  migrateLogos(out,c);
   return out;
+}
+/* ================= LOGO =================
+   Fills in missing logo settings. The first time a saved site meets the Logo tab, its older settings move in:
+   the header logo height, and a menu or loader logo picked from the library becomes an added version used there. */
+const isObj=v=>v&&typeof v==="object"&&!Array.isArray(v);
+function migrateLogos(cfg,saved){
+  const D=LOGO_DEFAULTS, had=isObj(saved&&saved.site&&saved.site.logos), L=isObj(cfg.site.logos)?cfg.site.logos:{};
+  const places={}; Object.keys(D.places).forEach(k=>{ places[k]={...D.places[k],...(isObj(L.places)&&isObj(L.places[k])?L.places[k]:{})}; });
+  cfg.site.logos={ white:typeof L.white==="string"?L.white:"", colour:typeof L.colour==="string"?L.colour:"",
+    versions:Array.isArray(L.versions)?L.versions.filter(v=>isObj(v)&&typeof v.id==="string"):[],
+    silver:{...D.silver,...(isObj(L.silver)?L.silver:{})}, places };
+  if (had || !saved || typeof saved!=="object") return;
+  const lg=cfg.site.logos;
+  if (+cfg.site.logoHeight) lg.places.header.height=+cfg.site.logoHeight;
+  const adopt=(id,name,place)=>{ if (!id) return; let v=lg.versions.find(x=>x.image===id); if (!v){ v={id:"lv-"+place,name,svg:"",image:id}; lg.versions.push(v); }
+    lg.places[place].dark=v.id; lg.places[place].light=v.id; };
+  const M=cfg.theme&&cfg.theme.menu; if (M&&M.logo){ adopt(M.logo,"Menu logo","menu"); M.logo=""; }
+  const LD=cfg.loader; if (LD&&LD.image){ adopt(LD.image,"Loader logo","loader"); LD.image=""; }
 }
 /* ================= LIBRARY CATEGORIES =================
    Every image, video, scene and article belongs to a category the admin manages (Library › Categories).
@@ -391,4 +412,4 @@ function resetOverrides(cfg,{flows=true,slides=true}={}){
 STARTER.flows.forEach(f=>migrateFlow(f,STARTER.motion.flow));
 STARTER.styles=[{ ...snapshotStyle(STARTER,"Dorma starter"), id:"st-starter", savedAt:"" }];
 
-export { SITE_MAP, normalize, defaultCategory, ensureCategory, migrateMedia, mediaSlots, mediaUsage, slotCategory, KIND_CATEGORY, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
+export { migrateLogos, SITE_MAP, normalize, defaultCategory, ensureCategory, migrateMedia, mediaSlots, mediaUsage, slotCategory, KIND_CATEGORY, snapshotStyle, applyStyle, resetOverrides, STYLE_THEME, STYLE_MOTION, A, STARTER, OPT, OV_PRESETS, ACTION_FIELDS, SECTION_TYPES, SECTION_BLANK };
