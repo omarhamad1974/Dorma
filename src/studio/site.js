@@ -152,7 +152,9 @@ function studioPill(cfg){
   if (Site.preview){
     box.append(h("span",{class:"draft-flag",text:ui("Draft preview")}), h("button",{class:"pill",type:"button",text:ui("Back to studio"),onclick:()=>{ location.hash="admin"; }}));
   } else if (Store.canEdit && cfg.site.showStudioLink!==false){
-    box.append(h("button",{class:"pill",type:"button",text:ui("Open studio"),onclick:()=>{ location.hash="admin"; }}));
+    // Only editors signed in on this browser see it; visitors never do. Small, no animation.
+    box.append(h("a",{class:"pill studio-go",href:"#admin",title:ui("Open studio"),"aria-label":ui("Open studio"),
+      html:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5l.6-2.8 7.6-7.6 2.2 2.2-7.6 7.6zM9.6 4.2l2.2 2.2"/></svg><span>'+esc(ui("Studio"))+'</span>'}));
   }
   return box;
 }

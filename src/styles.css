@@ -281,6 +281,11 @@ button.dv-row:hover .dv-go svg{transform:translateX(4px)}
 .console .hs .inner{padding-top:90px;padding-inline:clamp(20px,3vw,40px)}
 .card-a > .btn{align-self:flex-start}
 .studio-pill{display:flex;align-items:center;gap:10px}
+/* the editor-only studio shortcut in the header: small, quiet, no animation */
+.site-head .pill.studio-go{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;font-size:.62rem;color:inherit;opacity:.75;animation:none;box-shadow:none}
+.site-head .pill.studio-go:hover,.site-head .pill.studio-go:focus-visible{opacity:1}
+.studio-go svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+@media (max-width:860px){.site-head .pill.studio-go{padding:0;width:38px;height:38px;justify-content:center}.site-head .pill.studio-go span{display:none}}
 .studio-pill.floating{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;padding:6px;border-radius:100px;background:rgba(12,13,20,.85);border:1px solid var(--faint)}
 @media (max-width:960px){.console{grid-template-columns:1fr;gap:0}.rail{display:none}}
 

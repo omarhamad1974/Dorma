@@ -94,8 +94,15 @@ function updateTop(){
     h("span",{class:"status "+(st==="saving"||st==="pending"?"saving":st==="error"?"err":Store.mode==="local"?"local":""),role:"status"},h("i"),label),
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
     newMenu(),
+    h("button",{class:"btn view-site",type:"button",title:"Back to the live site, on the page you came from",html:IC.site+"View site",onclick:viewSite}),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
     h("button",{class:"btn primary",type:"button",disabled:!diff,html:IC.up+"Publish",onclick:async()=>{ if (await publishDraft()) toast("Published. Visitors now see this version."); updateTop(); }}));
+}
+/** Back to the live site, on the page the editor came from (or the home page). */
+function viewSite(){
+  let id=""; try { id=sessionStorage.getItem("dorma.lastPage")||""; } catch { /* storage blocked */ }
+  const pages=(Store.live||Store.draft).pages||[];
+  location.hash=id&&id!=="admin"&&(pages.some(p=>p.id===id)||/^post\//.test(id))?id:((Store.live||Store.draft).site.homePage||"home");
 }
 function previewDraft(){
   Site.preview=true;
@@ -427,7 +434,7 @@ function idOk(v,list,self){ return /^[a-z][a-z0-9-]{1,30}$/.test(v) && !["admin"
 function panelSite(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
-  body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Show the studio button to editors on the site"]]),
+  body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Studio button in the site header (only you see it, when signed in on that browser; publish to apply)"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
   body.append(card("Quote requests",h("p",{class:"adm-intro",style:"margin:0",text:"Quote request forms (service pages, catalogs and the Request a Quote modal) open the visitor's email app with the request filled in, addressed to this email. Nothing is stored on the site. Without an email, visitors can copy their request instead."}),
     fieldsFor(D.site,[["quoteEmail","text","Send quote requests to (email)",{placeholder:"name@company.com"}]])));

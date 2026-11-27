@@ -275,6 +275,8 @@ export const isMediaUrl = (u: unknown): u is string =>
 export function route(): void {
   const id = (location.hash || '').slice(1);
   if (id === 'admin') { Site.preview = false; void renderAdmin(); return; }
+  // Remember the page the editor was on, so the studio's "View site" brings them back to it.
+  try { sessionStorage.setItem('dorma.lastPage', id); } catch { /* storage blocked */ }
   if (Site.preview && Store.draft) { renderSite(Store.draft, id); return; }
   renderSite(Store.live || normalize(null), id);
 }
