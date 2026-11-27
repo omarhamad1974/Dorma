@@ -5,6 +5,7 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { MEDIA_BUCKET, SUPABASE_ANON_KEY, SUPABASE_URL, online } from '../config';
 import { normalize } from './data';
+import { normalizeSocial } from './social';
 export { normalize };
 import { clone } from './core';
 import { Site, renderSite } from './site';
@@ -154,6 +155,55 @@ export async function restoreVersion(id: number): Promise<boolean> {
   Store.draft = normalize(data.config); scheduleSave(); return true;
 }
 
+/* ---------- social plan (studio → Social) ----------
+   Templates, hashtags, the weekly rhythm and the calendar live in their own editors-only row (social_plan),
+   so they are never published with the site. Until that table exists (or offline) they stay in this browser. */
+export const Social = {
+  data: null as Config,
+  where: 'local' as 'db' | 'local',
+  status: 'saved' as Status,
+  timer: 0 as ReturnType<typeof setTimeout> | 0,
+  saving: false,
+  queued: false,
+  listeners: [] as Array<() => void>,
+};
+function socialStatus(s: Status): void { Social.status = s; Social.listeners.forEach((f) => f()); }
+export async function loadSocial(): Promise<Config> {
+  if (Social.data) return Social.data;
+  const local = LS.get('dorma.social');
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('social_plan').select('data').eq('id', 'main').maybeSingle();
+    if (!error) {
+      Social.where = 'db'; Social.data = normalizeSocial(data ? data.data : local);
+      if (!data && local) scheduleSocialSave(); // a plan kept in this browser before the table existed moves in
+      return Social.data;
+    }
+  }
+  Social.where = 'local'; Social.data = normalizeSocial(local);
+  return Social.data;
+}
+export function scheduleSocialSave(): void {
+  socialStatus('pending'); clearTimeout(Social.timer); Social.timer = setTimeout(saveSocial, 700);
+}
+export async function saveSocial(): Promise<void> {
+  clearTimeout(Social.timer);
+  if (!Social.data) return;
+  if (Social.saving) { Social.queued = true; return; }
+  Social.saving = true; socialStatus('saving');
+  try {
+    if (Social.where === 'db') {
+      const { error } = await db().from('social_plan').upsert({ id: 'main', data: clone(Social.data) });
+      if (error) throw error;
+    }
+    LS.set('dorma.social', Social.data); // a copy in this browser too, so nothing is lost if the connection drops
+    socialStatus('saved');
+  } catch {
+    LS.set('dorma.social', Social.data); socialStatus('error');
+  }
+  Social.saving = false;
+  if (Social.queued) { Social.queued = false; void saveSocial(); }
+}
+
 /* ---------- sign-in (editors) ---------- */
 export async function signIn(email: string, password: string): Promise<string | null> {
   const { error } = await db().auth.signInWithPassword({ email, password });
@@ -167,7 +217,7 @@ export async function signIn(email: string, password: string): Promise<string | 
   return null;
 }
 export async function signOut(): Promise<void> {
-  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null;
+  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null; Social.data = null;
 }
 export const signedInEmail = (): string => Store.session?.user?.email || '';
 

@@ -55,6 +55,26 @@ The key in `src/config.ts` is the public "publishable" key, which is safe in the
 | `src/studio/scenes.js` | Generated placeholder images used until real photos are uploaded. |
 | `scripts/library-index.mjs` | Lists the files in `public/library/` for the studio (runs before dev and build). |
 
+## Social posts (studio → Social)
+
+Turns the site's own text into posts for LinkedIn, a Facebook Page and Instagram. No AI and no paid service:
+templates fill in words already on the site, so nothing is invented, and you post by hand.
+
+- **Create posts**: pick a page, section, blog post, catalog item or flow. You get a caption per platform in
+  English and Arabic (from the Arabic on the site), hashtags, a link back to the page, the page's picture cropped
+  to each platform's size (save as JPG), and carousel slide text (a flow's steps, a page's points or a post's
+  headings). Placeholder text and unpublished posts are flagged. Everything can be edited and copied.
+- **Calendar**: the weekly rhythm (default Mon service, Wed project or process, Fri gift or print idea) marks the
+  days; *Fill empty rhythm days* plans them with site content not posted lately. Each entry is one post on one
+  platform with a status (planned, drafted, scheduled, posted) and a link to the live post.
+- **Social settings**: tone, own template, call to action, length and hashtag count per platform, hashtag sets,
+  carousel slides and the rhythm.
+
+The plan lives in its own editors-only table `social_plan` (`supabase/migrations/0002_social_plan.sql`), so it
+is never published with the site, never copied into `site_versions` and not touched by putting back a version.
+Logic is in `src/studio/social.js` (tested in `tests/social.test.ts`), the panels in `src/studio/socialpanel.js`.
+Entries keep `externalId`, `postedAt` and `url` for automatic posting through the Meta and LinkedIn APIs later.
+
 ## Flows, jumps and section effects
 
 - **Any section can have a flow under it.** Pages → section → More options → Flow under this section. The same panel sets the section's **label** (used as a jump target), whether it is a **preview only** sample, its **background effect**, and its own **Look** (spacing, width, background, title sizes, fonts and colours).
