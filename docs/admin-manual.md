@@ -18,6 +18,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
+| **Social** | Create posts, Calendar, Social settings |
 
 Most settings follow a simple chain: **Global style → the item → one slide or one item**. Leave a field empty (or set it to *Global*) to follow the level above. Pick *Custom* to give one thing its own look.
 
@@ -66,6 +67,12 @@ Every "pick a type" choice (section type, ＋ New, background effect, animation,
 - **Missing images** lists every empty slot, placeholder or broken picture on the site with a **Go there** button.
 - Image pickers show **pictures not used on the site yet** first.
 
+### Social (Social)
+- **Create posts**: pick any text from the site (pages, sections, blog posts, catalog items, flows) and the studio writes ready-to-copy posts for **LinkedIn, Facebook Page and Instagram**, in English and Arabic when the site has Arabic. It suggests a picture, crops it to each platform's size and saves it as a JPG, and can make carousel slides. Press **Add to calendar** to plan it.
+- **Calendar**: your posting plan. **Fill empty rhythm days** adds suggestions from the site, or **Suggest a post**. Mark each post drafted, scheduled or posted, and add the link to the live post.
+- **Social settings**: platforms on or off, tone and template per platform, call to action, hashtags, carousel slides, the weekly rhythm, and the site address that posts link back to (change it when the site gets its own domain). Optional tracking on links.
+- The plan is saved in the studio database for editors only. It is never published on the site.
+
 ---
 
 ## 2. What you cannot edit in the studio
@@ -80,7 +87,7 @@ These need a code change or a change in GitHub or Supabase. Ask for them as a ne
 - **Translation**: the studio does not translate. Write the Arabic yourself in the box next to the English.
 - **The real logo SVG**: upload it under Design → Logo once you have it. Until then the PNG is used, and the loader's **Draw** animation needs an SVG.
 - **Hosting, domain and Supabase plan**: the site runs on GitHub Pages and the free Supabase plan. Supabase pauses after about a week with no use; it needs waking up in the Supabase dashboard.
-- **Social tab** (post planner and calendar): built but **not live yet**. It appears in the studio once it is merged.
+- **Posting to social media**: the Social tab writes posts and pictures for you, but it does not post them. You copy the text, save the picture and post it yourself on LinkedIn, Facebook or Instagram.
 
 ---
 
