@@ -1361,3 +1361,44 @@ html.menu-open{overflow:hidden}
 .fill-row small{display:block;color:var(--muted);font-size:.74rem}
 .fill-row.is-skip{opacity:.6;cursor:default}
 .fill-row .grow{flex:1;min-width:0}
+
+/* ================= STUDIO LIVE PREVIEW (livepreview.js) =================
+   Floating window, docked beside the studio on wide screens (.adm.lp-split), or a bottom sheet on phones. */
+.adm .lp{position:fixed;z-index:55;display:flex;flex-direction:column;min-width:0;background:var(--panel);border:1px solid var(--faint);border-radius:12px;overflow:hidden;box-shadow:0 30px 80px -20px rgba(0,0,0,.75),0 0 0 1px rgba(0,0,0,.2)}
+.adm .lp[hidden],.adm .lp-fab[hidden],.adm .lp-b[hidden]{display:none}
+.adm .lp-bar{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-bottom:1px solid var(--faint);background:color-mix(in srgb,var(--panel) 80%,var(--ink));cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;flex:none}
+.adm .lp.dragging .lp-bar{cursor:grabbing}
+.adm .lp-t{display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:.8rem;font-weight:500;white-space:nowrap;overflow:hidden}
+.adm .lp-t i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent);flex:none}
+.adm .lp-t small{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--warn)}
+.adm .lp-tools{display:flex;align-items:center;gap:2px;flex:none}
+.adm .lp-b{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;border:0;background:none;color:var(--muted);cursor:pointer;padding:0}
+.adm .lp-b svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.adm .lp-b:hover{color:var(--fg);background:var(--glass)}
+.adm .lp-b[aria-pressed="true"]{color:var(--fg);background:var(--accent-soft)}
+.adm .lp-stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#05060a}
+.adm .lp[data-device="phone"] .lp-stage{background:repeating-linear-gradient(135deg,rgba(127,127,127,.06) 0 8px,transparent 8px 16px),var(--ink)}
+.adm .lp-frame{position:absolute;top:0;left:0;border:0;transform-origin:0 0;background:#fff}
+.adm .lp.dragging .lp-frame{pointer-events:none}
+.adm .lp-resize{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--muted) 50% 58%,transparent 58% 68%,var(--muted) 68% 76%,transparent 76%);opacity:.7}
+.adm .lp-edge{position:absolute;left:0;top:0;bottom:0;width:7px;cursor:ew-resize;touch-action:none;display:none}
+.adm .lp-edge:hover,.adm .lp.dragging .lp-edge{background:var(--accent-soft)}
+.adm .lp.is-min{height:auto!important}
+.adm .lp.is-min .lp-stage,.adm .lp.is-min .lp-resize{display:none}
+.adm .lp.is-min .lp-bar{border-bottom:0}
+/* docked: the studio makes room on the right */
+.adm.lp-split{padding-right:var(--lp-w,560px)}
+.adm .lp[data-layout="split"]{top:0;right:0;bottom:0;width:var(--lp-w,560px);border-radius:0;border-width:0 0 0 1px;box-shadow:none}
+.adm .lp[data-layout="split"] .lp-bar{cursor:default;padding-left:16px}
+.adm .lp[data-layout="split"] .lp-resize{display:none}
+.adm .lp[data-layout="split"] .lp-edge{display:block}
+.adm .lp-toggle.on{border-color:var(--accent);background:var(--accent-soft)}
+.adm .lp-toggle svg,.adm .lp-fab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* phones: a button opens the preview as a sheet from the bottom */
+.adm .lp-fab{position:fixed;z-index:55;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:100px;border:1px solid var(--accent);background:var(--panel);color:var(--fg);font-size:.84rem;box-shadow:0 14px 40px -10px rgba(0,0,0,.7);cursor:pointer}
+.adm .lp[data-layout="sheet"]{left:0;right:0;bottom:0;height:min(78vh,78dvh);border-radius:16px 16px 0 0;border-width:1px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+.adm .lp[data-layout="sheet"] .lp-bar{cursor:default}
+.adm .lp[data-layout="sheet"] .lp-resize{display:none}
+@media (max-width:900px){.adm.lp-split{padding-right:0}}
+/* the site inside the preview window */
+.dpreview .studio-pill.floating{display:none}

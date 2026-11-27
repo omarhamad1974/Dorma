@@ -14,6 +14,7 @@ import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
+import { mountLivePreview } from './livepreview';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -40,6 +41,7 @@ const IC={
   expand:'<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   social:'<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/></svg>',
+  pv:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><rect x="11" y="10" width="8" height="5" rx="1"/><path d="M8 21h8"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
 const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
@@ -53,6 +55,7 @@ function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } c
   const a=$(".adm"); if (a) a.classList.toggle("light",m==="light"); document.documentElement.style.colorScheme=m; const b=$("#admMode"); if (b) b.innerHTML=(m==="light"?IC.moon+"Dark mode":IC.sun+"Light mode"); }
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
+let LP=null; // the floating live preview (livepreview.js)
 
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); gsap.fromTo(t,{y:20,autoAlpha:0},{y:0,autoAlpha:1,duration:.3}); setTimeout(()=>gsap.to(t,{autoAlpha:0,duration:.3,onComplete:()=>t.remove()}),2400); }
 function touch(opts={}){ scheduleSave(); if (opts.theme) applyTheme(Store.draft); if (Admin.refresh) Admin.refresh(); updateTop(); }
@@ -82,7 +85,8 @@ async function renderAdmin(){
   const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub",role:"tablist"});
   app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},h("div",{class:"adm-head"},top,mnav,sub),body)));
   setStudioMode(studioMode());
-  Store.listeners=[updateTop];
+  LP=mountLivePreview($(".adm"),{draft:()=>Store.draft,where:()=>({panel:Admin.panel,sel:Admin.sel}),onChange:()=>updateTop()});
+  Store.listeners=[updateTop,()=>LP&&LP.changed()];
   openPanel(Admin.panel);
 }
 function updateTop(){
@@ -95,6 +99,7 @@ function updateTop(){
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
     newMenu(),
     h("button",{class:"btn view-site",type:"button",title:"Back to the live site, on the page you came from",html:IC.site+"View site",onclick:viewSite}),
+    h("button",{class:"btn lp-toggle"+(LP&&LP.isOpen()?" on":""),type:"button","aria-pressed":LP&&LP.isOpen()?"true":"false",title:"A small window with the draft site that updates as you edit",html:IC.pv+"Live preview",onclick:()=>{ if (LP) LP.toggle(); }}),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
     h("button",{class:"btn primary",type:"button",disabled:!diff,html:IC.up+"Publish",onclick:async()=>{ if (await publishDraft()) toast("Published. Visitors now see this version."); updateTop(); }}));
 }
@@ -117,7 +122,7 @@ function openPanel(k){
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
-  updateTop(); scrollTo(0,0);
+  updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
 }
 
 /* ---------- generic field engine ---------- */
@@ -1718,7 +1723,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
           h("div",{class:"sec-body"},fieldsFor(s,T.fields),sectionExtras(s)),
         onRemove:()=>{ list.splice(i,1); drawSecs(); touch(); },
         onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
-        onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
+        onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); secs.lastElementChild.dataset.sec=s.id; });
     const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"});
     Object.entries(SECTION_TYPES).filter(([k])=>!(inModal&&k==="heroCarousel")).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
     secs.append(h("div",{class:"sec-add",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},typePicker(sel,{kind:"section"}),h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ list.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
