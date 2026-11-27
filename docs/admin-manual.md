@@ -14,6 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
+| **Outline** | Site outline (also the **Outline** button next to Preview draft) |
 | **Content** | Pages, Carousels, Blog, Import |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
@@ -28,9 +29,19 @@ Every "pick a type" choice (section type, ＋ New, background effect, animation,
 
 ## 1. What you can edit
 
+### The whole site at a glance (Outline)
+- **Outline** (first in the side menu, or the **Outline** button just before Preview draft) shows every page in menu order, with its sections in the order visitors see them. The line at the top counts pages, pages in the menu, sections and hidden sections.
+- Tap a page to open or close it. **Open all** and **Close all** do every page at once.
+- **Pages:** drag the dots (or use the up and down arrows) to change the order, which is also the menu order. **In menu / Not in menu** switches whether a page shows in the menu. The eye previews the page, the two squares duplicate it (the copy gets its own address and stays out of the menu until you add it), the cross removes it. The home page can't be removed.
+- **Sections:** drag to reorder, or drag onto another open page to move it there. **Shown / Hidden** switches it for visitors. Duplicate puts a copy right below. **＋ Add section** under a page opens the visual picker and adds the section at the end of that page.
+- **＋ Add page** at the bottom adds a page from a template (Page, Service page, Catalog page, Article page).
+- **Jump to design** (or tap a section's name) opens that page in Content → Pages with the section open and in view. Hero carousels open in Content → Carousels.
+- Removing asks first, and says if any buttons link to that page or section. After any change in Outline, an **Undo** button appears at the top. Undo goes back one step at a time, and only while you haven't changed the same pages somewhere else in the studio.
+- **Not live yet** marks pages and sections that are in the draft but not published.
+
 ### Pages and sections (Content → Pages)
 - Add, delete and rename pages, change their address, choose a layout (Cinematic, Index, Console) and show or hide them in the menu.
-- Each page is a stack of **sections**. Add a section from the visual picker, drag to reorder, **hide** (stays saved, not shown), or **duplicate**.
+- Each page is a stack of **sections**. Add a section from the visual picker, drag to reorder (drag the dots on the left), **hide** (stays saved, not shown), or **duplicate**.
 - Section types: Hero, Hero carousel, Chapters, Numbers, About, Clients, Card grid, Accordion, Timeline, Flow strip, Wide banner, Division, Call to action, Feature list, Testimonials, Quote request form, Catalog, Blog posts, Text article.
 - Inside each section: all text, images, buttons and what buttons do (open a modal, go to a page, open a post or article, go to a slide, open a link).
 - **More options** on a section: a label (so any button can jump to it), a flow under the section, a background effect, its animation, and its own look (spacing, width, background, title font and colours).
