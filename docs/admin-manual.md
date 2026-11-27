@@ -24,6 +24,20 @@ Most settings follow a simple chain: **Global style → the item → one slide o
 
 Every "pick a type" choice (section type, ＋ New, background effect, animation, modal type and so on) opens a **visual picker** with a small drawing or a moving preview of each option.
 
+## Finding your way on long screens
+
+Next to the sub-tab names (Pages, Carousels…) there is a small toolbar. It only changes how the studio looks for you, in this browser. Visitors never see it, and the public site is not affected.
+
+- **Groups fold open and closed.** Every box with a title (Page, Sections, Look, Animation…) is a group. Tap its title or the arrow to close or open it. The studio remembers each choice on this browser. Groups most people seldom use (for example *Header on this page*, *Look*, *More button*, *Backup*, *Published versions*, *Import…*) start closed.
+- **Open all / Close all** open or close every group on the tab (Close all also closes open items such as sections and slides).
+- **Find** (or press **/**) lists the groups on the tab so you can jump to one, and searches setting names, items and groups as you type. Pick a result and the studio opens its group, scrolls to it and makes it blink once. Closed items (a section or slide you have not opened yet) are found by their name.
+- **Text size:** **A−** and **A+** make all studio text smaller or bigger, from 90% up to 200%. Tap **Aa** to pick a size from the list. It is saved on this browser only.
+- **Colour bands:** groups alternate in tone and have a coloured edge (Dorma blue, yellow, magenta, cyan) so you can tell where one ends. Items inside a group alternate too, and the item you have open has a highlighted border.
+- **Titles stay in view:** while you scroll through a long group, its title stays at the top of the screen (on computers).
+- **Long lists page:** the lists on the left (pages, carousels, flows, modals, blog posts) show 12 at a time with a filter box once there are more than 8. The Library shows 48 pictures per page. **Show all** shows the whole list again.
+- **On a phone** the list on the left folds into one row with the item you are editing; tap it to choose another. The toolbar shows Find and Aa (Open all and Close all are inside Find).
+
+
 ---
 
 ## 1. What you can edit
