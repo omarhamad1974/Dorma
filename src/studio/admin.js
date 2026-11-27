@@ -12,6 +12,7 @@ import { labelKey } from './jump';
 import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
+import { typePicker, kindOf, registerLists } from './typepick';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -161,7 +162,10 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       wrap.append(row); break; }
     case "select": {
       const s=h("select",{id}); (opts.options||[]).forEach(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; const op=h("option",{value:v,text:l}); if (String(obj[key])===String(v)) op.selected=true; s.append(op); });
-      s.addEventListener("change",()=>{ const v=(opts.options||[]).map(o=>Array.isArray(o)?o[0]:o).find(v=>String(v)===s.value); set(v,opts.theme?{theme:true}:undefined); }); wrap.append(s); break; }
+      s.addEventListener("change",()=>{ const v=(opts.options||[]).map(o=>Array.isArray(o)?o[0]:o).find(v=>String(v)===s.value); set(v,opts.theme?{theme:true}:undefined); });
+      /* lists of types (effects, animations, layouts…) open a visual picker with a preview of each choice */
+      const pk=opts.preview===false?"":opts.preview||kindOf(opts.options);
+      wrap.append(pk?typePicker(s,{kind:pk,fx:fxTile}):s); break; }
     case "toggle": {
       wrap.textContent=""; const i=h("input",{id,type:"checkbox"}); i.checked=!!obj[key];
       i.addEventListener("change",()=>set(i.checked,opts.theme?{theme:true}:undefined)); wrap.append(h("label",{class:"toggle",for:id},i,label)); break; }
@@ -774,6 +778,9 @@ const debounce=(fn,ms=160)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTime
 const ownOnly=o=>Object.fromEntries(Object.entries(o||{}).filter(([k,v])=>v!==""&&v!=null&&v!=="default"));
 const fxName=v=>v==="none"?"None":(FX[v]||{}).label||v;
 OPT.bgfx=FX_OPTIONS;
+registerLists(OPT,{fxGroups:Object.fromEntries(Object.entries(FX).map(([k,v])=>[k,v.group]))});
+/** Plays a background effect inside a picker tile. */
+const fxTile=(box,type)=>fxPreview(box,{...FX_DEFAULTS,type,opacity:.85},{eyebrow:"Dorma"});
 /** Background effect: type, colours and the controls that effect uses, with a live preview. */
 function fxEditor(fx,{global=false,sec=null}={}){
   const D=Store.draft, T=D.theme, GF={...FX_DEFAULTS,...((T.sections||{}).bgfx||{})};
@@ -1513,11 +1520,11 @@ function newMenu(){
     h("optgroup",{label:"Page"},...PAGE_TEMPLATES.map(([v,l])=>h("option",{value:"page:"+v,text:l}))),
     h("optgroup",{label:"Modal"},...OPT.modalTypes.map(([v,l])=>h("option",{value:"modal:"+v,text:l}))),
     h("optgroup",{label:"Flow"},h("option",{value:"flow:row",text:"Flow (row of items)"}),h("option",{value:"flow:tabs",text:"Flow as tabs"}),h("option",{value:"flow:reveal",text:"Flow that reveals parts of a section"})));
-  s.addEventListener("change",()=>{ const [k,v]=s.value.split(":"); s.value=""; const D=Store.draft; if (!k) return;
+  s.addEventListener("change",()=>{ const [k,v]=s.value.split(":"); s.value=""; s._tpSync?.(); const D=Store.draft; if (!k) return;
     if (k==="page"){ const p=makePage(D,v); Admin.sel.pages=p.id; touch(); openPanel("pages"); toast("New page made. Change its address and title at the top."); }
     else if (k==="modal"){ const m=makeModal(D,+v); Admin.sel.modals=m.id; touch(); openPanel("modals"); toast("New modal made."); }
     else { const f=makeFlow(D,v==="tabs"?"New tabs":v==="reveal"?"New reveal flow":"New flow"); f.display=v; Admin.sel.flows=f.id; touch(); openPanel("flows"); toast("New flow made. Use it from any section (More options → Flow under this section)."); } });
-  return s;
+  return typePicker(s,{kind:"create",action:true});
 }
 /** Labelled sections a button can travel to: a page's sections, a modal's sections (Type 5) or services (Type 4). */
 function sectionLabels(D,type,id){
@@ -1548,7 +1555,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
         onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); });
     const sel=h("select",{"aria-label":"Section type",style:"padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"});
     Object.entries(SECTION_TYPES).filter(([k])=>!(inModal&&k==="heroCarousel")).forEach(([k,v])=>sel.append(h("option",{value:k,text:v.label})));
-    secs.append(h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},sel,h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ list.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
+    secs.append(h("div",{class:"sec-add",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},typePicker(sel,{kind:"section"}),h("button",{class:"btn sm",type:"button",html:IC.plus+"Add section",onclick:()=>{ list.push({id:uid("s"),type:sel.value,...SECTION_BLANK[sel.value]()}); drawSecs(); secs.children[secs.children.length-2]?._open?.(); touch(); }})));
     sortable(secs,list,()=>{ drawSecs(); touch(); });
   };
   drawSecs();
