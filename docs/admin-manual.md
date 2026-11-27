@@ -45,10 +45,26 @@ Next to the sub-tab names (Pages, Carousels…) there is a small toolbar. It onl
 ### Pages and sections (Content → Pages)
 - Add, delete and rename pages, change their address, choose a layout (Cinematic, Index, Console) and show or hide them in the menu.
 - Each page is a stack of **sections**. Add a section from the visual picker, drag to reorder, **hide** (stays saved, not shown), or **duplicate**.
-- Section types: Hero, Hero carousel, Chapters, Numbers, About, Clients, Card grid, Accordion, Timeline, Flow strip, Wide banner, Division, Call to action, Feature list, Testimonials, Quote request form, Catalog, Blog posts, Text article.
+- Section types: Hero, Hero carousel, Chapters, Numbers, About, Clients, Card grid, Accordion, Timeline, Flow strip, Wide banner, Division, Call to action, Feature list, Testimonials, Quote request form, Catalog, Blog posts, Text article, Photo only, Logo.
 - Inside each section: all text, images, buttons and what buttons do (open a modal, go to a page, open a post or article, go to a slide, open a link).
 - **More options** on a section: a label (so any button can jump to it), a flow under the section, a background effect, its animation, and its own look (spacing, width, background, title font and colours).
 - **Header on this page** lets one page have its own header colours.
+
+### Icons, hiding parts, logo and button (Content → Pages → section → Icon, text, logo and button)
+Every section has a folding box **Icon, text, logo and button**, right under its own settings:
+- **Icon by the title**: pick any icon (icons are added under Flows and modals → Icons), then **Before the title**, **After the title** or **Above the title**, its size (1 = as tall as the title), colour, and animation (Pop in, Spin in, Draw its lines, Rise, Float, Pulse, Glow, Swing). On Arabic pages "before" is on the right, as you would expect.
+- **Cards, accordion rows, chapters, linked items, catalog items and slides** each have their own **Icon by the title** and **Icon position** (open the item).
+- **Hide parts**: Hide the subtitle (eyebrow and small labels), Hide the title, Hide the text. Cards and rows have **Hide the subtitle** (code and tag, tags, caption, type and price line, role) and **Hide the text**. Slides have Hide the eyebrow and Hide the short paragraph. Hidden text stays saved, so switching it off brings it back.
+- **Logo in this section**: show any logo version (automatic, white, colour, silver or an added version) above or below the section's content, with its height (and a phone height), alignment, entrance (Fade, Rise, Pop, Blur, Spin, Drop, Wipe, Flip), a movement that keeps going (Float, Pulse, Glow, Light sweeps across, Breathe, Nudge), a delay, and an optional click action.
+- **Button (call to action)**: a button with an optional line above it, size (Small to Extra large), style (Site button, Solid accent, Outline, Glowing ring, Text with an arrow), place, alignment, entrance, movement and delay.
+- **Heading style and cards**: the heading's style (Gradient, Shimmer, Glow, Outline letters, Marker highlight, Underline draws in, CMYK print offset), how it arrives (Letter by letter, Word by word, Blur, Typewriter, Fade up) and what cards do under the pointer (Lift, Glow, 3D tilt, Picture zooms, Accent border, Light sweeps across).
+- Carousels have the same icon, logo, button and title style under **Content → Carousels → Icon, logo, button and title style**.
+- The defaults for the whole site are under **Design → Global style → Headings, icons and cards**.
+
+### Photo only and Logo sections
+- **Photo only**: one picture from the Library with a **mask** (Rounded, Pill, Arch, Circle, Hexagon, Diamond, Slanted bottom, Cut corners, Leaf, Soft blob, Frame, Fade out at the bottom/top/sides, Soft oval, Wave at the bottom, Diagonal stripes, Halftone dots, or **Inside a word**, where the photo shows through big letters such as DORMA), **opacity** (1 = solid, lower = see-through, with an optional colour behind it), height (21:9 to portrait, or full screen), width (edge to edge, page, narrow, small) and alignment, Fill or Show the whole photo, blur, black and white, slow zoom as you scroll, movement with the scroll, its own colour filter (or as set in the Library) and an optional caption.
+- **Logo**: the logo on its own, any version, any height, aligned start, centre or end, with an entrance, a movement that keeps going and an optional click action.
+- **Call to action** now also has a short line under the heading, button size, style, alignment, entrance and movement.
 
 ### Carousels and slides (Content → Carousels)
 - All hero carousels in one place. Add, reorder, duplicate, hide slides.
@@ -138,6 +154,15 @@ Always check with **Preview draft** (most panels also have a **Replay** or **Pre
 - **Exit** (as it scrolls away): Fade, Shrink, Blur, Parallax, Darken, Fold back, Slide away.
 - Set the entrance length, and **Replay entrance** to play it each time it scrolls into view.
 - **Design → Animation → Sections on scroll** and **Count numbers up** are the simple site-wide switches.
+
+### Headings, icons, logo and buttons
+- **Design → Global style → Headings, icons and cards** for every section; one section under **Icon, text, logo and button** (see part 1).
+- **Heading style**: Gradient, Shimmer (light runs through), Glow, Outline letters, Marker highlight (draws in), Underline draws in, CMYK print offset.
+- **Heading entrance**: Letter by letter, Word by word, Blur in, Typewriter, Fade up (it plays when the heading scrolls into view).
+- **Icons by titles**: Pop in, Spin in, Draw its lines, Rise, or keep moving: Float, Pulse, Glow, Swing.
+- **Logo and button blocks**: entrance (Fade, Rise, Pop, Blur, Spin, Drop, Wipe, Flip) and a movement that keeps going (Float, Pulse, Glow, Light sweeps across, Breathe, Nudge now and then), each with a delay.
+- **Card hover**: Lift, Glow, 3D tilt, Picture zooms, Accent border, Light sweeps across.
+- Visitors who prefer reduced motion see all of these at rest.
 
 ### Pictures: reveals, masks and hover
 - **Design → Global style → Pictures: masks, reveals and hover**, or per section under **More options → Animation**.

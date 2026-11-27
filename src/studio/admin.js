@@ -5,6 +5,7 @@ import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publish
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
+import { decoEditor, decoGlobal } from './decoeditor';
 import Sortable from 'sortablejs';
 import { loaderLogo, markHtml, previewLoader } from '../loader';
 import { optimizeImage, uploadSettings, fmtBytes, UPLOAD_FORMATS, MAX_UPLOAD_BYTES } from './optimize';
@@ -218,6 +219,12 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       wrap.append(g); if (!opts.hint) wrap.append(h("span",{class:"hint",text:"Seconds from when this comes into view. Empty uses the default shown. Lower numbers come first, so you can change the order."})); break; }
     case "list": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(listEditor(obj,key,opts,onChange)); break; }
     case "look": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(lookEditor(obj,key,opts,onChange)); break; }
+    /* a colour filter of its own, or "as set in the Library" (Photo only sections) */
+    case "overlay": { lab.removeAttribute("for"); wrap.classList.add("wide"); if (!obj[key]||typeof obj[key]!=="object") obj[key]={mode:"default"};
+      wrap.append(overlayEditor(obj,key,{allowDefault:true,preview:true,defaultLabel:"As set in the Library",onChange:()=>onChange(obj[key],key)})); break; }
+    /* any logo version (Design → Logo), including silver and added versions */
+    case "logoVersion": { const s=h("select",{id}); logoVersionOptions(D).forEach(([v,l])=>{ const o=h("option",{value:v,text:l}); if ((obj[key]||"auto")===v) o.selected=true; s.append(o); });
+      s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
   return wrap;
@@ -1040,6 +1047,8 @@ function panelStyle(body){
       h("p",{class:"hint",style:"margin:0"},"Title, subtitle and body sizes and fonts for the whole site are under ",h("button",{type:"button",class:"linkish",text:"Colours and type → Type",onclick:()=>openPanel("theme")}),"."),
       h("p",{class:"hint",style:"margin:0",text:"Background effect for every section that has none of its own"}),
       fxEditor(T.sections.bgfx,{global:true})),
+    card("Headings, icons and cards",h("p",{class:"adm-intro",style:"margin:0",text:"How section headings look and arrive, how icons by titles move, and what cards, rows and items do under the pointer. Any section can use its own (Pages → section → Icon, text, logo and button)."}),
+      decoGlobal(M)),
     card("Section entrance and exit",h("p",{class:"adm-intro",style:"margin:0",text:"How every section arrives as it scrolls into view and how it leaves. A section can use its own (Pages → section → More options → Animation)."}),
       sectionAnimEditor(M.sectionFx,{global:true})),
     card("Pictures: masks, reveals and hover",h("p",{class:"adm-intro",style:"margin:0",text:"Every picture in sections and modals (not the full-screen hero backgrounds). Reveal plays once as the picture scrolls in; the shape stays on as a mask. A section can use its own."}),
@@ -1243,6 +1252,7 @@ function panelCarousels(body){
       return [
         card(h("span",{class:"grow"},"Carousel on "+(plain(p.title)||p.id)),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:()=>{ Admin.sel.pages=p.id; Site.preview=true; if (location.hash.slice(1)===p.id) route(); else location.hash=p.id; }}),
           F(s,"hidden","toggle","Hide this carousel from visitors",{},()=>redraw()),fieldsFor(s,setF,()=>redraw())),
+        card("Icon, logo, button and title style",decoEditor(s,{carousel:true,G:M.deco})),
         card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw())),
         card(h("span",{class:"grow"},"Import slides from Markdown"),importBox("slides",{fixed:{carousel:s.id},done:()=>openPanel("carousels")}))
       ];
@@ -1751,7 +1761,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
       secs.append(subCard(s,{title:()=>(s.previewOnly?"[Preview only] ":"")+secTitle(s),kind:T.label+(s.anchor?" · #"+plain(s.anchor):""),open:false,
         body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
             h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):
-          h("div",{class:"sec-body"},fieldsFor(s,T.fields),sectionExtras(s)),
+          h("div",{class:"sec-body"},fieldsFor(s,T.fields),decoEditor(s,{G:Store.draft.motion.deco}),sectionExtras(s)),
         onRemove:()=>{ list.splice(i,1); drawSecs(); touch(); },
         onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
         onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); secs.lastElementChild.dataset.sec=s.id; });
