@@ -11,6 +11,7 @@ import { optimizeImage, uploadSettings, fmtBytes, UPLOAD_FORMATS, MAX_UPLOAD_BYT
 import { labelKey } from './jump';
 import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
+import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -36,11 +37,12 @@ const IC={
   down:'<svg viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>',
   expand:'<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
+  social:'<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -105,7 +107,7 @@ function openPanel(k){
   const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
     G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
   updateTop(); scrollTo(0,0);
 }
 
