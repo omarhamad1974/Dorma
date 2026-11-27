@@ -3,6 +3,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import './styles.css';
 import { initLoader, finishLoader } from './loader';
 import { Store, initStore, normalize, route } from './studio/store';
+import { bootEmbed, isEmbed } from './studio/embed';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -17,4 +18,5 @@ async function boot(): Promise<void> {
   finishLoader(Store.live);
 }
 
-void boot();
+// The studio's live preview window loads this page in a frame and sends it the draft.
+if (isEmbed()) bootEmbed(); else void boot();

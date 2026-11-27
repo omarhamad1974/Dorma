@@ -14,7 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
-| **Outline** | Site outline (also the **Outline** button next to Preview draft) |
+| **Outline** | Site outline (also the **Outline** button just before Live preview) |
 | **Content** | Pages, Carousels, Blog, Import |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
@@ -30,7 +30,7 @@ Every "pick a type" choice (section type, ＋ New, background effect, animation,
 ## 1. What you can edit
 
 ### The whole site at a glance (Outline)
-- **Outline** (first in the side menu, or the **Outline** button just before Preview draft) shows every page in menu order, with its sections in the order visitors see them. The line at the top counts pages, pages in the menu, sections and hidden sections.
+- **Outline** (first in the side menu, or the **Outline** button just before **Live preview** in the top bar) shows every page in menu order, with its sections in the order visitors see them. The line at the top counts pages, pages in the menu, sections and hidden sections.
 - Tap a page to open or close it. **Open all** and **Close all** do every page at once.
 - **Pages:** drag the dots (or use the up and down arrows) to change the order, which is also the menu order. **In menu / Not in menu** switches whether a page shows in the menu. The eye previews the page, the two squares duplicate it (the copy gets its own address and stays out of the menu until you add it), the cross removes it. The home page can't be removed.
 - **Sections:** drag to reorder, or drag onto another open page to move it there. **Shown / Hidden** switches it for visitors. Duplicate puts a copy right below. **＋ Add section** under a page opens the visual picker and adds the section at the end of that page.
