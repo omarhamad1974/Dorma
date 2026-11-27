@@ -15,6 +15,7 @@ import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
 import { mountLivePreview } from './livepreview';
+import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager, pageInfo } from './comfort';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -56,6 +57,7 @@ function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } c
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 let LP=null; // the floating live preview (livepreview.js)
+let CF=null; // reading comfort: folding groups, Find, text size (comfort.js)
 
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); gsap.fromTo(t,{y:20,autoAlpha:0},{y:0,autoAlpha:1,duration:.3}); setTimeout(()=>gsap.to(t,{autoAlpha:0,duration:.3,onComplete:()=>t.remove()}),2400); }
 function touch(opts={}){ scheduleSave(); if (opts.theme) applyTheme(Store.draft); if (Admin.refresh) Admin.refresh(); updateTop(); }
@@ -65,6 +67,7 @@ async function renderAdmin(){
   const tok=++renderTok; setDocLang("en");
   disposePage(); closeModal(true);
   const app=$("#app");
+  applyStudioText();
   if (!Store.canEdit){ app.textContent=""; app.append(Store.session?notEditor():signInForm()); return; }
   await loadDraft();
   if (tok!==renderTok) return; // a newer render started while the draft was loading
@@ -82,9 +85,10 @@ async function renderAdmin(){
     h("button",{type:"button",id:"admMode",onclick:()=>setStudioMode(studioMode()==="light"?"dark":"light")}),
     Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):"");
   const top=h("div",{class:"adm-top",id:"admTop"});
-  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub",role:"tablist"});
+  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub"});
   app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},h("div",{class:"adm-head"},top,mnav,sub),body)));
   setStudioMode(studioMode());
+  if (CF) CF.stop(); CF=mountComfort($(".adm"),{body:()=>$("#admBody"),panel:()=>Admin.panel});
   LP=mountLivePreview($(".adm"),{draft:()=>Store.draft,where:()=>({panel:Admin.panel,sel:Admin.sel}),onChange:()=>updateTop()});
   Store.listeners=[updateTop,()=>LP&&LP.changed()];
   openPanel(Admin.panel);
@@ -118,8 +122,11 @@ function openPanel(k){
   if (!PANELS.some(p=>p[0]===k)) k="pages";
   if (cpClose) cpClose(); stopPreviews(); Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
   $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
-  const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
-    G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
+  closePop();
+  const sub=$("#admSub"); if (sub){ sub.textContent="";
+    const tabs=h("span",{class:"tabs",role:"tablist"}); sub.append(tabs);
+    G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
+    sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
@@ -419,16 +426,34 @@ function sortable(box,arr,onMove){
   Sortable.create(box,{handle:".handle",draggable:".sub-item",animation:180,ghostClass:"sortable-ghost",onEnd(e){ if (e.oldIndex===e.newIndex) return; const [m]=arr.splice(e.oldIndex,1); arr.splice(e.newIndex,0,m); onMove(); }});
 }
 function card(title,...kids){ return h("section",{class:"card-a"},h("h2",{},title),...kids); }
+/* Long lists on the left page in 12s, with a filter box once there are more than 8.
+   On a phone the list folds into one row showing the item being edited; tap it to choose another. */
+const LIST_PAGE=12, MD={};
+const textOf=x=>x==null?"":typeof x==="object"&&x.nodeType?x.textContent:plain(x);
 function masterDetail(body,{items,selKey,label,kind,onAdd,addLabel,detail}){
-  const list=h("div",{class:"list",role:"list"}), det=h("div",{style:"display:flex;flex-direction:column;gap:20px;min-width:0"});
+  const st=MD[selKey]=MD[selKey]||{page:0,q:"",all:false};
+  const list=h("div",{class:"list md-list",role:"list"}), det=h("div",{style:"display:flex;flex-direction:column;gap:20px;min-width:0"});
+  const head=h("button",{class:"md-head",type:"button","aria-expanded":"false"}), rows=h("div",{class:"md-rows"}), pg=h("div",{class:"md-pager"}), addSlot=h("div",{class:"md-add"});
+  const find=h("input",{type:"search",class:"md-find",placeholder:"Filter this list…","aria-label":"Filter this list",value:st.q});
+  find.addEventListener("input",()=>{ st.q=find.value; st.page=0; drawList(); });
+  head.addEventListener("click",()=>{ const o=!list.classList.contains("open"); list.classList.toggle("open",o); head.setAttribute("aria-expanded",String(o)); if (o&&!find.hidden) find.focus({preventScroll:true}); });
+  list.append(head,find,rows,pg,addSlot);
+  const shown=()=>{ const q=st.q.trim().toLowerCase(); return q?items().filter(x=>(textOf(label(x))+" "+(kind?textOf(kind(x)):"")).toLowerCase().includes(q)):items(); };
   /* Editing a name only redraws the list on the left. The detail is built once per selection,
      so a text box being typed in is never replaced (that is what used to drop the focus). */
-  const drawList=()=>{ list.textContent="";
-    items().forEach(x=>list.append(h("button",{class:"li"+(x.id===Admin.sel[selKey]?" on":""),type:"button",onclick:()=>{ Admin.sel[selKey]=x.id; draw(); }},label(x),kind?h("small",{text:kind(x)}):null)));
-    if (onAdd) list.append(h("button",{class:"btn sm",type:"button",style:"margin-top:6px",html:IC.plus+esc(addLabel),onclick:()=>{ const n=onAdd(); Admin.sel[selKey]=n.id; touch(); draw(); }}));
+  const drawList=()=>{ rows.textContent=""; pg.textContent=""; addSlot.textContent="";
+    const all=items(), sh=shown(), I=pageInfo(sh.length,LIST_PAGE,st.page); st.page=I.page;
+    find.hidden=all.length<=8&&!st.q;
+    const cur=all.find(x=>x.id===Admin.sel[selKey]);
+    head.textContent=""; head.append(h("span",{class:"md-cur",text:cur?textOf(label(cur)):"Choose…"}),h("small",{text:all.length+(all.length===1?" item":" items")}),h("i",{"aria-hidden":"true"}));
+    (st.all?sh:sh.slice(I.start,I.end)).forEach(x=>rows.append(h("button",{class:"li"+(x.id===Admin.sel[selKey]?" on":""),type:"button",onclick:()=>{ Admin.sel[selKey]=x.id; list.classList.remove("open"); head.setAttribute("aria-expanded","false"); draw(); }},label(x),kind?h("small",{text:kind(x)}):null)));
+    if (!sh.length) rows.append(h("p",{class:"md-none",text:"Nothing matches “"+st.q+"”."}));
+    const p=pager({total:sh.length,size:LIST_PAGE,page:st.page,all:st.all,compact:true,noun:"items",onPage:n=>{ st.page=n; drawList(); },onAll:v=>{ st.all=v; drawList(); }}); if (p) pg.append(p);
+    if (onAdd) addSlot.append(h("button",{class:"btn sm",type:"button",style:"margin-top:6px",html:IC.plus+esc(addLabel),onclick:()=>{ const n=onAdd(); Admin.sel[selKey]=n.id; st.q=""; find.value=""; touch(); draw(); }}));
   };
   const draw=()=>{
     if (!items().some(x=>x.id===Admin.sel[selKey])) Admin.sel[selKey]=items()[0]?.id;
+    const i=shown().findIndex(x=>x.id===Admin.sel[selKey]); if (i>=0) st.page=Math.floor(i/LIST_PAGE); // keep the item being edited in view
     drawList(); det.textContent=""; const cur=items().find(x=>x.id===Admin.sel[selKey]); if (cur) det.append(...[].concat(detail(cur,drawList)));
   };
   body.append(h("div",{class:"cols"},list,det)); draw(); return draw;
@@ -1253,7 +1278,8 @@ function panelPages(body){
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
 IC.link='<svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>';
-const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set() };
+const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set(), page:0, all:false, sig:"" };
+const LIB_PAGE=48; // library cards per page
 const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
@@ -1367,7 +1393,7 @@ function panelMedia(body){
   /* Category strip: tap to show one category; drop pictures on it to move them there */
   const strip=h("div",{class:"cat-strip",role:"group","aria-label":"Categories. Drop pictures here to move them"});
   const bulk=h("div",{class:"lib-bulk",role:"region","aria-label":"Selected items"});
-  const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"});
+  const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"}), libPager=h("div",{class:"lib-pager"});
   const drawFilters=()=>{ kinds.textContent=""; OPT.libKinds.forEach(([v,l])=>kinds.append(h("button",{type:"button",class:"chip"+(LIB.kind===v?" on":""),text:l,onclick:()=>{ LIB.kind=v; drawFilters(); drawGrid(); }})));
     $(".cat-slot",filters).replaceWith(Object.assign(categorySelect(LIB.cat,v=>{ LIB.cat=v; drawGrid(); }),{className:"cat-slot"})); };
   /** Moves items to a category; returns how many changed. */
@@ -1405,7 +1431,12 @@ function panelMedia(body){
     const free=D.media.filter(m=>m.kind!=="article"&&!m.hidden&&!usage.has(m.id)).length;
     countEl.textContent=list.length+" of "+D.media.length+" items · "+free+" pictures not used on the site yet";
     if (!list.length) grid.append(h("p",{class:"adm-intro",text:LIB.dupes?"No duplicates found here.":"Nothing matches. Add files on GitHub (below), or change the filters."}));
-    list.forEach(m=>{ const b=bytesOf(m,libIndex), dg=dupes.get(m.id), on=LIB.selecting?LIB.sel.has(m.id):m.id===Admin.sel.media;
+    /* Pages of 48: a new filter starts at page 1; picking an item keeps its page */
+    const sig=[LIB.cat,LIB.kind,LIB.q,LIB.hidden,LIB.use,LIB.sort,LIB.dupes].join("|"); if (sig!==LIB.sig){ LIB.sig=sig; LIB.page=0; }
+    const I=pageInfo(list.length,LIB_PAGE,LIB.page); LIB.page=I.page; libPager.textContent="";
+    const lp=pager({total:list.length,size:LIB_PAGE,page:LIB.page,all:LIB.all,noun:"items",onPage:n=>{ LIB.page=n; drawGrid(); countEl.scrollIntoView({behavior:"smooth",block:"start"}); },onAll:v=>{ LIB.all=v; drawGrid(); }});
+    if (lp){ libPager.append(lp); countEl.append(" · page "+(I.page+1)+" of "+I.pages); }
+    (LIB.all?list:list.slice(I.start,I.end)).forEach(m=>{ const b=bytesOf(m,libIndex), dg=dupes.get(m.id), on=LIB.selecting?LIB.sel.has(m.id):m.id===Admin.sel.media;
       const c=h("button",{class:"lib-card"+(on?" on":"")+(m.hidden?" is-hidden":"")+(dg?" is-dupe":""),type:"button",draggable:"true","aria-pressed":LIB.selecting?String(on):null,onclick:()=>{
           if (LIB.selecting){ if (LIB.sel.has(m.id)) LIB.sel.delete(m.id); else LIB.sel.add(m.id); drawGrid(); return; }
           Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
@@ -1497,7 +1528,7 @@ function panelMedia(body){
   let draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
   const optSlot=h("div"); const drawOpt=()=>optSlot.replaceChildren(optimizeCard(drawOpt));
   const draw0=draw; draw=()=>{ draw0(); drawOpt(); };
-  body.append(bar,linkSlot,strip,filters,tools,bulk,countEl,grid,det,optSlot,githubCard(),categoriesCard(()=>draw()));
+  body.append(bar,linkSlot,strip,filters,tools,bulk,countEl,grid,libPager,det,optSlot,githubCard(),categoriesCard(()=>draw()));
   draw();
   syncLibrary(true).then(n=>{ if (n){ touch(); } draw(); });
 }
@@ -1732,7 +1763,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
   drawSecs();
   /* Arriving from Missing images: open that section and bring it into view */
   if (Admin.openSec){ const i=list.findIndex(s=>s.id===Admin.openSec); Admin.openSec=""; const el=i>=0?[...secs.querySelectorAll(":scope > .sub-item")][i]:null;
-    if (el){ el._open?.(); setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60); } }
+    if (el){ el._open?.(); setTimeout(()=>{ revealEl(el,Admin.panel); el.scrollIntoView({behavior:"smooth",block:"start"}); },60); } }
   return {el:secs,visBar,draw:drawSecs};
 }
 /** What every section can have: a label, a flow under it, its own look, a background effect, preview only. */
