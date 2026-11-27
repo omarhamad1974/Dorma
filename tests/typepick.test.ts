@@ -15,6 +15,8 @@ const LISTS: [string, string][] = [
   ['modalOpen', 'modalOpen'], ['modalClose', 'modalClose'], ['menuModes', 'menuMode'], ['menuLinkStyles', 'linkStyle'], ['menuHover', 'menuHover'],
   ['menuOpen', 'menuOpen'], ['menuItems', 'menuItems'], ['transition', 'transition'], ['titleReveal', 'titleReveal'], ['scrollReveal', 'scrollReveal'],
   ['ease', 'ease'], ['colorModes', 'colorMode'], ['fxPalettes', 'palette'], ['fxDirs', 'fxDir'], ['dirs4', 'dir4'], ['fxPos', 'fxPos'], ['fxSoften', 'fxSoften'], ['bgfx', 'bgfx'],
+  ['iconPos', 'iconPos'], ['iconAnim', 'iconAnim'], ['blockIn', 'blockIn'], ['blockLoop', 'blockLoop'], ['headStyles', 'headStyle'], ['headIn', 'headIn'],
+  ['cardHover', 'cardHover'], ['photoMasks', 'photoMask'], ['ctaStyles', 'ctaStyle'],
 ];
 
 describe('visual type pickers', () => {
