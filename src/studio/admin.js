@@ -1,5 +1,5 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
-import { flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
+import { libraryUrl, mediaUrl, flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
 import { gsap } from 'gsap';
 import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
@@ -9,6 +9,7 @@ import Sortable from 'sortablejs';
 import { loaderLogo, markHtml, previewLoader } from '../loader';
 import { optimizeImage, uploadSettings, fmtBytes, UPLOAD_FORMATS, MAX_UPLOAD_BYTES } from './optimize';
 import { labelKey } from './jump';
+import { SORTS, sortMedia, findDuplicates, bytesOf, fileNameOf, extOf, seoSlug, renamedAssetPath, parseMediaLink, linkOk, planFill } from './libtools';
 import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
@@ -274,7 +275,7 @@ function actionEditor(a,onChange){
   setTimeout(()=>$$("select,input",row).forEach(x=>x.style.cssText+=";padding:9px 11px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg)"));
   return row;
 }
-function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180}); return n||h("span",{text:"Missing"}); }
+function mediaThumb(id){ const n=mediaNode(Store.draft,id,{w:240,hh:180,thumb:true}); return n||h("span",{text:"Missing"}); }
 /* Image picker. The field shows the current image large and clear, with a + that opens the library on the same category
    as that image (filters and search still work). Thumbnail size is remembered per browser; filters are shared by every picker. */
 /* Every picker opens on "Not used yet" so each library picture tends to be used once; the admin can switch to Used or All. */
@@ -1239,7 +1240,8 @@ function panelPages(body){
    - files committed to public/library/<category>/ on GitHub (item.path), found through library/index.json
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
-const LIB={ cat:"", kind:"", q:"", hidden:false, use:"" };
+IC.link='<svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>';
+const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set() };
 const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
@@ -1256,8 +1258,9 @@ async function syncLibrary(quiet){
   catch(e){ if (!quiet) toast("Couldn't read the library list from the site."); return 0; }
   let files=0;
   (libIndex.folders||[]).forEach(f=>{ if (/^[a-z0-9][a-z0-9-]{0,40}$/.test(f) && !D.categories.some(c=>c.id===f)) D.categories.push({id:f,label:prettyName(f)}); });
-  (libIndex.files||[]).forEach(f=>{ if (!libPathOk(f.path) || D.media.some(m=>m.path===f.path)) return;
-    D.media.push({id:uid("m"),label:prettyName(f.path),kind:f.kind,path:f.path,category:ensureCategory(D,f.category||defaultCategory({kind:f.kind})),tags:[],alt:"",summary:"",link:"",cover:""}); files++; });
+  const ignore=new Set(Array.isArray(D.libIgnore)?D.libIgnore:[]);
+  (libIndex.files||[]).forEach(f=>{ if (!libPathOk(f.path) || ignore.has(f.path) || D.media.some(m=>m.path===f.path||m.fromPath===f.path)) return;
+    D.media.push({id:uid("m"),label:prettyName(f.path),kind:f.kind,path:f.path,category:ensureCategory(D,f.category||defaultCategory({kind:f.kind})),tags:[],alt:"",summary:"",link:"",cover:"",bytes:+f.size||undefined,added:f.modified||undefined}); files++; });
   if (files){ scheduleSave(); toast(files===1?"1 new file from GitHub added to the library":files+" new files from GitHub added to the library"); }
   else if (!quiet) toast("The library is up to date with GitHub.");
   return files;
@@ -1278,9 +1281,9 @@ const DOC_ICON='<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M1
 function docThumb(m){ const D=Store.draft; if (m.cover){ const n=mediaNode(D,m.cover,{w:240,hh:180}); if (n) return n; } return h("span",{class:"doc-thumb",html:DOC_ICON}); }
 
 function panelMedia(body){
-  const D=Store.draft;
-  body.append(h("p",{class:"adm-intro",text:"Every image, video, background and article in one place, sorted into categories. Anything here can be picked wherever the studio asks for an image, and articles can be opened from any button."}));
-  /* Every new item needs a category: uploads, articles and scenes go into the one chosen here (the GitHub folder decides for GitHub files). */
+  const D=Store.draft; D.libIgnore=Array.isArray(D.libIgnore)?D.libIgnore:[];
+  body.append(h("p",{class:"adm-intro",text:"Every image, video, background and article in one place, sorted into categories. Drag pictures onto a category to move them, tick several to move, hide or delete them together, and sort by size to find duplicates. Anything here can be picked wherever the studio asks for an image."}));
+  /* Every new item needs a category: uploads, links, articles and scenes go into the one chosen here (the GitHub folder decides for GitHub files). */
   const newCat=h("span",{class:"cat-new"});
   const drawNewCat=()=>{ newCat.textContent=""; const sel=categorySelect(NEWCAT.id,v=>{ NEWCAT.id=v; },{required:true}); sel.setAttribute("aria-label","Category for new items"); newCat.append(h("span",{class:"mono",text:"New items go into"}),sel); };
   const needCat=()=>{ if (NEWCAT.id && D.categories.some(c=>c.id===NEWCAT.id)) return NEWCAT.id; toast("Choose a category for the new item first."); const s=$("select",newCat); if (s){ s.focus(); s.classList.add("need"); setTimeout(()=>s.classList.toggle("need",false),1600); } return ""; };
@@ -1292,57 +1295,189 @@ function panelMedia(body){
       const o=await optimizeImage(f,D.uploads,{keepOriginal:keep});
       if (o.file.size>MAX_UPLOAD_BYTES){ toast(f.name+" is "+fmtBytes(o.file.size)+", over the 25 MB limit."+(f.type.startsWith("video")?" Compress the video first (HandBrake is free).":"")); results.push({name:f.name,o,error:"over 25 MB"}); continue; }
       toast("Uploading "+o.file.name+(o.changed?" ("+fmtBytes(o.before)+" → "+fmtBytes(o.after)+")":""));
-      const r=await assetsApi.upload(o.file);
-      const m={id:uid("m"),label:prettyName(f.name),kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:cat,tags:[],alt:"",bytes:o.file.size};
+      const label=prettyName(f.name), r=await assetsApi.upload(o.file,label);
+      const m={id:uid("m"),label,kind:f.type.startsWith("video")?"video":"image",assetId:r.id,url:r.url,category:cat,tags:[],alt:"",bytes:o.file.size,added:new Date().toISOString()};
       if (o.changed) m.origBytes=o.before; if (o.width){ m.w=o.width; m.h=o.height; }
       D.media.push(m); Admin.sel.media=m.id; results.push({name:f.name,o}); touch(); draw();
       toast(o.changed?"Uploaded "+f.name+": "+fmtBytes(o.before)+" → "+fmtBytes(o.after)+" ("+savedPct(o)+" smaller)":"Uploaded "+f.name+" ("+fmtBytes(o.after)+(o.note?", "+o.note:"")+")");
     } catch(e){ results.push({name:f.name,error:e&&e.message||"failed"}); toast("Upload failed: "+(e&&e.message||"try a smaller file")); } }
     UPL.last=results; draw(); });
+  const linkSlot=h("div");
   const bar=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},
     h("button",{class:"btn primary",type:"button",html:IC.up+"Check GitHub for new files",onclick:async()=>{ await syncLibrary(false); touch(); draw(); }}),
-    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub. Pictures are optimized first (see Picture optimizing below).",onclick:()=>{ if (needCat()) up.click(); }}):null,
+    assetsApi?h("button",{class:"btn",type:"button",html:IC.up+"Quick upload (Supabase)",title:"Stored in Supabase Storage instead of GitHub, under a readable file name. Pictures are optimized first (see Picture optimizing below).",onclick:()=>{ if (needCat()) up.click(); }}):null,
     assetsApi?h("label",{class:"toggle",title:"Skip optimizing for the next upload only"},h("input",{type:"checkbox",checked:UPL.original,onchange:e=>{ UPL.original=e.target.checked; }}),"Keep originals"):null,
-    h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New article",kind:"article",category:cat,tags:[],summary:"",link:"",cover:""}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
+    h("button",{class:"btn",type:"button",html:IC.link+"Add by link",title:"Use a picture or video that lives on another site (a direct image or video link, YouTube or Vimeo) without uploading it",onclick:()=>{ if (linkSlot.firstChild){ linkSlot.textContent=""; return; } if (needCat()) linkSlot.append(linkForm()); }}),
+    h("button",{class:"btn",type:"button",html:IC.plus+"Add article",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New article",kind:"article",category:cat,tags:[],summary:"",link:"",cover:"",added:new Date().toISOString()}; D.media.push(m); Admin.sel.media=m.id; LIB.kind=""; touch(); draw(); }}),
     importLink("library","Import names and tags from a file"),h("button",{class:"btn",type:"button",html:IC.plus+"Add generated scene",onclick:()=>{ const cat=needCat(); if (!cat) return; const m={id:uid("m"),label:"New scene",kind:"scene",scene:"nebula",fx:.5,fy:.5,zoom:1,category:cat,tags:[]}; D.media.push(m); Admin.sel.media=m.id; touch(); draw(); }}),up,newCat);
+  /* ---------- add by link ---------- */
+  function linkForm(){
+    const url=h("input",{type:"url",placeholder:"https://… (image or video file, YouTube or Vimeo)","aria-label":"Link to the picture or video",style:"flex:2;min-width:220px"});
+    const name=h("input",{type:"text",placeholder:"Name (optional)","aria-label":"Name",style:"flex:1;min-width:140px"});
+    const kind=h("select",{"aria-label":"Type"},h("option",{value:"image",text:"Image"}),h("option",{value:"video",text:"Video"}));
+    const note=h("p",{class:"hint",style:"margin:0",text:"The file stays where it is: if that site removes it, the picture disappears here too. Upload important pictures instead."});
+    const pv=h("div",{class:"ph link-pv",hidden:true});
+    const read=()=>{ const r=parseMediaLink(url.value); pv.hidden=true; pv.textContent="";
+      if (r.error){ note.textContent=url.value.trim()?r.error:""; note.style.color=url.value.trim()?"var(--bad)":""; return null; }
+      note.style.color=""; note.textContent=r.provider==="file"?(r.unsure?"Couldn't tell from the link whether it's an image or a video: pick the type.":"A direct "+r.kind+" link."):(r.provider==="youtube"?"YouTube":"Vimeo")+" video: it plays muted and looping, like the site's own videos.";
+      if (r.provider==="file") kind.value=r.kind; else kind.value="video"; kind.disabled=r.provider!=="file";
+      const tmp={id:"__pv",kind:r.provider==="file"?kind.value:"video",ext:r.provider==="file"?r.url:"",embed:r.provider==="file"?null:{provider:r.provider,id:r.id}};
+      const n=mediaNode({media:[tmp]},"__pv",{thumb:true}); if (n){ pv.append(n); pv.hidden=false; if (n.tagName==="IMG") n.addEventListener("error",()=>{ note.textContent="The picture didn't load from that link. Check that it opens on its own in a browser tab."; note.style.color="var(--bad)"; }); }
+      return r; };
+    url.addEventListener("input",debounce(read,250)); kind.addEventListener("change",read);
+    const add=h("button",{class:"btn sm primary",type:"button",html:IC.plus+"Add to library",onclick:()=>{ const r=read(); if (!r){ toast("Paste a link first."); url.focus(); return; } const cat=needCat(); if (!cat) return;
+      if (D.media.some(m=>(r.provider==="file"&&m.ext===r.url)||(m.embed&&m.embed.provider===r.provider&&m.embed.id===r.id))){ toast("That link is already in the library."); }
+      const label=name.value.trim()||(r.provider==="file"?prettyName(new URL(r.url).pathname)||"Linked file":(r.provider==="youtube"?"YouTube video ":"Vimeo video ")+r.id);
+      const m={id:uid("m"),label,kind:r.provider==="file"?kind.value:"video",category:cat,tags:[],alt:"",added:new Date().toISOString()};
+      if (r.provider==="file") m.ext=r.url; else m.embed={provider:r.provider,id:r.id};
+      D.media.push(m); Admin.sel.media=m.id; linkSlot.textContent=""; touch(); draw(); toast("Added "+label+". Give it a description under SEO below."); }});
+    return card("Add by link",h("div",{style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},url,kind,name,add,h("button",{class:"btn sm",type:"button",text:"Cancel",onclick:()=>{ linkSlot.textContent=""; }})),note,pv);
+  }
   const kinds=h("div",{class:"lib-kinds",role:"group","aria-label":"Type"});
   const search=h("input",{type:"search",placeholder:"Search titles, tags, files","aria-label":"Search the library",value:LIB.q});
   search.addEventListener("input",()=>{ LIB.q=search.value; drawGrid(); });
   const hiddenT=h("label",{class:"toggle"},h("input",{type:"checkbox",checked:LIB.hidden,onchange:e=>{ LIB.hidden=e.target.checked; drawGrid(); }}),"Show hidden");
   const useSel=h("select",{"aria-label":"Used on the site"},...[["","Used or not"],["unused","Not used yet"],["used","Already used"]].map(([v,l])=>h("option",{value:v,text:l,selected:LIB.use===v})));
   useSel.addEventListener("change",()=>{ LIB.use=useSel.value; drawGrid(); });
-  const filters=h("div",{class:"lib-filters"},kinds,h("span",{class:"cat-slot"}),useSel,search,hiddenT);
+  const sortSel=h("select",{"aria-label":"Sort by",title:"Sort by"},...SORTS.map(([v,l])=>h("option",{value:v,text:"Sort: "+l,selected:LIB.sort===v})));
+  sortSel.addEventListener("change",()=>{ LIB.sort=sortSel.value; drawGrid(); });
+  const dupBtn=h("button",{type:"button",class:"chip",title:"Pictures and videos with exactly the same file size, the same file name or the same link"});
+  dupBtn.addEventListener("click",()=>{ LIB.dupes=!LIB.dupes; if (LIB.dupes) LIB.sort="dupes"; sortSel.value=LIB.sort; drawGrid(); });
+  const selBtn=h("button",{type:"button",class:"chip",title:"Tick several items to move, hide or delete them together"});
+  selBtn.addEventListener("click",()=>{ LIB.selecting=!LIB.selecting; if (!LIB.selecting) LIB.sel.clear(); drawGrid(); });
+  const sizeBtn=h("button",{type:"button",class:"chip",text:"Read missing sizes",title:"Asks the server for the size of uploads and links added before sizes were recorded, so sorting by size and finding duplicates covers them"});
+  sizeBtn.addEventListener("click",async()=>{ const todo=D.media.filter(m=>(m.kind==="image"||m.kind==="video")&&!m.embed&&!bytesOf(m,libIndex)&&mediaUrl(m)); if (!todo.length){ toast("Every file's size is known."); return; }
+    sizeBtn.disabled=true; let n=0; for (const m of todo){ sizeBtn.textContent="Reading sizes "+(++n)+"/"+todo.length;
+      try { const r=await fetch(mediaUrl(m),{method:"HEAD",cache:"no-store"}); const b=+r.headers.get("content-length"); if (r.ok&&b>0) m.bytes=b; } catch { /* the other site doesn't allow it */ } }
+    sizeBtn.disabled=false; sizeBtn.textContent="Read missing sizes"; const got=todo.filter(m=>m.bytes).length; touch(); drawGrid(); toast(got===todo.length?"Read "+got+" sizes.":"Read "+got+" of "+todo.length+" sizes. Some linked sites don't say."); });
+  const filters=h("div",{class:"lib-filters"},kinds,h("span",{class:"cat-slot"}),useSel,sortSel,search,hiddenT);
+  const tools=h("div",{class:"lib-filters lib-tools"},selBtn,dupBtn,sizeBtn);
+  /* Category strip: tap to show one category; drop pictures on it to move them there */
+  const strip=h("div",{class:"cat-strip",role:"group","aria-label":"Categories. Drop pictures here to move them"});
+  const bulk=h("div",{class:"lib-bulk",role:"region","aria-label":"Selected items"});
   const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"});
   const drawFilters=()=>{ kinds.textContent=""; OPT.libKinds.forEach(([v,l])=>kinds.append(h("button",{type:"button",class:"chip"+(LIB.kind===v?" on":""),text:l,onclick:()=>{ LIB.kind=v; drawFilters(); drawGrid(); }})));
     $(".cat-slot",filters).replaceWith(Object.assign(categorySelect(LIB.cat,v=>{ LIB.cat=v; drawGrid(); }),{className:"cat-slot"})); };
-  let usage=mediaUsage(D);
-  const drawGrid=()=>{ grid.textContent=""; usage=mediaUsage(D);
-    const list=libFilter(D.media,{kinds:LIB.kind?[LIB.kind]:null,cat:LIB.cat,q:LIB.q,hidden:LIB.hidden}).filter(m=>!LIB.use||(LIB.use==="used")===usage.has(m.id));
+  /** Moves items to a category; returns how many changed. */
+  const moveTo=(ids,cat)=>{ let n=0; ids.forEach(id=>{ const m=D.media.find(x=>x.id===id); if (m&&m.category!==cat){ m.category=cat; n++; } }); if (n){ touch(); } return n; };
+  const dragIds=e=>{ try { return JSON.parse(e.dataTransfer.getData("application/x-dorma-media")||"[]"); } catch { return []; } };
+  const drawStrip=()=>{ strip.textContent="";
+    const chip=(id,label,n)=>{ const b=h("button",{type:"button",class:"chip cat-drop"+(LIB.cat===id?" on":""),"data-cat":id},label+" ",h("b",{text:String(n)}));
+      b.addEventListener("click",()=>{ LIB.cat=id; drawFilters(); drawGrid(); });
+      if (id){ b.addEventListener("dragover",e=>{ if (!e.dataTransfer.types.includes("application/x-dorma-media")) return; e.preventDefault(); e.dataTransfer.dropEffect="move"; b.classList.add("drop"); });
+        b.addEventListener("dragleave",()=>b.classList.remove("drop"));
+        b.addEventListener("drop",e=>{ e.preventDefault(); b.classList.remove("drop"); const ids=dragIds(e), n=moveTo(ids,id);
+          toast(n?"Moved "+(n===1?"1 item":n+" items")+" to "+categoryLabel(D,id)+".":"Already in "+categoryLabel(D,id)+"."); LIB.sel.clear(); drawGrid(); drawDetail(); }); }
+      return b; };
+    strip.append(chip("","All",D.media.length)); D.categories.forEach(c=>strip.append(chip(c.id,plain(c.label),D.media.filter(m=>m.category===c.id).length))); };
+  let usage=mediaUsage(D), dupes=new Map();
+  const shownList=()=>{ let list=libFilter(D.media,{kinds:LIB.kind?[LIB.kind]:null,cat:LIB.cat,q:LIB.q,hidden:LIB.hidden}).filter(m=>!LIB.use||(LIB.use==="used")===usage.has(m.id));
+    if (LIB.dupes) list=list.filter(m=>dupes.has(m.id));
+    return sortMedia(list,LIB.sort,{index:libIndex,dupes,catLabel:c=>categoryLabel(D,c)}); };
+  const drawBulk=()=>{ bulk.textContent=""; bulk.hidden=!LIB.selecting; if (!LIB.selecting) return;
+    const ids=[...LIB.sel].filter(id=>D.media.some(m=>m.id===id)), n=ids.length, shown=shownList();
+    const to=categorySelect("",()=>{},{required:true,placeholder:"Move to…"}); to.setAttribute("aria-label","Move the selected items to");
+    bulk.append(h("b",{text:n?n+" selected":"Tick items below"}),
+      h("button",{class:"btn sm",type:"button",text:"Select all shown ("+shown.length+")",onclick:()=>{ shown.forEach(m=>LIB.sel.add(m.id)); drawGrid(); }}),
+      n?h("button",{class:"btn sm",type:"button",text:"Clear",onclick:()=>{ LIB.sel.clear(); drawGrid(); }}):null,
+      n?h("span",{class:"bulk-move"},to,h("button",{class:"btn sm primary",type:"button",text:"Move",onclick:()=>{ if (!to.value){ toast("Pick a category to move to."); to.focus(); return; } const k=moveTo(ids,to.value); toast(k?"Moved "+k+" to "+categoryLabel(D,to.value)+".":"They're already there."); LIB.sel.clear(); drawGrid(); drawDetail(); }})):null,
+      n?h("button",{class:"btn sm",type:"button",text:"Hide",title:"Hidden items stay where they're used but leave the pickers",onclick:()=>{ ids.forEach(id=>{ const m=D.media.find(x=>x.id===id); if (m) m.hidden=true; }); touch(); LIB.sel.clear(); drawGrid(); toast("Hidden. Tick Show hidden to see them again."); }}):null,
+      n?h("button",{class:"btn sm danger",type:"button",text:"Delete",onclick:e=>deleteItems(e.currentTarget,ids)}):null,
+      h("span",{class:"hint",text:"Tip: drag pictures onto a category above to move them."})); };
+  const drawGrid=()=>{ grid.textContent=""; usage=mediaUsage(D); dupes=findDuplicates(D.media.filter(m=>!m.hidden||LIB.hidden),{index:libIndex});
+    const nd=new Set([...dupes.values()].map(g=>g.key)).size;
+    dupBtn.className="chip"+(LIB.dupes?" on":""); dupBtn.textContent=(LIB.dupes?"Showing possible duplicates":"Possible duplicates")+" ("+dupes.size+(nd?" in "+nd+" groups":"")+")";
+    selBtn.className="chip"+(LIB.selecting?" on":""); selBtn.textContent=LIB.selecting?"Done selecting":"Select several";
+    drawStrip(); drawBulk();
+    const list=shownList();
     const free=D.media.filter(m=>m.kind!=="article"&&!m.hidden&&!usage.has(m.id)).length;
     countEl.textContent=list.length+" of "+D.media.length+" items · "+free+" pictures not used on the site yet";
-    if (!list.length) grid.append(h("p",{class:"adm-intro",text:"Nothing matches. Add files on GitHub (below), or change the filters."}));
-    list.forEach(m=>grid.append(h("button",{class:"lib-card"+(m.id===Admin.sel.media?" on":"")+(m.hidden?" is-hidden":""),type:"button",onclick:()=>{ Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
-      h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id),m.kind==="article"?null:overlayEl(D,m.id)),
-      h("div",{class:"meta"},h("span",{text:m.label}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.url?"Supabase":""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")+(m.kind==="article"?"":usage.has(m.id)?" · used"+(usage.get(m.id).length>1?" ×"+usage.get(m.id).length:""):" · not used yet")})))));
+    if (!list.length) grid.append(h("p",{class:"adm-intro",text:LIB.dupes?"No duplicates found here.":"Nothing matches. Add files on GitHub (below), or change the filters."}));
+    list.forEach(m=>{ const b=bytesOf(m,libIndex), dg=dupes.get(m.id), on=LIB.selecting?LIB.sel.has(m.id):m.id===Admin.sel.media;
+      const c=h("button",{class:"lib-card"+(on?" on":"")+(m.hidden?" is-hidden":"")+(dg?" is-dupe":""),type:"button",draggable:"true","aria-pressed":LIB.selecting?String(on):null,onclick:()=>{
+          if (LIB.selecting){ if (LIB.sel.has(m.id)) LIB.sel.delete(m.id); else LIB.sel.add(m.id); drawGrid(); return; }
+          Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
+        h("div",{class:"thumb"},m.kind==="article"?docThumb(m):mediaThumb(m.id),m.kind==="article"?null:overlayEl(D,m.id),LIB.selecting?h("i",{class:"lib-tick"+(on?" on":""),"aria-hidden":"true"}):null,dg?h("em",{class:"dupe-tag",title:"Possible duplicate: "+dg.reason+" as "+(dg.ids.length-1)+" other"+(dg.ids.length>2?"s":""),text:"Twin ×"+dg.ids.length}):null),
+        h("div",{class:"meta"},h("span",{text:plain(m.label)}),h("small",{text:[{scene:"Scene",image:"Image",video:"Video",article:"Article"}[m.kind]||m.kind,categoryLabel(D,m.category)||"No category",m.path?"GitHub":m.embed?(m.embed.provider==="youtube"?"YouTube":"Vimeo"):m.ext?"Link":m.url?"Supabase":"",b?fmtBytes(b):""].filter(Boolean).join(" · ")+(libMissing(m)?" · file missing":"")+(m.kind==="article"?"":usage.has(m.id)?" · used"+(usage.get(m.id).length>1?" ×"+usage.get(m.id).length:""):" · not used yet")})));
+      c.addEventListener("dragstart",e=>{ const ids=LIB.selecting&&LIB.sel.has(m.id)?[...LIB.sel]:[m.id]; e.dataTransfer.setData("application/x-dorma-media",JSON.stringify(ids)); e.dataTransfer.effectAllowed="move"; strip.classList.add("dragging"); });
+      c.addEventListener("dragend",()=>strip.classList.remove("dragging"));
+      grid.append(c); });
   };
+  /* ---------- delete ---------- */
+  function deleteItems(anchor,ids){
+    const items=ids.map(id=>D.media.find(m=>m.id===id)).filter(Boolean), used=items.filter(m=>usage.has(m.id)).length, gh=items.filter(m=>m.path).length;
+    confirmInline(anchor,(items.length===1?"Delete "+plain(items[0].label)+"?":"Delete "+items.length+" items?")+(used?" "+used+" "+(used===1?"is":"are")+" used on the site: those places will show in Missing images, ready to fill.":"")+(gh?" GitHub files leave the library; delete them on GitHub too to free the space.":""),async()=>{
+      let failed=0;
+      for (const m of items){
+        if (m.assetId && assetsApi){ try { await assetsApi.delete(m.assetId); } catch { failed++; } }
+        if (m.path && !D.libIgnore.includes(m.path)) D.libIgnore.push(m.path); // so Check GitHub doesn't bring it back
+        if (m.fromPath && !D.libIgnore.includes(m.fromPath)) D.libIgnore.push(m.fromPath);
+        const i=D.media.indexOf(m); if (i>=0) D.media.splice(i,1); LIB.sel.delete(m.id); }
+      touch(); drawGrid(); drawDetail();
+      toast((items.length===1?"Deleted.":"Deleted "+items.length+" items.")+(failed?" "+failed+" stored file"+(failed===1?"":"s")+" couldn't be removed from Supabase; they're out of the library anyway.":"")); },"Delete");
+  }
+  /* ---------- SEO: file name, words for search engines ---------- */
+  const seoF=(m,key,kind,label,opts={})=>D.site.languages&&D.site.languages!=="en"?biField(m,key,kind,label,opts,()=>{}):F(m,key,kind,label,opts);
+  function seoCard(m){
+    const cur=fileNameOf(m), ext=extOf(cur), base=cur.replace(/\.[a-z0-9]{2,5}$/i,"");
+    const nameIn=h("input",{type:"text",value:base,"aria-label":"File name",spellcheck:"false",style:"flex:1;min-width:180px"});
+    const out=h("span",{class:"hint"}), sug=seoSlug(plain(m.title)||plain(m.label));
+    const show=()=>{ const s=seoSlug(nameIn.value); out.textContent=s?"Will be: "+s+(ext?"."+ext:""):"Use letters and numbers"; };
+    nameIn.addEventListener("input",show); show();
+    let action=null;
+    if (m.assetId && assetsApi){
+      action=h("button",{class:"btn sm primary",type:"button",text:"Rename file",onclick:async e=>{ const s=seoSlug(nameIn.value); if (!s){ toast("Type a name with letters or numbers."); return; }
+        const to=renamedAssetPath(m.assetId,s); if (to===m.assetId){ toast("That's already its name."); return; }
+        e.currentTarget.disabled=true; try { const r=await assetsApi.rename(m.assetId,to); m.assetId=r.id; m.url=r.url; touch(); drawGrid(); drawDetail(); toast("Renamed to "+r.id.split("/").pop()+". Every place that shows it keeps working."); }
+        catch(err){ e.currentTarget.disabled=false; toast("Couldn't rename: "+(err&&err.message||"try again")); } }});
+    } else if (m.path && assetsApi){
+      action=h("button",{class:"btn sm primary",type:"button",text:"Rename (copy to Supabase)",title:"GitHub files can't be renamed from the browser. This copies the file to Supabase Storage under the new name and points the library item at it, so every place that shows it keeps working.",onclick:async e=>{ const s=seoSlug(nameIn.value); if (!s){ toast("Type a name with letters or numbers."); return; }
+        e.currentTarget.disabled=true; toast("Copying "+cur+"…");
+        try { const res=await fetch(libraryUrl(m.path)); if (!res.ok) throw new Error("the file couldn't be read ("+res.status+")"); const blob=await res.blob();
+          const file=new File([blob],s+(ext?"."+ext:""),{type:blob.type||(m.kind==="video"?"video/mp4":"image/"+(ext==="jpg"?"jpeg":ext))});
+          const r=await assetsApi.upload(file,s); const old=m.path; m.fromPath=old; if (!D.libIgnore.includes(old)) D.libIgnore.push(old); delete m.path; m.assetId=r.id; m.url=r.url; if (!m.bytes) m.bytes=file.size;
+          touch(); drawGrid(); drawDetail(); toast("Now "+r.id.split("/").pop()+" in Supabase. You can delete the old file on GitHub."); }
+        catch(err){ e.currentTarget.disabled=false; toast("Couldn't copy: "+(err&&err.message||"try again")); } }});
+    }
+    const fileRow=m.embed||m.kind==="scene"||m.kind==="article"?null:h("div",{class:"field wide"},h("label",{text:"File name (part of its address)"}),
+      m.ext?h("p",{class:"hint",style:"margin:0",text:"A linked file keeps the name it has on its own site ("+cur+")."}):h("div",{style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},nameIn,ext?h("span",{class:"mono",text:"."+ext}):null,
+        sug&&sug!==base?h("button",{class:"btn sm",type:"button",text:"Use "+sug,title:"A name made from the title",onclick:()=>{ nameIn.value=sug; show(); }}):null,action),
+      m.ext?null:out,
+      m.path&&!assetsApi?h("p",{class:"hint",text:"GitHub files can't be renamed from the studio while you're working offline. Rename it on GitHub, then Check GitHub for new files."}):null,
+      m.fromPath?h("p",{class:"hint"},"Was public/library/"+m.fromPath+" on GitHub · ",h("a",{href:ghFile(m.fromPath),target:"_blank",rel:"noopener",text:"open it on GitHub to delete it"})):null);
+    const f=h("div",{class:"fields"},fileRow,
+      seoF(m,"alt","text","Alt text: what the picture shows (read aloud by screen readers, used by Google Images)",{wide:true}),
+      seoF(m,"title","text","Title (shown when the pointer rests on it)",{wide:true}),
+      seoF(m,"caption","text","Caption",{wide:true}),
+      seoF(m,"description","area","Description (for search engines)",{wide:true}));
+    const tips=[!plain(m.alt)&&"no alt text",/^(img|dsc|image|photo|screenshot|whatsapp|[0-9a-f-]{20,})/i.test(base)&&"a camera or random file name"].filter(Boolean);
+    return card(h("span",{class:"grow"},"SEO"),tips.length?h("span",{class:"mp-flag",text:"To improve: "+tips.join(", ")}):null,
+      h("p",{class:"adm-intro",style:"margin:0",text:"These words go into the page for search engines and screen readers: the alt text and title on the picture itself, and the caption and description in the page's structured data. Tags are its keywords."}),f);
+  }
   const drawDetail=()=>{ det.textContent=""; const m=D.media.find(x=>x.id===Admin.sel.media); if (!m) return;
     const pv=h("div",{class:"ph",style:"aspect-ratio:16/9;max-width:560px"}); const redraw=()=>{ pv.textContent=""; const n=m.kind==="article"?docThumb(m):mediaNode(D,m.id,{w:960,hh:540}); if (n) pv.append(n); const ov=m.kind==="article"?null:overlayEl(D,m.id); if (ov) pv.append(ov); };
     const common=[["label","text",m.kind==="article"?"Title":"Name"],["category","category","Category (required)",{required:true}],["tags","strings","Tags (one per line)"]];
     let schema=common;
     if (m.kind==="scene") schema=common.concat([["scene","select","Scene",{options:OPT.scenes}],["fx","range","Focus left–right",{min:0,max:1,step:.01}],["fy","range","Focus top–bottom",{min:0,max:1,step:.01}],["zoom","range","Crop zoom",{min:1,max:3,step:.05}],["animate","toggle","Plays as a video (slow motion loop)"]]);
     else if (m.kind==="article") schema=common.concat([["summary","area","Summary",{wide:true}],["link","text","Link (https://…), if it lives on another site",{wide:true}],["cover","media","Cover image",{wide:true,allowNone:true}]]);
-    else schema=common.concat([["alt","text","Description for screen readers",{wide:true}]]);
-    const src=m.path?h("p",{class:"mono",style:"overflow-wrap:anywhere"},"GitHub: public/library/"+m.path+" · ",h("a",{href:ghFile(m.path),target:"_blank",rel:"noopener",text:"open on GitHub"}),libMissing(m)?h("b",{style:"color:var(--bad)",text:" · not found in the latest site build"}):null)
-      :m.url?h("p",{class:"mono",text:"Stored in Supabase Storage"+sizeNote(m)}):null;
-    const del=m.path
-      ?h("button",{class:"btn sm",type:"button",text:m.hidden?"Show in library again":"Hide from library",onclick:()=>{ m.hidden=!m.hidden; touch(); drawGrid(); drawDetail(); }})
-      :h("button",{class:"btn danger sm",type:"button",text:"Delete",onclick:e=>confirmInline(e.currentTarget,"Remove this from the library? Places that use it will show nothing.",()=>{ D.media.splice(D.media.indexOf(m),1); touch(); drawGrid(); drawDetail(); })});
+    const b=bytesOf(m,libIndex), dg=dupes.get(m.id);
+    const src=m.path?h("p",{class:"mono",style:"overflow-wrap:anywhere"},"GitHub: public/library/"+m.path+(b?" · "+fmtBytes(b):"")+" · ",h("a",{href:ghFile(m.path),target:"_blank",rel:"noopener",text:"open on GitHub"}),libMissing(m)?h("b",{style:"color:var(--bad)",text:" · not found in the latest site build"}):null)
+      :m.embed?h("p",{class:"mono",style:"overflow-wrap:anywhere"},(m.embed.provider==="youtube"?"YouTube":"Vimeo")+" video · ",h("a",{href:m.embed.provider==="youtube"?"https://www.youtube.com/watch?v="+m.embed.id:"https://vimeo.com/"+m.embed.id,target:"_blank",rel:"noopener",text:"open it"}))
+      :m.ext?h("p",{class:"mono",style:"overflow-wrap:anywhere"},"Linked file"+sizeNote(m)+" · ",h("a",{href:linkOk(m.ext),target:"_blank",rel:"noopener noreferrer",text:linkOk(m.ext)}))
+      :m.url?h("p",{class:"mono",style:"overflow-wrap:anywhere",text:"Supabase Storage: "+(m.assetId||"")+sizeNote(m)}):null;
+    const twin=dg?h("div",{class:"lib-used dupe"},h("b",{text:"Possible duplicate ("+dg.reason+")"}),h("ul",{},...dg.ids.filter(i=>i!==m.id).map(i=>{ const o=D.media.find(x=>x.id===i); return o?h("li",{},h("button",{class:"linkish",type:"button",text:plain(o.label)+" · "+categoryLabel(D,o.category)+(bytesOf(o,libIndex)?" · "+fmtBytes(bytesOf(o,libIndex)):"")+(usage.has(o.id)?" · used":" · not used"),onclick:()=>{ Admin.sel.media=o.id; drawGrid(); drawDetail(); }})):null; })),
+      h("p",{class:"hint",style:"margin:0",text:"Keep the one that's used, and delete the other."})):null;
+    const actions=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+      h("button",{class:"btn sm",type:"button",text:m.hidden?"Show in library again":"Hide from library",title:"Hidden items stay where they're used but leave the pickers",onclick:()=>{ m.hidden=!m.hidden; touch(); drawGrid(); drawDetail(); }}),
+      h("button",{class:"btn danger sm",type:"button",text:"Delete",onclick:e=>deleteItems(e.currentTarget,[m.id])}));
     det.append(card(h("span",{class:"grow"},"Edit "+({article:"article",scene:"scene",video:"video"}[m.kind]||"image")),pv,src,
-      fieldsFor(m,schema,()=>{ redraw(); drawGrid(); }),
+      fieldsFor(m,schema,(v,k)=>{ redraw(); drawGrid(); if (k==="category") toast("Moved to "+categoryLabel(D,m.category)+"."); }),
       h("p",{class:"hint",text:"Use it in a blog post by writing [["+m.id+"|caption]] on its own line."}),
+      twin,
       usage.has(m.id)?h("div",{class:"lib-used"},h("b",{text:"Used in "+usage.get(m.id).length+(usage.get(m.id).length===1?" place":" places")}),h("ul",{},...usage.get(m.id).map(w=>h("li",{text:w}))))
         :h("p",{class:"lib-used is-free",text:"Not used anywhere on the site yet. Image pickers show it first."}),
-      h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},del)));
+      actions));
+    if (m.kind==="image"||m.kind==="video") det.append(seoCard(m));
     if (m.kind!=="article") det.append(card("Colour overlay",h("p",{class:"adm-intro",text:"Lay a colour or gradient over this "+(m.kind==="video"?"video":"image")+" wherever it appears. The preview above updates as you change it."}),
       overlayEditor(m,"overlay",{allowDefault:true,onChange:()=>{ redraw(); drawGrid(); }})));
     redraw();
@@ -1350,15 +1485,15 @@ function panelMedia(body){
   let draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
   const optSlot=h("div"); const drawOpt=()=>optSlot.replaceChildren(optimizeCard(drawOpt));
   const draw0=draw; draw=()=>{ draw0(); drawOpt(); };
-  body.append(bar,filters,countEl,grid,det,optSlot,githubCard(),categoriesCard(()=>draw()));
+  body.append(bar,linkSlot,strip,filters,tools,bulk,countEl,grid,det,optSlot,githubCard(),categoriesCard(()=>draw()));
   draw();
-  syncLibrary(true).then(n=>{ if (n){ touch(); draw(); } });
+  syncLibrary(true).then(n=>{ if (n){ touch(); } draw(); });
 }
 /* ================= MISSING IMAGES =================
    One list of every place on the site whose picture still needs attention: nothing picked, a placeholder scene,
    an item removed from the library, or a GitHub file that isn't there. Each row is fixed right here with the
    same + picker (opening on the same category), or "Go there" opens the page, carousel, modal, flow or post. */
-const MISS={ state:"", hidden:false };
+const MISS={ state:"", hidden:false, any:false };
 const MISS_STATES=[["","Everything"],["empty","No image"],["placeholder","Placeholders"],["missing","Removed from library"],["file","File not on GitHub"]];
 function missingSlots(){ return mediaSlots(Store.draft,{all:true}).map(x=>({...x,state:x.state==="empty"?"empty":mediaState(x.obj[x.key])})).filter(x=>x.state&&!(x.optional&&x.state==="empty")); }
 function goToSlot(go){ if (go.sel) Admin.sel[go.panel]=go.sel; Admin.openSec=go.section||""; openPanel(go.panel); }
@@ -1367,7 +1502,7 @@ function panelMissing(body){
   body.append(h("p",{class:"adm-intro",text:"Every place on the site where a picture is still missing or is a placeholder: pages, sections, carousel slides, modals, flows, blog posts and the logo. Press + on a row to choose from the library (it opens on the right category), or Go there to edit it in place."}));
   const chips=h("div",{class:"lib-kinds",role:"group","aria-label":"Show"}), sum=h("p",{class:"mono"}), list=h("div",{class:"miss-list"});
   const hid=h("label",{class:"toggle"},h("input",{type:"checkbox",checked:MISS.hidden,onchange:e=>{ MISS.hidden=e.target.checked; draw(); }}),"Include hidden sections, drafts and old pages");
-  const draw=()=>{ const all=missingSlots(), shown=all.filter(x=>MISS.hidden||!x.hidden);
+  let draw=()=>{ const all=missingSlots(), shown=all.filter(x=>MISS.hidden||!x.hidden);
     chips.textContent=""; MISS_STATES.forEach(([v,l])=>{ const n=v?shown.filter(x=>x.state===v).length:shown.length; if (v&&!n&&MISS.state!==v) return;
       chips.append(h("button",{type:"button",class:"chip"+(MISS.state===v?" on":""),text:l+" ("+n+")",onclick:()=>{ MISS.state=v; draw(); }})); });
     const rows=shown.filter(x=>!MISS.state||x.state===MISS.state), off=all.length-shown.length;
@@ -1386,7 +1521,31 @@ function panelMissing(body){
           return row; })));
     });
   };
-  body.append(h("div",{class:"lib-filters"},chips,hid),sum,list);
+  /* ---------- Fill missing from category ----------
+     Proposes the next unused picture from each slot's category, shows the plan with a tick per row, then applies it (with Undo). */
+  const fillBox=h("div",{class:"fill-box"}); let undo=null;
+  const drawFill=()=>{ fillBox.textContent="";
+    const shown=missingSlots().filter(x=>(MISS.hidden||!x.hidden)&&(!MISS.state||x.state===MISS.state));
+    const go=h("button",{class:"btn primary",type:"button",html:IC.plus+"Fill missing from category",disabled:!shown.length,title:"Gives each missing picture the next picture from its category that isn't used anywhere yet. You see the list first."});
+    const any=h("label",{class:"toggle",title:"A slot whose category can't be told (nothing else in its section or page has a picture yet) takes from every category"},h("input",{type:"checkbox",checked:!!MISS.any,onchange:e=>{ MISS.any=e.target.checked; }}),"No category yet: use any category");
+    fillBox.append(h("div",{style:"display:flex;gap:10px;flex-wrap:wrap;align-items:center"},go,any,
+      undo?h("button",{class:"btn sm",type:"button",text:"Undo last fill ("+undo.length+")",onclick:()=>{ undo.forEach(u=>{ u.obj[u.key]=u.was; }); const n=undo.length; undo=null; touch(); draw(); toast("Put back "+n+" picture"+(n===1?"":"s")+"."); }}):null));
+    go.addEventListener("click",()=>{
+      const {plan,skipped}=planFill(D,{missing:shown,all:mediaSlots(D,{all:true})},mediaUsage(D),{anyCategory:!!MISS.any});
+      const keep=new Set(plan.map((_,i)=>i)), rows=h("div",{class:"fill-plan"});
+      plan.forEach((p,i)=>{ const m=D.media.find(x=>x.id===p.id);
+        const tick=h("input",{type:"checkbox",checked:true,"aria-label":"Use this one"}); tick.addEventListener("change",()=>{ if (tick.checked) keep.add(i); else keep.delete(i); apply.textContent="Fill "+keep.size; apply.disabled=!keep.size; });
+        rows.append(h("label",{class:"fill-row"},tick,h("span",{class:"sub-thumb"},mediaThumb(p.id)),h("span",{class:"grow"},h("b",{text:p.slot.where.join(" › ")}),h("small",{text:plain(m&&m.label)+" · "+categoryLabel(D,p.cat)+(p.guessed?" (from its neighbours)":"")})))); });
+      skipped.forEach(x=>rows.append(h("div",{class:"fill-row is-skip"},h("span",{class:"grow"},h("b",{text:x.slot.where.join(" › ")}),h("small",{text:x.why+(x.cat?" ("+categoryLabel(D,x.cat)+")":"")})))));
+      const apply=h("button",{class:"btn sm primary",type:"button",text:"Fill "+plan.length,disabled:!plan.length,onclick:()=>{
+        undo=[]; plan.forEach((p,i)=>{ if (!keep.has(i)) return; undo.push({obj:p.slot.obj,key:p.slot.key,was:p.slot.obj[p.slot.key]}); p.slot.obj[p.slot.key]=p.id; });
+        const n=undo.length; touch(); draw(); toast("Filled "+n+" picture"+(n===1?"":"s")+". Undo is next to the button."); }});
+      fillBox.append(card(h("span",{class:"grow"},plan.length?plan.length+" ready to fill"+(skipped.length?" · "+skipped.length+" left as they are":""):"Nothing can be filled yet"+(skipped.length&&!MISS.any?" (tick \"use any category\" to fill the rest)":"")),h("div",{style:"display:flex;gap:8px"},apply,h("button",{class:"btn sm",type:"button",text:"Cancel",onclick:drawFill})),
+        h("p",{class:"adm-intro",style:"margin:0",text:"Each gets the next picture in its category that isn't used anywhere yet, never the same one twice. A slot that had a video or a moving placeholder gets a video when its category has one. Untick any you want to choose yourself."}),rows));
+      go.disabled=true; });
+  };
+  body.append(fillBox,h("div",{class:"lib-filters"},chips,hid),sum,list);
+  const draw0=draw; draw=()=>{ draw0(); drawFill(); };
   draw();
   if (!libIndex) syncLibrary(true).then(()=>{ if (Admin.panel==="missing") draw(); });
 }

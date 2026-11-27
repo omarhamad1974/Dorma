@@ -6,6 +6,7 @@ import { createClient, type Session, type SupabaseClient } from '@supabase/supab
 import { MEDIA_BUCKET, SUPABASE_ANON_KEY, SUPABASE_URL, online } from '../config';
 import { normalize } from './data';
 import { normalizeSocial } from './social';
+import { seoSlug } from './libtools';
 export { normalize };
 import { clone } from './core';
 import { Site, renderSite } from './site';
@@ -221,22 +222,44 @@ export async function signOut(): Promise<void> {
 }
 export const signedInEmail = (): string => Store.session?.user?.email || '';
 
-/* ---------- media uploads (Supabase Storage) ---------- */
+/* ---------- media uploads (Supabase Storage) ----------
+   Files are stored as <year-month>/<readable-name>.<ext> (e.g. 2026-11/dorma-booth-riyadh.webp) so their addresses
+   read well for search engines; a name already taken gets -2, -3… Renaming moves the file (Library › SEO). */
 export interface MediaApi {
-  upload(file: File): Promise<{ id: string; url: string }>;
+  upload(file: File, name?: string): Promise<{ id: string; url: string }>;
+  rename(id: string, to: string): Promise<{ id: string; url: string }>;
   delete(id: string): Promise<void>;
 }
+const taken = (e: { message?: string; statusCode?: string } | null): boolean =>
+  !!e && (/exists|duplicate/i.test(e.message || '') || e.statusCode === '409');
 /** Upload helper for editors, or null when uploads aren't possible (offline build, signed out). */
 export function media(): MediaApi | null {
   if (Store.mode !== 'db' || !Store.canEdit) return null;
   const bucket = () => db().storage.from(MEDIA_BUCKET);
+  const url = (path: string) => bucket().getPublicUrl(path).data.publicUrl;
   return {
-    async upload(file) {
+    async upload(file, name) {
       const ext = (file.name.match(/\.[a-z0-9]{1,5}$/i)?.[0] || '').toLowerCase();
-      const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}${ext}`;
-      const { error } = await bucket().upload(path, file, { contentType: file.type, cacheControl: '31536000', upsert: false });
-      if (error) throw error;
-      return { id: path, url: bucket().getPublicUrl(path).data.publicUrl };
+      const base = seoSlug(name || file.name.replace(/\.[^.]+$/, '')) || crypto.randomUUID().slice(0, 8);
+      const dir = new Date().toISOString().slice(0, 7);
+      for (let n = 1; n < 30; n++) {
+        const path = `${dir}/${base}${n > 1 ? '-' + n : ''}${ext}`;
+        const { error } = await bucket().upload(path, file, { contentType: file.type, cacheControl: '31536000', upsert: false });
+        if (!error) return { id: path, url: url(path) };
+        if (!taken(error as { message?: string })) throw error;
+      }
+      throw new Error('Too many files with that name');
+    },
+    async rename(id, to) {
+      if (id === to) return { id, url: url(id) };
+      const ext = to.match(/\.[a-z0-9]{1,5}$/i)?.[0] || '', base = ext ? to.slice(0, -ext.length) : to;
+      for (let n = 1; n < 30; n++) {
+        const path = n > 1 ? `${base}-${n}${ext}` : to;
+        const { error } = await bucket().move(id, path);
+        if (!error) return { id: path, url: url(path) };
+        if (!taken(error as { message?: string })) throw error;
+      }
+      throw new Error('Too many files with that name');
     },
     async delete(id) {
       const { error } = await bucket().remove([id]);

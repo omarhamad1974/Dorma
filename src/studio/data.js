@@ -120,7 +120,9 @@ const STARTER = {
   posts: POSTS,
   pages: PAGES,
   /* Pictures uploaded from the studio are made smaller in the browser first (studio › Library › Picture optimizing). */
-  uploads: { optimize:true, maxSide:2400, quality:0.85, format:"webp", keepPng:true }
+  uploads: { optimize:true, maxSide:2400, quality:0.85, format:"webp", keepPng:true },
+  /* GitHub files deleted from the Library (or copied to Supabase under a new name), so Check GitHub doesn't add them back. */
+  libIgnore: []
 };
 
 /* ================= FIELD SCHEMAS =================

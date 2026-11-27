@@ -1,6 +1,7 @@
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
-import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, logoNode } from './core';
+import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, logoNode, SHOWN, mediaUrl } from './core';
+import { mediaJsonLd } from './libtools';
 import { Store } from './store';
 import { A } from './data';
 import { flowBlock, sectionVars, modalLook } from './core';
@@ -19,7 +20,7 @@ function disposePage(){
 function onWin(type,fn,opts){ addEventListener(type,fn,opts); Site.disposers.push(()=>removeEventListener(type,fn,opts)); }
 
 function renderSite(cfg,pageId){
-  disposePage(); closeModal(true);
+  disposePage(); closeModal(true); SHOWN.clear();
   cfg=localize(cfg); NUM.on=cfg.site.showNumbers===true;
   Site.cfg=cfg; applyTheme(cfg,{mode:siteMode(cfg)}); gsap.globalTimeline.timeScale(+cfg.motion.speed||1); watchDeviceMode();
   // "#page/label" opens the page and travels to the section with that label
@@ -536,8 +537,17 @@ function playSequence(cfg,sec,seq,ST){
   if (!ST || sec.getBoundingClientRect().top<innerHeight*.9){ run(); return; }
   ST.create({trigger:sec,start:"top 85%",once:true,onEnter:run});
 }
+/* Pictures on this page as schema.org ImageObject / VideoObject (names, captions, descriptions from Library › SEO). */
+function pictureData(cfg){
+  let el=document.getElementById("media-ld");
+  const list=mediaJsonLd(cfg,[...SHOWN],m=>{ const u=mediaUrl(m); try { return u?new URL(u,location.href).href:""; } catch { return ""; } });
+  if (!list.length){ if (el) el.remove(); return; }
+  if (!el){ el=document.createElement("script"); el.type="application/ld+json"; el.id="media-ld"; document.head.append(el); }
+  el.textContent=JSON.stringify({"@context":"https://schema.org","@graph":list}).replace(/</g,"\\u003c");
+}
 function afterRender(cfg,page){
   const main=$("#main"); if (!main) return;
+  pictureData(cfg);
   $$("section",main).forEach(s=>{ if (s._after) s._after(); });
   $$("section",main).forEach(s=>{ if (s._fx) s._fx(); });
   $$("section",main).forEach(s=>{ if (s._motion) s._motion(); });
