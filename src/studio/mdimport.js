@@ -8,6 +8,7 @@
    build(cfg, text, opts) changes cfg and reports what it did, so the studio runs it on a copy for the preview
    and on the draft for the real import. Pure functions, no DOM: easy to test. */
 import { parseFlowLine, resolveImage, parseSlidesMd, applySlidesImport } from './mdslides';
+import { parseMediaLink } from './libtools';
 import { OPT, SECTION_TYPES, SECTION_BLANK, A, defaultCategory, ensureCategory } from './data';
 
 const rid = () => Math.random().toString(36).slice(2,8);
@@ -255,14 +256,15 @@ function buildLibrary(cfg,text,opts={}){
     if (path){ if (!/^[\w\-. ()&+,]+(\/[\w\-. ()&+,]+)*$/.test(path)||path.split("/").some(x=>x===".."||x==="."||!x)){ w.push(`"${file}" isn't a usable file path.`); return null; } m.path=path;
       if (opts.knownPaths && !opts.knownPaths.has(path)) w.push(`public/library/${path} isn't on GitHub yet. Upload it there (Library → Add files on GitHub) so it shows.`);
       if (!m.category && path.includes("/")) m.category=categoryOf(cfg,path.split("/")[0],ctx); }
-    else if (isUrl){ if (m.kind==="article") m.link=m.link||file; else m.url=file; }
+    else if (isUrl){ if (m.kind==="article") m.link=m.link||file; else if (/\/storage\/v1\/object\/public\//.test(file)) m.url=file;
+      else { const r=parseMediaLink(file); if (r.error){ w.push(r.error); return null; } if (r.provider==="file") m.ext=r.url; else { m.kind="video"; m.embed={provider:r.provider,id:r.id}; } } }
     if (m.kind==="scene" && !m.scene) m.scene="nebula";
     if (!m.category) m.category=ensureCategory(cfg,defaultCategory(m)); // every library item has a category
     if (m.kind==="article"){ m.summary=m.summary||""; m.link=m.link||""; m.cover=m.cover||""; }
     m.label=plainTx(m.label)||(path||file).split("/").pop()||"Imported item";
-    const same=cfg.media.find(x=>(path&&x.path===path)||(m.url&&x.url===m.url)||(((!path&&!m.url)||opts.mode==="update")&&x.kind===m.kind&&norm(x.label)===norm(m.label)));
+    const same=cfg.media.find(x=>(path&&x.path===path)||(m.url&&x.url===m.url)||(m.ext&&x.ext===m.ext)||(m.embed&&x.embed&&x.embed.id===m.embed.id)||(((!path&&!m.url&&!m.ext&&!m.embed)||opts.mode==="update")&&x.kind===m.kind&&norm(x.label)===norm(m.label)));
     if (same && opts.mode!=="update"){ w.push("Already in the Library, so it was skipped. Choose \"Update\" to change it."); return { title:m.label, meta:"Skipped · already in the Library", image:same.id }; }
-    if (same){ assignGiven(same,m,[...present(entries,LIB_FIELDS).filter(k=>k!=="file"),"label","kind",...(m.path?["path"]:[]),...(m.url?["url"]:[])]); counts.updated++; }
+    if (same){ assignGiven(same,m,[...present(entries,LIB_FIELDS).filter(k=>k!=="file"),"label","kind",...(m.path?["path"]:[]),...(m.url?["url"]:[]),...(m.ext?["ext"]:[]),...(m.embed?["embed"]:[])]); counts.updated++; }
     else { m.id="m-"+(slug(m.label,20)||"item")+"-"+rid(); cfg.media.push(m); counts.added++; }
     return { title:m.label, meta:[same?"Updates":"New",m.kind,m.path?"GitHub: "+m.path:m.url?"Link":""].filter(Boolean).join(" · "), text:plainTx(m.alt||m.summary), image:same?same.id:m.id, chips:m.tags||[] };
   });

@@ -85,6 +85,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ph{position:relative;overflow:hidden;background:#0a0b12;border-radius:var(--radius);border:1px solid var(--faint);max-width:100%}
 .ph > canvas,.ph > img,.ph > video{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;filter:brightness(var(--img-bright,.85)) contrast(1.06);transform-origin:50% 50%}
 .ph.bleed{border:0;border-radius:0}
+/* Linked YouTube or Vimeo video (Library › Add by link): a muted, looping player cropped to fill its box like a video file */
+.embed-v{position:absolute;inset:0;overflow:hidden;display:block;pointer-events:none;filter:brightness(var(--img-bright,.85)) contrast(1.06)}
+.embed-v iframe{position:absolute;top:50%;left:50%;width:auto;height:auto;min-width:100%;min-height:100%;aspect-ratio:16/9;transform:translate(-50%,-50%);border:0}
+.embed-ph{position:absolute;inset:0;display:grid;place-items:center;background:#0a0b12;color:#cfd6e6;font:500 12px/1 var(--mono,monospace);letter-spacing:.08em}
 .ph,.hc .slide,.lib-card .thumb{isolation:isolate}
 .img-ov{position:absolute;inset:0;display:block;pointer-events:none}
 .badge{position:absolute;top:12px;left:12px;z-index:2;font-family:var(--mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;padding:6px 9px;border-radius:3px;background:rgba(5,6,10,.5);border:1px solid rgba(238,241,246,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -1323,3 +1327,32 @@ html.menu-open{overflow:hidden}
 .tp-fx.tp-live>svg{opacity:0}
 .tp-fx .sfx-host{z-index:1}
 .tp-draw{stroke-dasharray:120}
+
+/* ================= LIBRARY: arrange, duplicates, SEO, links ================= */
+.cat-strip{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px dashed transparent;border-radius:10px;transition:border-color .2s,background .2s}
+.cat-strip.dragging{border-color:var(--accent-line);background:var(--accent-soft)}
+.cat-strip .chip b{font-weight:500;opacity:.6;margin-left:2px}
+.chip.cat-drop.drop{border-color:var(--accent);background:var(--accent);color:#040915}
+.lib-tools .chip:disabled{opacity:.6;cursor:wait}
+.lib-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-soft)}
+.lib-bulk[hidden]{display:none}
+.lib-bulk .bulk-move{display:inline-flex;gap:6px;align-items:center}
+.lib-bulk select{padding:6px 9px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg,rgba(0,0,0,.25));color:var(--fg);font:inherit;font-size:.82rem}
+.lib-card[draggable=true]{cursor:grab}
+.lib-card.is-dupe{border-color:rgba(237,6,119,.55)}
+.lib-card .dupe-tag{position:absolute;inset:auto;top:6px;left:6px;z-index:2;width:auto;height:auto;padding:2px 7px;border-radius:100px;background:#ed0677;color:#fff;font:500 .6rem/1.4 var(--mono,monospace);letter-spacing:.06em;font-style:normal}
+.lib-card .lib-tick{position:absolute;top:6px;right:6px;left:auto;bottom:auto;z-index:2;width:20px;height:20px;border-radius:6px;border:2px solid #fff;background:rgba(0,0,0,.35);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.lib-card .lib-tick.on{background:var(--accent);border-color:var(--accent)}
+.lib-card .lib-tick.on::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #040915;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.lib-used.dupe{border-color:rgba(237,6,119,.5)}
+.lib-used .linkish{background:none;border:0;padding:0;color:var(--fg);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left}
+.link-pv{aspect-ratio:16/9;max-width:360px}
+.link-pv[hidden]{display:none}
+/* Missing images › Fill missing from category */
+.fill-box{display:flex;flex-direction:column;gap:12px}
+.fill-plan{display:flex;flex-direction:column;gap:6px;max-height:min(60vh,560px);overflow:auto}
+.fill-row{display:flex;gap:10px;align-items:center;padding:6px 8px;border:1px solid var(--faint);border-radius:8px;cursor:pointer}
+.fill-row b{display:block;font-weight:500;font-size:.84rem}
+.fill-row small{display:block;color:var(--muted);font-size:.74rem}
+.fill-row.is-skip{opacity:.6;cursor:default}
+.fill-row .grow{flex:1;min-width:0}
