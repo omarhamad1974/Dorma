@@ -5,7 +5,7 @@ name: Supabase
 # - Pull request that touches supabase/: "check" starts a fresh local Supabase database in the runner
 #   and applies every file in supabase/migrations/ in order. A broken migration fails here, before merge.
 # - Merge to main (or "Run workflow" on the Actions tab): "deploy" applies the migrations the live
-#   project has not had yet (supabase db push).
+#   project has not had yet (supabase db push), then deploys the edge functions in supabase/functions/.
 #
 # Repository secrets (Settings > Secrets and variables > Actions), see docs/supabase-deploy.md:
 #   SUPABASE_ACCESS_TOKEN  personal access token from supabase.com/dashboard/account/tokens
@@ -36,6 +36,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check edge functions
+        # --node-modules-dir=none: fetch npm: imports directly (the site's node_modules is not installed in this job)
+        run: for f in supabase/functions/*/index.ts; do deno check --node-modules-dir=none "$f"; done
       - uses: supabase/setup-cli@v1
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
@@ -83,3 +89,12 @@ jobs:
         run: supabase db push --linked --yes
       - name: Migration history now
         run: supabase migration list --linked
+      # Edge functions (supabase/functions/*): the studio's "Write with AI" (ai-write).
+      # Its Gemini key is an edge function secret set once in the Supabase dashboard, never in the repo.
+      - name: Deploy edge functions
+        run: |
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            echo "Deploying $name"
+            supabase functions deploy "$name" --project-ref "$PROJECT_REF" --use-api
+          done

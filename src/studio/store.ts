@@ -206,6 +206,25 @@ export async function saveSocial(): Promise<void> {
   if (Social.queued) { Social.queued = false; void saveSocial(); }
 }
 
+/* ---------- edge functions (studio → Write with AI) ----------
+   Calls a Supabase edge function as the signed-in editor. Always resolves: app-level problems come back as
+   { ok: false, code, message } so the studio can explain them in plain words. */
+export interface FnReply { ok: boolean; code?: string; message?: string; [k: string]: unknown }
+export async function callFunction(name: string, body: Record<string, unknown>): Promise<FnReply> {
+  if (Store.mode !== 'db') return { ok: false, code: 'offline', message: 'AI writing needs the online studio (this copy saves in the browser only).' };
+  if (!Store.session) return { ok: false, code: 'signed_out', message: 'Sign in to the studio to use AI writing.' };
+  try {
+    const { data, error } = await db().functions.invoke(name, { body });
+    if (!error) return (data as FnReply) || { ok: false, code: 'empty', message: 'No answer came back. Try again.' };
+    const status = (error as { context?: Response }).context?.status;
+    if (status === 404) return { ok: false, code: 'not_deployed', message: 'The AI writing service is not set up on Supabase yet.' };
+    if (status === 546 || status === 504) return { ok: false, code: 'gemini_down', message: 'The AI took too long to answer. Try again in a moment.' };
+    return { ok: false, code: 'unreachable', message: "Couldn't reach the AI writing service. Check your connection and try again." };
+  } catch {
+    return { ok: false, code: 'unreachable', message: "Couldn't reach the AI writing service. Check your connection and try again." };
+  }
+}
+
 /* ---------- sign-in (editors) ---------- */
 export async function signIn(email: string, password: string): Promise<string | null> {
   const { error } = await db().auth.signInWithPassword({ email, password });

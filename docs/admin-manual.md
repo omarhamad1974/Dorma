@@ -14,7 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
-| **Content** | Pages, Carousels, Blog, Import |
+| **Content** | Pages, Carousels, Blog, Import, AI writing |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
@@ -78,6 +78,22 @@ Every section has a folding box **Icon, text, logo and button**, right under its
 ### Import (Content → Import)
 - Bring in pages, sections, slides, flows, modals, posts or library names from a Markdown file, with a preview first. **Download template** gives a filled-in example.
 
+### Write with AI (Content → AI writing)
+- A small **AI** button sits in the corner of the text boxes all over the studio (titles, paragraphs, lists, blog posts, buttons, Library alt text and SEO). It opens a window where you can:
+  - **Write new**: say in a few words what it should say, and get English and Arabic side by side.
+  - **Improve** or **Shorten** the text that is there.
+  - **Translate** English to Arabic or Arabic to English.
+  - **Describe the picture** (Library → an image → SEO): alt text, title, caption and description written from the picture itself.
+- Nothing changes until you press **Use this**. You can edit the suggestion first, and untick a language to keep what you had. Then it saves like any other edit, and visitors only see it after **Publish**.
+- The AI uses only real facts: your notes under **What the AI should know**, the box itself and the boxes around it. It never makes up clients, projects, numbers or results; where a fact is missing it writes **[To be supplied by Dorma]** (Arabic: [تُضاف من دورما]) for you to fill in. Always read it before you publish.
+- **AI writing** tab: the status (Ready, or what is missing), the AI buttons on or off, the model (**Flash** for better writing, **Flash-Lite** for more free uses), the brand notes, Arabic notes, words to avoid, and a **Try it** box.
+- It uses Google's free **Gemini** service through your Supabase project. The key is kept in Supabase, never on the site or in GitHub. Each editor can make 150 AI requests a day (and 8 a minute); Google's free allowance also has limits, and the studio tells you in plain words when one is reached.
+- **One-time setup** (also shown step by step in the AI writing tab):
+  1. Open **Google AI Studio → API keys** (aistudio.google.com/app/apikey), sign in with your Google account, press **Create API key** and copy it. No billing needed; leave billing off to stay free.
+  2. Open **Supabase → Edge Functions → Secrets** for the Dorma project, add a secret named `GEMINI_API_KEY` with the key as its value, and save.
+  3. In the studio, press **Check again** under Content → AI writing. It should say **Ready**.
+- On Google's free tier, Google may use what you send to improve its services, so don't paste private or confidential information into the AI window.
+
 ### Flows, modals and icons (Flows and modals)
 - **Flows**: the row of buttons or items under a title. Add items (Button, Text, Icon, Animated note, Custom SVG), give each an action, and choose how the flow behaves: **Row**, **Tabs** or **Reveal**.
 - **Modals**: the pop-up panels. Five types: Media, Gallery, Flow, Service list, and Sections (any page sections inside a modal). Edit text, pictures, flow, look, animation and the More button.
@@ -114,7 +130,8 @@ These need a code change or a change in GitHub or Supabase. Ask for them as a ne
 - **Who can edit**: editor accounts are added in Supabase, not in the studio.
 - **Library files on GitHub**: adding files to the `public/library/` folders, creating a new category folder, and deleting files is done on GitHub (the studio opens the right GitHub page for you). The site redeploys in about two minutes, then press **Check GitHub for new files**. GitHub takes up to 25 MB per file.
 - **Quote requests** open the visitor's email app addressed to your quote email. Nothing is stored on the site, and there is no form inbox.
-- **Translation**: the studio does not translate. Write the Arabic yourself in the box next to the English.
+- **Translation**: the studio's **AI** button can draft the Arabic (or the English) for you, but it is a suggestion: read it, fix it, and press **Use this** only when it's right.
+- **The Gemini key and AI limits**: the key is a secret in Supabase (Edge Functions → Secrets), and the daily limit per editor is a Supabase setting (`AI_DAILY_LIMIT`), not a studio field.
 - **The real logo SVG**: upload it under Design → Logo once you have it. Until then the PNG is used, and the loader's **Draw** animation needs an SVG.
 - **Hosting, domain and Supabase plan**: the site runs on GitHub Pages and the free Supabase plan. Supabase pauses after about a week with no use; it needs waking up in the Supabase dashboard.
 - **Posting to social media**: the Social tab writes posts and pictures for you, but it does not post them. You copy the text, save the picture and post it yourself on LinkedIn, Facebook or Instagram.
