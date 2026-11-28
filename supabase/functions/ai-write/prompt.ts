@@ -21,6 +21,8 @@ export interface WriteRequest {
   brand?: string;
   arabic?: string;
   avoid?: string;
+  /** allow general industry knowledge (printing processes, materials, marketing practice…) beyond the site's own text */
+  general?: boolean;
   /** a picture to describe (describe action), base64 without the data: prefix */
   image?: { mime: string; data: string } | null;
 }
@@ -61,6 +63,7 @@ export function cleanRequest(body: unknown): WriteRequest | string {
     brand: cut(b.brand, LIMITS.brand),
     arabic: cut(b.arabic, LIMITS.short),
     avoid: cut(b.avoid, LIMITS.short),
+    general: b.general === true,
     image: null,
   };
   const img = b.image as Record<string, unknown> | null | undefined;
@@ -87,7 +90,8 @@ export function systemPrompt(r: WriteRequest): string {
     'You write website copy for Dorma Advertising, an advertising agency with in-house printing and production, established in 2000.',
     'You are helping the site editor fill in one box in their website studio. Your text goes into that box after the editor reads and edits it.',
     '',
-    'FACTS. Use only facts found in the brand notes, the existing text, the brief, the picture and the page context below. ' +
+    r.general ? generalRule() :
+      'FACTS. Use only facts found in the brand notes, the existing text, the brief, the picture and the page context below. ' +
       'Never invent clients, brand names, project names, results, statistics, numbers, years, awards, testimonials, quotes, prices, locations, team members or contact details. ' +
       `When the text needs a fact you were not given, write ${GAP} in English and ${GAP_AR} in Arabic instead of making one up.`,
     'VOICE. Clear, practical and confident. Short sentences. Speak to the reader as "you". Say what Dorma does and how, instead of piling up adjectives. ' +
@@ -101,6 +105,17 @@ export function systemPrompt(r: WriteRequest): string {
   rules.push('Answer with JSON only: ' + r.langs.map((l) => `"${l}" (${LANG_NAME[l]})`).join(' and ') + '. Each value is the finished text for the box, with nothing before or after it.');
   if (r.brand) rules.push('', 'BRAND NOTES (from the editor):', r.brand);
   return rules.join('\n');
+}
+
+/* "Use general industry knowledge": general explanations are fine, but anything about Dorma itself still needs a source. */
+function generalRule(): string {
+  return 'FACTS. You may use accurate, widely accepted general knowledge about the industry to explain things: printing methods ' +
+    '(for example offset, digital, large-format and screen printing), paper and materials, finishing, packaging, signage, exhibitions, events, ' +
+    'video, branding and marketing practice. Keep it correct and practical, and avoid exact figures, prices, lead times or statistics unless they are given. ' +
+    'Facts about Dorma itself must still come only from the brand notes, the existing text, the brief, the picture and the page context below: ' +
+    'never invent Dorma\'s clients, projects, results, numbers, years, awards, testimonials, quotes, prices, locations, equipment, team or contact details, ' +
+    'and never say Dorma offers a service, machine or method unless that source says so. Write general knowledge as general ("Offset printing suits long runs"), not as a Dorma claim. ' +
+    `When the text needs a Dorma fact you were not given, write ${GAP} in English and ${GAP_AR} in Arabic instead of making one up.`;
 }
 
 function formatRule(kind: Kind): string {

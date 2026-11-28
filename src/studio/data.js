@@ -28,6 +28,7 @@ const STARTER = {
   ai: {
     enabled: true,
     model: "flash",
+    general: true,   // may explain general industry topics (offset, digital printing…); Dorma facts still only from the site
     brand: "Dorma Advertising, established in 2000. Two divisions under one roof:\n" +
       "- Agency: Creative & Design; Photography, Video & Music; Digital Marketing & Social Media; Websites & Mobile Apps; Event & Activation Logistics.\n" +
       "- Printing & Production: Printing & Finishing; Giveaways & Branded Merchandise; Packaging; Signage & Displays; In-Store Branding; Booth Production; Custom Fabrication; Event & Activation Accessories.\n" +

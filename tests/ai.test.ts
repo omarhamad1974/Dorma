@@ -64,6 +64,26 @@ describe('ai-write prompt', () => {
   });
 });
 
+describe('general industry knowledge', () => {
+  it('is off unless asked, and keeps Dorma facts sourced when on', () => {
+    expect(req({ action: 'write', brief: 'x' }).general).toBe(false);
+    const off = systemPrompt(req({ action: 'write', brief: 'x' }));
+    expect(off).toMatch(/Use only facts found/);
+    const on = systemPrompt(req({ action: 'write', brief: 'Explain offset printing', general: true }));
+    expect(on).toMatch(/general knowledge/);
+    expect(on).toMatch(/offset/);
+    expect(on).toMatch(/never say Dorma offers a service/);
+    expect(on).toContain(GAP);
+    expect(on).not.toMatch(/Use only facts found/);
+  });
+  it('follows the studio default unless the window says otherwise', () => {
+    const base = { action: 'write', langs: ['en'], text: {}, brief: 'x', field: { label: 'T', kind: 'text' } };
+    expect(requestBody({ ...base, ai: { general: true } }).general).toBe(true);
+    expect(requestBody({ ...base, ai: { general: true }, general: false }).general).toBe(false);
+    expect(requestBody({ ...base, ai: {} }).general).toBe(false);
+  });
+});
+
 describe('ai-write reply', () => {
   const ok = (text: string, finishReason = 'STOP') => ({ candidates: [{ finishReason, content: { parts: [{ text }] } }] });
   it('reads the JSON answer and tidies single lines', () => {

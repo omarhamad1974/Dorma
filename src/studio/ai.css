@@ -63,3 +63,6 @@
   .ai-foot{flex-direction:column;align-items:stretch}
   .ai-btns .btn{flex:1;justify-content:center}
 }
+.ai-gen{display:flex;align-items:flex-start;gap:8px;font-size:.84rem;line-height:1.45;cursor:pointer}
+.ai-gen input{margin-top:3px;flex:none}
+.ai-gen small{color:var(--muted);font-size:.8rem}

@@ -75,7 +75,7 @@ export function openAi(ctx){
   const D=Store.draft, langs=ctx.langs, both=langs.length>1;
   const imgUrl=DESCRIBE_KEYS.includes(ctx.key)&&ctx.image?ctx.image():null;
   const start=ctx.get();
-  let action=defaultAction({ text:start, langs, canDescribe:!!imgUrl }), from=translateFrom(start), busy=false, result=null;
+  let action=defaultAction({ text:start, langs, canDescribe:!!imgUrl }), from=translateFrom(start), busy=false, result=null, general=D.ai.general===true;
 
   const back=h("div",{class:"ai-back"}), dlg=h("div",{class:"ai-dlg",role:"dialog","aria-modal":"true","aria-label":"Write with AI"});
   const close=()=>{ removeEventListener("keydown",onKey); back.remove(); openDlg=null; ctx.root?.querySelector(".ai-btn")?.focus({preventScroll:true}); };
@@ -108,6 +108,12 @@ export function openAi(ctx){
     const hint=(ACTIONS.find(x=>x[0]===action)||[])[2];
     const brief=hint?h("textarea",{class:"ai-brief",rows:2,placeholder:hint,"aria-label":"What should it say"}):null;
     if (brief){ brief.value=body.dataset.brief||""; brief.addEventListener("input",()=>{ body.dataset.brief=brief.value; }); body.append(brief); }
+    /* general industry knowledge (offset, digital printing…) on top of the site's own facts */
+    if (action!=="translate" && action!=="describe"){
+      const g=h("input",{type:"checkbox"}); g.checked=general; g.addEventListener("change",()=>{ general=g.checked; });
+      body.append(h("label",{class:"ai-gen",title:"General explanations are allowed. Facts about Dorma (clients, results, numbers, what Dorma offers) still come only from your site and notes."},g,
+        h("span",{},h("b",{text:"Use general industry knowledge"}),h("small",{text:" e.g. how offset or digital printing works. Facts about Dorma still come only from your site."}))));
+    }
     const go=h("button",{type:"button",class:"btn primary",html:SPARK+(result?"Try again":{write:"Write",improve:"Improve",shorten:"Shorten",translate:"Translate",describe:"Describe"}[action]),disabled:busy});
     const msg=h("span",{class:"ai-msg",role:"status"});
     body.append(h("div",{class:"ai-go"},go,msg));
@@ -151,7 +157,7 @@ export function openAi(ctx){
         catch { busy=false; go.disabled=false; msg.className="ai-msg err"; msg.textContent="Couldn't read this picture from here. Write the text yourself, or try a picture uploaded to Supabase."; return; }
       }
       const r=await callFunction(FN,requestBody({ action, langs, text:ctx.get(), from, brief:brief?brief.value:"",
-        field:{ label:ctx.label, group:ctx.group||"", kind:ctx.kind, key:ctx.key||"" }, context:nearby(ctx.root), ai:D.ai, image }));
+        field:{ label:ctx.label, group:ctx.group||"", kind:ctx.kind, key:ctx.key||"" }, context:nearby(ctx.root), ai:D.ai, image, general }));
       busy=false;
       if (r.used!=null) AI.status={ ...AI.status, used:r.used, limit:r.limit||AI.status.limit };
       if (!r.ok){
@@ -200,10 +206,11 @@ export function panelAI(body){
   body.append(card("Set up (one time)",setup));
   body.append(card("Settings",fieldsFor(D.ai,[
     ["enabled","toggle","Show the AI buttons beside text boxes"],
+    ["general","toggle","Use general industry knowledge by default (how offset or digital printing works, materials, finishing…). Facts about Dorma still come only from the site and the notes below"],
     ["model","select","Gemini model",{options:[["flash","Gemini Flash: better writing (recommended)"],["lite","Gemini Flash-Lite: lighter, more free uses per day"]],preview:false}],
   ])));
   body.append(card("What the AI should know",
-    h("p",{class:"adm-intro",style:"margin:0",text:"Sent with every request. The AI only uses facts from these notes, the box you are writing in and the boxes around it. It never invents clients, projects, numbers or results; where a fact is missing it writes [To be supplied by Dorma] so you can fill it in."}),
+    h("p",{class:"adm-intro",style:"margin:0",text:"Sent with every request. Facts about Dorma come only from these notes, the box you are writing in and the boxes around it. It never invents clients, projects, numbers or results, or says Dorma offers something the site doesn't; where a fact is missing it writes [To be supplied by Dorma] so you can fill it in. With general industry knowledge on, it may also explain topics in general terms (for example how offset printing differs from digital)."}),
     fieldsFor(D.ai,[
       ["brand","area","About Dorma: facts and voice",{wide:true,hint:"Add real facts you are happy for it to use (services, years, places you work). Leave out anything private."}],
       ["arabic","area","Notes for the Arabic",{wide:true}],

@@ -22,13 +22,15 @@ export function defaultAction({ text={}, langs=["en"], canDescribe=false }){
 export const translateFrom = (text={}, pref) => pref && String(text[pref]||"").trim() ? pref : String(text.en||"").trim() ? "en" : "ar";
 
 /** The body sent to the ai-write edge function. */
-export function requestBody({ action, langs, text, from, brief, field, context, ai={}, image=null }){
+/** @param {{action:string, langs:string[], text:Record<string,any>, from?:string, brief?:string, field:object, context?:string, ai?:Record<string,any>, image?:any, general?:boolean}} o */
+export function requestBody({ action, langs, text, from, brief="", field, context="", ai={}, image=null, general }){
   const t={}; ["en","ar"].forEach(l=>{ const v=String(text?.[l]||""); if (v.trim()) t[l]=v; });
   return {
     action, langs: action==="translate" ? ["en","ar"] : langs, text: t,
     from: action==="translate" ? translateFrom(t, from) : undefined,
     brief: String(brief||"").trim(), field, context: String(context||"").slice(0,4000),
     brand: ai.brand||"", arabic: ai.arabic||"", avoid: ai.avoid||"", model: ai.model==="lite"?"lite":"flash",
+    general: general==null ? ai.general===true : !!general,
     image: action==="describe" ? image : null,
   };
 }
