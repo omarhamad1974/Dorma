@@ -150,7 +150,11 @@ const STARTER = {
   /* Pictures uploaded from the studio are made smaller in the browser first (studio › Library › Picture optimizing). */
   uploads: { optimize:true, maxSide:2400, quality:0.85, format:"webp", keepPng:true },
   /* GitHub files deleted from the Library (or copied to Supabase under a new name), so Check GitHub doesn't add them back. */
-  libIgnore: []
+  libIgnore: [],
+  /* Studio › Site care › Backups: how many versions (publishes and snapshots) the database keeps; pinned ones are extra. */
+  backups: { keep: 30 },
+  /* Studio › Site care › Health check: problems the editor chose to ignore (by id), and the big-file warning size. */
+  health: { ignore: [], bigFileKB: 1500 }
 };
 
 /* ================= FIELD SCHEMAS =================
