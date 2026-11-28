@@ -393,7 +393,7 @@ function libBrowser({ current="", multi=false, onPick, onAdd, onClose, addLabel=
   const syncAdd=()=>{ if (!addBtn) return; addBtn.disabled=!chosen.length; addBtn.innerHTML=IC.plus+(chosen.length?addLabel+" ("+chosen.length+")":"Pick one or more images"); };
   outer.append(use,h("div",{class:"media-pick-filters"},cats,q,sizes,countEl));
   const draw=()=>{ g.textContent=""; usage=mediaUsage(D); drawUse(); fillCats();
-    const all=pool(), found=libFilter(all,{cat:PICK.cat,q:PICK.q}), list=[...found.filter(m=>m.kind!=="scene"),...found.filter(m=>m.kind==="scene")]; // real photos first, placeholders last
+    const all=pool(), found=sortMedia(libFilter(all,{cat:PICK.cat,q:PICK.q}),"newest",{index:libIndex}), list=[...found.filter(m=>m.kind!=="scene"),...found.filter(m=>m.kind==="scene")]; // newest first; real photos first, placeholders last
     countEl.textContent=list.length===all.length?all.length+" items":list.length+" of "+all.length;
     list.forEach(m=>{ const n=chosen.indexOf(m.id), on=multi?n>=0:current===m.id, places=usage.get(m.id)||[];
       const b=h("button",{type:"button",class:(on?"on":"")+(m.kind==="scene"?" is-ph":"")+(places.length?" is-used":" is-free"),title:plain(m.label)+(m.kind==="scene"?" (placeholder)":"")+"\n"+(places.length?usedText(places):"Not used anywhere yet"),"aria-label":plain(m.label)+(places.length?", used in "+places.length+(places.length===1?" place":" places"):", not used yet"),"aria-pressed":String(on)},mediaThumb(m.id),h("span",{text:plain(m.label)}),
@@ -1341,7 +1341,7 @@ function panelPages(body){
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
 IC.link='<svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>';
-const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set(), page:0, all:false, sig:"" };
+const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"newest", dupes:false, selecting:false, sel:new Set(), page:0, all:false, sig:"" };
 const LIB_PAGE=48; // library cards per page
 const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
@@ -1383,6 +1383,7 @@ function docThumb(m){ const D=Store.draft; if (m.cover){ const n=mediaNode(D,m.c
 
 function panelMedia(body){
   const D=Store.draft; D.libIgnore=Array.isArray(D.libIgnore)?D.libIgnore:[];
+  LIB.sort="newest"; LIB.dupes=false; // every open starts newest first; other sorts stay one click away
   body.append(h("p",{class:"adm-intro",text:"Every image, video, background and article in one place, sorted into categories. Drag pictures onto a category to move them, tick several to move, hide or delete them together, and sort by size to find duplicates. Anything here can be picked wherever the studio asks for an image."}));
   /* Every new item needs a category: uploads, links, articles and scenes go into the one chosen here (the GitHub folder decides for GitHub files). */
   const newCat=h("span",{class:"cat-new"});
