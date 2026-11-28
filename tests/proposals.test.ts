@@ -60,12 +60,14 @@ describe('client proposals', () => {
     expect(site.site.homePage).toBe('for/acme-k7p2');
     expect(site.__pageMap).toEqual({ packaging: 'for/acme-k7p2/packaging', 'booth-production': 'for/acme-k7p2/booth-production' });
     const ov = site.pages[0];
-    expect(ov.sections.map((s: Any) => s.type)).toEqual(['forCover', 'division', 'grid', 'cta']);
-    expect(ov.sections[0].eyebrow).toEqual({ en: 'Prepared for Acme', ar: 'مقدَّم إلى أكمي' });
-    expect(ov.sections[0].lede).toEqual({ en: 'Hello', ar: 'مرحباً' });
+    expect(ov.sections.map((s: Any) => s.type)).toEqual(['forCover', 'forBrief', 'division', 'grid', 'forSign', 'cta']);
+    expect(ov.sections[0].eyebrow).toEqual({ en: 'Prepared for', ar: 'مقدَّم إلى' });
+    expect(ov.sections[0].clientName).toEqual({ en: 'Acme', ar: 'أكمي' });
+    expect(ov.sections[0].lede).toBe('');
+    expect(ov.sections[1].text).toEqual({ en: 'Hello', ar: 'مرحباً' });
     expect(ov.sections[0].media).toBe(pkg.sections[0].media); // first service's picture
-    expect(ov.sections[1].items[0]).toMatchObject({ title: pkg.title, action: { type: 'page', target: 'packaging' } });
-    expect(ov.sections[2].items).toHaveLength(1);
+    expect(ov.sections[2].items[0]).toMatchObject({ title: pkg.title, action: { type: 'page', target: 'packaging' } });
+    expect(ov.sections[3].items).toHaveLength(1);
     const pp = site.pages[1];
     expect(pp.sections.some((s: Any) => s.id === hideId)).toBe(false);
     expect(pp.sections.length).toBe(pkg.sections.length - 1);
@@ -79,7 +81,8 @@ describe('client proposals', () => {
     const site: Any = buildProposalSite(cfg, { langs: 'ar', defaultLang: 'ar', contact: { label: { en: '', ar: '' }, action: { type: 'none', target: '' } } }, 'x-abcd');
     expect(site.site.languages).toBe('ar');
     expect(site.site.defaultLang).toBe('ar');
-    expect(site.pages[0].sections.map((s: Any) => s.type)).toEqual(['forCover']);
+    expect(site.pages[0].sections.map((s: Any) => s.type)).toEqual(['forCover', 'forSign']);
+    expect(buildProposalSite(cfg, { sign: { show: false } }, 'x-abcd').pages[0].sections.map((s: Any) => s.type)).not.toContain('forSign');
     expect(site.site.cta.label).toBe('');
   });
 
@@ -92,7 +95,7 @@ describe('client proposals', () => {
 
   it('writes the default headline and keeps custom words', () => {
     const d: Any = normalizeProposal({ client: { name: { en: 'Acme', ar: '' } }, words: { preparedFor: { en: 'Made for', ar: '' }, bogus: 'x' } });
-    expect(proposalTitle(d)).toEqual({ en: 'A proposal for Acme', ar: 'عرض مقدّم إلى Acme' });
+    expect(proposalTitle(d)).toEqual({ en: 'Our proposal for you', ar: 'عرضنا المقدَّم لكم' });
     expect(preparedFor(d).en).toBe('Made for Acme');
     expect(Object.keys(d.words)).toEqual(['preparedFor']);
   });

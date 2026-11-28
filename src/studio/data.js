@@ -1,5 +1,6 @@
 import { FLOWS, MODALS, PAGES, POSTS, SITE_MAP } from './content';
 import { LOGO_DEFAULTS } from './logos';
+import { kitDefaults } from './proposals';
 /* ================= STARTER TEMPLATE =================
    The site renders entirely from one settings object. This is the starter
    template the studio falls back to before anything has been saved. */
@@ -50,6 +51,8 @@ const STARTER = {
     /* reference websites the AI reads for facts and focus: [{ url, note, on }] (on = used by default) */
     refs: [],
   },
+  /* Content → Proposals → Templates and signature: brief templates with [placeholders], default sender and company. */
+  proposalKit: kitDefaults(),
   loader: { enabled: true, mark: "image", image: "", bg: "theme", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {
     ink: "#040915", panel: "#0b1630", fg: "#eef2fa", accent: "#ffc93c",

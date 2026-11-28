@@ -6,10 +6,14 @@
 .pr-bar a{color:inherit;text-decoration:none}
 .pr-who{display:inline-flex;align-items:center;gap:10px;min-width:0}
 .pr-who > span:not(.pr-mini){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the client's name in the band: larger, in the display font, not in capitals */
+.pr-for{display:inline-flex;align-items:baseline;gap:8px;min-width:0}
+.pr-for small{font-size:inherit;opacity:.75;flex:none}
+.pr-nm{font-family:var(--display);font-size:clamp(.95rem,1.3vw,1.12rem);font-weight:700;letter-spacing:.01em;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pr-when{opacity:.7;font-size:inherit;letter-spacing:inherit}
 .pr-full{white-space:nowrap;opacity:.85}.pr-full:hover,.pr-full:focus-visible{opacity:1;text-decoration:underline}
 .pr-mini,.pr-client{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:6px;flex:none}
-.pr-mini{height:24px;padding:3px 6px}.pr-mini img{height:18px;width:auto;max-width:80px;object-fit:contain;display:block}
+.pr-mini{height:30px;padding:3px 7px}.pr-mini img{height:24px;width:auto;max-width:80px;object-fit:contain;display:block}
 .pr-mini b{font-size:.6rem;color:#0b1630;padding:0 2px}
 .pr-mini.bare,.pr-client.bare{background:transparent;padding:0}
 .pr-lockup{display:flex;align-items:center;gap:clamp(12px,2vw,22px);flex-wrap:wrap}
@@ -21,8 +25,23 @@
 .pr-client b{color:#0b1630;font-size:clamp(1rem,1.6vw,1.3rem);font-weight:600;letter-spacing:.02em}
 .pr-client.bare b{color:inherit}
 .pr-date{margin:-8px 0 0}
+/* overview: "Prepared for" · CLIENT NAME (large) · headline */
+.pr-cover .pr-name{font-family:var(--display);font-weight:700;font-size:clamp(2.6rem,7vw,5.6rem);line-height:1.02;letter-spacing:-.02em;margin:4px 0 6px;color:var(--fg);overflow-wrap:anywhere;text-wrap:balance}
+.pr-cover h1.pr-headline{max-width:28ch;font-size:clamp(1.5rem,3vw,2.5rem);line-height:1.15;font-weight:400;opacity:.92}
+[dir="rtl"] .pr-cover .pr-name{letter-spacing:0;line-height:1.2}
+/* the brief (letter after the header) and the signature */
+.pr-brief{padding-block:clamp(48px,8vw,96px)}
+.pr-brief.pr-end{padding-block:clamp(24px,4vw,48px)}
+.pr-letter{max-width:760px}
+.pr-letter .prose{font-size:clamp(1.06rem,1.35vw,1.22rem)}
+.pr-sign{margin-top:32px;display:grid;gap:2px}
+.pr-end .pr-sign{margin-top:0}
+.pr-sign p{margin:0}
+.pr-sign-off{color:color-mix(in srgb,var(--fg) 75%,transparent)}
+.pr-sign-name{font-family:var(--display);font-weight:600;font-size:1.3rem;color:var(--fg);margin-top:10px !important}
+.pr-sign-co{font-family:var(--mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .pr-foot{color:var(--muted);text-decoration:none}.pr-foot:hover{text-decoration:underline}
-@media (max-width:640px){ .pr-when,.pr-full{display:none} .site-head.has-pr .wrap{padding-top:12px} }
+@media (max-width:640px){ .pr-when,.pr-full{display:none} .site-head.has-pr .wrap{padding-top:12px} .pr-for small{display:none} }
 [dir="rtl"] .pr-full{direction:rtl}
 
 /* --- studio (Content → Proposals) --- */
@@ -82,6 +101,17 @@
 .pp-eyebrow{font-family:var(--mono);font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:#1452c7;margin:0 0 4px}
 .pp-date{font-family:var(--mono);font-size:9pt;color:#5a6680}
 .pp-lede{font-size:12pt;color:#2a3550}
+.pp-client-name{font-family:var(--display);font-size:36pt;line-height:1.05;font-weight:700;color:#0072bc;margin:2px 0 10px !important;letter-spacing:-.01em;overflow-wrap:anywhere}
+[dir="rtl"] .pp-client-name{letter-spacing:0;line-height:1.25}
+.pp-doc h1.pp-headline{font-size:20pt;font-weight:500;color:#2a3550}
+.pp-brief{font-size:12pt;line-height:1.7;color:#1d2840}
+.pp-brief p{margin:0 0 12px}
+.pp-sign{margin-top:18px;break-inside:avoid}
+.pp-sign p{margin:0 0 2px}
+.pp-sign-name{font-family:var(--display);font-weight:600;font-size:14pt;margin-top:8px !important}
+.pp-sign-co{font-family:var(--mono);font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:#0072bc}
+.pp-end{padding-top:6mm !important}
+.pp-end .pp-sign{margin-top:0}
 .pp-cover{min-height:240mm;display:flex;flex-direction:column;justify-content:flex-start;gap:6px}
 .pp-lockup{margin-bottom:22mm}
 .pp-lockup .pr-dorma{height:40px}
@@ -108,7 +138,8 @@
   .pp-doc{width:auto;margin:0;box-shadow:none}
   .pp-doc > section{padding:16mm 16mm}
   .pp-cover{min-height:265mm;break-after:page}
-  .pp-svc,.pp-toc,.pp-work,.pp-close{break-before:page;border-top:0 !important}
+  .pp-svc,.pp-toc,.pp-work,.pp-close,.pp-brief{break-before:page;border-top:0 !important}
+  .pp-end{border-top:0 !important}
   .pp-close{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pp-doc a{text-decoration:none}
 }
@@ -117,3 +148,21 @@
 .adm .pr-mode.frozen{border-color:rgba(120,170,255,.7);color:#8fb5ff}
 .adm.light .pr-mode.live{color:#17804f}.adm.light .pr-mode.frozen{color:#1452c7}
 .adm .pr-new{color:var(--accent);font-weight:600}
+/* studio: brief, templates and signature */
+.adm .pr-tpl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.adm .pr-tpl-row select,.adm .pr-pv select{padding:8px 10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);min-width:200px;max-width:100%}
+.adm .pr-pv{display:inline-flex;align-items:center;gap:8px;margin-inline-start:auto}
+.adm .pr-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.adm .pr-chip{font-family:var(--mono);font-size:.72rem;text-transform:none;letter-spacing:0}
+.adm .pr-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.adm .pr-prev-col{border:1px dashed var(--faint);border-radius:10px;padding:12px 14px;font-size:.92rem;line-height:1.6;background:var(--field-bg)}
+.adm .pr-prev-col p{margin:0 0 8px}
+.adm .pr-prev-lang{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.adm .pr-prev-sign,.adm .pr-sign-prev > div{display:grid;gap:2px;margin-top:10px}
+.adm .pr-prev-sign p,.adm .pr-sign-prev p{margin:0;color:var(--muted)}
+.adm .pr-prev-sign small,.adm .pr-sign-prev small{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.adm .pr-sign-prev{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;border:1px dashed var(--faint);border-radius:10px;padding:12px 14px}
+.adm .pr-sign-prev > div{margin:0}
+.adm .pr-ph{border-collapse:collapse;font-size:.86rem;width:100%}
+.adm .pr-ph td{padding:6px 8px;border-bottom:1px solid var(--faint);vertical-align:top}
+.adm .pr-ph code{font-family:var(--mono);font-size:.8rem}

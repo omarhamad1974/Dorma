@@ -24,8 +24,102 @@ const PR_WORDS = {
   unavailableText: T("Contact Dorma Advertising for an updated proposal, or browse the full website.", "تواصل مع دورما للإعلان للحصول على عرض محدّث، أو تصفّح الموقع الكامل."),
   missing: T("This proposal link isn't valid", "رابط العرض غير صحيح"),
   pdf: T("Save as PDF", "حفظ كملف PDF"),
-  missingText: T("Check the link you received, or browse the full website.", "تحقّق من الرابط الذي وصلك، أو تصفّح الموقع الكامل.")
+  missingText: T("Check the link you received, or browse the full website.", "تحقّق من الرابط الذي وصلك، أو تصفّح الموقع الكامل."),
+  signOff: T("Kind regards,", "مع أطيب التحيات،"),
+  advertising: T("Dorma Advertising", "دورما للإعلان"),
+  production: T("Dorma Production", "دورما للإنتاج")
 };
+
+/* ---------- brief templates and signature ----------
+   The brief is the letter after the header ("Dear [client name], …"). The admin keeps named templates (English and
+   Arabic) with a default sender name and company in Store.draft.proposalKit; a proposal copies a template's text into
+   its own brief (kept in data.welcome, the older "welcome message") and can then change it freely. Placeholders in
+   square brackets are filled in when the proposal is shown, in each language. */
+const PLACEHOLDERS = [
+  { key: "client", en: "[client name]", ar: "[اسم العميل]", label: "Client name", names: ["client name", "customer name", "client", "customer", "اسم العميل", "العميل", "اسم الزبون"] },
+  { key: "date", en: "[date]", ar: "[التاريخ]", label: "Date", names: ["date", "التاريخ"] },
+  { key: "services", en: "[services]", ar: "[الخدمات]", label: "Services list", names: ["services", "services list", "service list", "الخدمات", "قائمة الخدمات"] },
+  { key: "sender", en: "[sender name]", ar: "[اسم المرسل]", label: "Sender name", names: ["sender name", "sender", "اسم المرسل", "المرسل"] },
+  { key: "company", en: "[company]", ar: "[الشركة]", label: "Dorma Advertising / Production", names: ["company", "company name", "الشركة", "اسم الشركة"] }
+];
+const PH_BY_NAME = new Map(PLACEHOLDERS.flatMap(p => p.names.map(n => [n, p.key])));
+const COMPANY_KEYS = ["advertising", "production"];
+
+const STARTER_TEMPLATES = [
+  { id: "tpl-standard", name: "Standard brief",
+    body: T("Dear [client name],\n\nThank you for the opportunity to present this proposal. On the following pages you will find how we can help you with [services].\n\nEach service has its own page with the details. We would be glad to walk you through it and adjust anything to fit your plans.",
+      "عزيزنا [اسم العميل]،\n\nنشكركم على إتاحة الفرصة لنا لتقديم هذا العرض. ستجدون في الصفحات التالية كيف يمكننا مساعدتكم في [الخدمات].\n\nلكل خدمة صفحة خاصة بها فيها التفاصيل. يسعدنا أن نشرحها لكم ونعدّل ما يلزم ليناسب خططكم.") },
+  { id: "tpl-short", name: "Short note",
+    body: T("Dear [client name],\n\nAs promised, here is our proposal for [services], prepared on [date]. We look forward to hearing from you.",
+      "عزيزنا [اسم العميل]،\n\nكما وعدناكم، هذا عرضنا لـ[الخدمات]، أُعدّ بتاريخ [التاريخ]. نتطلع إلى التواصل معكم.") }
+];
+function kitDefaults() {
+  return { templates: JSON.parse(JSON.stringify(STARTER_TEMPLATES)), defaultTemplate: "tpl-standard", sender: T(), company: "advertising", place: "end" };
+}
+/** The studio's saved templates and signature defaults, with anything missing filled in. */
+function normalizeKit(k) {
+  const base = kitDefaults(), src = isObj(k) ? k : {};
+  const templates = Array.isArray(src.templates) ? src.templates.filter(t => isObj(t) && typeof t.id === "string" && t.id)
+    .map(t => ({ id: t.id, name: typeof t.name === "string" ? t.name : "", body: txOf(t.body) })) : base.templates;
+  return { templates, defaultTemplate: typeof src.defaultTemplate === "string" ? src.defaultTemplate : base.defaultTemplate,
+    sender: src.sender == null ? base.sender : txOf(src.sender), company: COMPANY_KEYS.includes(src.company) ? src.company : base.company,
+    place: src.place === "brief" ? "brief" : "end" };
+}
+
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+/** 2026-11-28 → "28 November 2026" / "28 نوفمبر 2026". */
+function longDate(iso, lang = "en") {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return "";
+  const mo = +m[2] - 1; if (mo < 0 || mo > 11) return "";
+  return +m[3] + " " + (lang === "ar" ? AR_MONTHS : EN_MONTHS)[mo] + " " + m[1];
+}
+/** "A, B and C" / "A، B وC". */
+function joinList(list, lang = "en") {
+  const xs = list.filter(Boolean); if (xs.length < 2) return xs[0] || "";
+  return lang === "ar" ? xs.slice(0, -1).join("، ") + " و" + xs[xs.length - 1] : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
+}
+/** What each placeholder stands for in one language, for one proposal (cfg gives the service page titles). */
+function placeholderValues(rawData, cfg, lang = "en") {
+  const d = normalizeProposal(rawData), L = v => inLang(v, lang), pages = (cfg && cfg.pages) || [];
+  return {
+    client: L(d.client.name),
+    date: longDate(d.date, lang),
+    services: joinList(d.services.map(s => pages.find(p => p.id === s.page)).filter(Boolean).map(p => L(p.title)), lang),
+    sender: L(d.sign.name),
+    company: L(word(d, d.sign.company))
+  };
+}
+/** Replaces [client name], [date], [services], [sender name] and [company] (or their Arabic names). Links like
+    [text](https://…) and unknown brackets are left as they are. */
+function fillPlaceholders(text, vals) {
+  return String(text || "").replace(/\[([^\]\n]{1,40})\](?!\()/g, (m, k) => {
+    const key = PH_BY_NAME.get(k.trim().toLowerCase().replace(/\s+/g, " "));
+    return key ? String(vals[key] ?? "") : m;
+  });
+}
+/** The proposal's brief with the placeholders filled in, in both languages. */
+function briefText(rawData, cfg) {
+  const d = normalizeProposal(rawData);
+  return T(fillPlaceholders(d.welcome.en, placeholderValues(d, cfg, "en")), fillPlaceholders(d.welcome.ar, placeholderValues(d, cfg, "ar")));
+}
+/** Placeholders in a text that aren't known (likely typos), to warn about in the studio. */
+function unknownPlaceholders(text) {
+  const out = []; String(text || "").replace(/\[([^\]\n]{1,40})\](?!\()/g, (m, k) => { if (!PH_BY_NAME.has(k.trim().toLowerCase().replace(/\s+/g, " ")) && !out.includes(m)) out.push(m); return m; });
+  return out;
+}
+/** Signature lines: "Kind regards," · sender name · Dorma Advertising (or Production). null when switched off. */
+function signature(rawData) {
+  const d = normalizeProposal(rawData); if (!d.sign.show) return null;
+  return { off: word(d, "signOff"), name: d.sign.name, company: word(d, d.sign.company), place: d.sign.place };
+}
+/** A new proposal's brief and signature from the studio's defaults. */
+function applyKit(data, rawKit) {
+  const kit = normalizeKit(rawKit), t = kit.templates.find(x => x.id === kit.defaultTemplate);
+  if (t && !(data.welcome && (data.welcome.en || data.welcome.ar))) { data.welcome = { ...t.body }; data.briefTemplate = t.id; }
+  data.sign = { ...(data.sign || {}), show: true, name: { ...kit.sender }, company: kit.company, place: kit.place };
+  return data;
+}
 
 const STATUS_NAME = { live: "Live", off: "Off", expired: "Expired", archived: "Archived" };
 
@@ -34,7 +128,9 @@ function proposalDefaults(today = "") {
     client: { name: T(), logo: "", logoSrc: "", logoBg: "white" },
     title: T(),          // headline on the overview; empty = "A proposal for <client>"
     date: today,         // shown in the header and on the overview
-    welcome: T(),        // welcome message under the headline
+    welcome: T(),        // the brief: letter after the header, with [placeholders] (was the welcome message)
+    briefTemplate: "",   // id of the template the brief was last taken from (studio only)
+    sign: { show: true, name: T(), company: "advertising", place: "end" }, // signature: sender, Dorma Advertising | Production, end | brief
     cover: "",           // overview picture (library id); empty = the first service's picture
     services: [],        // [{ page, hide:[section ids], note:{en,ar} }]
     work: { media: [], posts: [] },
@@ -71,6 +167,9 @@ function normalizeProposal(d, today = "") {
   out.langs = ["site", "en", "ar", "both"].includes(src.langs) ? src.langs : "site";
   out.defaultLang = ["site", "en", "ar"].includes(src.defaultLang) ? src.defaultLang : "site";
   out.internal = typeof src.internal === "string" ? src.internal : "";
+  out.briefTemplate = typeof src.briefTemplate === "string" ? src.briefTemplate : "";
+  const sg = isObj(src.sign) ? src.sign : {};
+  out.sign = { show: sg.show !== false, name: txOf(sg.name), company: COMPANY_KEYS.includes(sg.company) ? sg.company : "advertising", place: sg.place === "brief" ? "brief" : "end" };
   out.pdfLink = src.pdfLink !== false;
   const fz = isObj(src.frozen) ? src.frozen : null;
   out.frozen = fz && Array.isArray(fz.pages) ? { at: String(fz.at || ""), pages: fz.pages.filter(isObj), media: (fz.media || []).filter(isObj), modals: (fz.modals || []).filter(isObj), flows: (fz.flows || []).filter(isObj), posts: (fz.posts || []).filter(isObj) } : null;
@@ -131,9 +230,9 @@ function preparedFor(data) {
   return T([w.en, n.en || n.ar].filter(Boolean).join(" "), [w.ar, n.ar || n.en].filter(Boolean).join(" "));
 }
 function proposalTitle(data) {
-  const t = data.title, n = data.client.name;
+  const t = data.title;
   if (t.en || t.ar) return t;
-  return T(n.en || n.ar ? "A proposal for " + (n.en || n.ar) : "Your proposal", n.ar || n.en ? "عرض مقدّم إلى " + (n.ar || n.en) : "عرضك");
+  return T("Our proposal for you", "عرضنا المقدَّم لكم"); // the client's name is shown large just above it
 }
 
 /**
@@ -158,11 +257,16 @@ function buildProposalSite(liveCfg, rawData, slug) {
     ...data.work.posts.map(id => (cfg.posts || []).find(p => p.id === id && p.published)).filter(Boolean)
       .map(p => ({ media: p.cover || "", title: p.title || "", text: p.excerpt || "", tag: "", action: { type: "post", target: p.id } }))
   ];
+  const hasName = !!(data.client.name.en || data.client.name.ar);
+  const brief = briefText(data, cfg), sign = signature(data);
+  const signSec = sign ? { off: sign.off, name: sign.name, company: sign.company } : null;
   const overview = { id: base, title: word(data, "overview"), nav: true, layout: "cinematic", isProposal: true, sections: [
-    { id: "pr-cover", type: "forCover", num: "", eyebrow: preparedFor(data), title: proposalTitle(data), lede: data.welcome, media: cover, height: "tall", flowId: "",
+    { id: "pr-cover", type: "forCover", num: "", eyebrow: hasName ? word(data, "preparedFor") : "", clientName: data.client.name, title: proposalTitle(data), lede: "", media: cover, height: "tall", flowId: "",
       button: contact || { label: "", action: { type: "none", target: "" } }, client: data.client, date: data.date },
+    ...((brief.en || brief.ar) ? [{ id: "pr-brief", type: "forBrief", anchor: "brief", text: brief, sign: sign && sign.place === "brief" ? signSec : null }] : []),
     ...(items.length ? [{ id: "pr-services", type: "division", anchor: "services", num: "", eyebrow: word(data, "services"), title: "", text: "", media: "", items }] : []),
     ...(workItems.length ? [{ id: "pr-work", type: "grid", anchor: "work", title: word(data, "work"), filters: false, items: workItems }] : []),
+    ...(sign && (sign.place === "end" || !(brief.en || brief.ar)) ? [{ id: "pr-sign", type: "forSign", sign: signSec }] : []),
     ...(contact ? [{ id: "pr-cta", type: "cta", title: (data.closing.en || data.closing.ar) ? data.closing : word(data, "closing"), button: contact, bgfx: { type: "goo" } }] : [])
   ] };
   const servicePages = chosen.map(({ s, page }) => ({ ...page, id: pageMap[page.id], nav: true, isProposal: true, sourceId: page.id,
@@ -176,7 +280,7 @@ function buildProposalSite(liveCfg, rawData, slug) {
     site: { ...cfg.site, homePage: base, languages: langs, defaultLang, cta: contact || { label: "", action: { type: "none", target: "" } } },
     theme: navCount > 5 ? { ...cfg.theme, menu: { ...(cfg.theme && cfg.theme.menu || {}), mode: "overlay" } } : cfg.theme,
     __pageMap: pageMap,
-    __proposal: { slug, base, client: data.client, date: data.date, preparedFor: preparedFor(data), fullSite: word(data, "fullSite"), pdf: data.pdfLink ? word(data, "pdf") : null, frozen: !!data.frozen }
+    __proposal: { slug, base, client: data.client, date: data.date, preparedFor: preparedFor(data), forWord: word(data, "preparedFor"), fullSite: word(data, "fullSite"), pdf: data.pdfLink ? word(data, "pdf") : null, frozen: !!data.frozen }
   };
 }
 
@@ -256,9 +360,11 @@ function proposalPrint(liveCfg, rawData, lang = "en") {
   ];
   const cover = (data.cover && media(data.cover) ? data.cover : "") || services.map(x => x.media).find(Boolean) || "";
   const site = cfg.site || {};
+  const brief = briefText(data, cfg), sg = signature(data);
   return {
     lang, dir: lang === "ar" ? "rtl" : "ltr",
-    brand: L(site.brand), preparedFor: L(preparedFor(data)), title: L(proposalTitle(data)), welcome: L(data.welcome),
+    brand: L(site.brand), preparedFor: L(preparedFor(data)), forWord: L(word(data, "preparedFor")), title: L(proposalTitle(data)), welcome: L(brief), brief: L(brief),
+    sign: sg ? { off: L(sg.off), name: L(sg.name), company: L(sg.company), place: sg.place } : null,
     date: data.date, client: { name: L(data.client.name), logo: data.client.logo, logoSrc: data.client.logoSrc, logoBg: data.client.logoBg },
     cover, services, work, workTitle: L(word(data, "work")), servicesTitle: L(word(data, "services")),
     closing: L(data.closing) || L(word(data, "closing")), email: String(site.quoteEmail || "").trim(), frozen: data.frozen ? data.frozen.at : ""
@@ -276,4 +382,5 @@ const deviceOf = (w, coarse = false) => w < 700 ? "phone" : (w < 1100 && coarse)
 
 export { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, slugPart, proposalState, pageSummary, pageMedia,
   proposalPages, preparedFor, proposalTitle, buildProposalSite, proposalsUsing, deviceOf, word,
-  freezeSnapshot, withFrozen, notInFrozen, snapshotBytes, proposalPrint, inLang, stripMd };
+  freezeSnapshot, withFrozen, notInFrozen, snapshotBytes, proposalPrint, inLang, stripMd,
+  PLACEHOLDERS, COMPANY_KEYS, kitDefaults, normalizeKit, longDate, joinList, placeholderValues, fillPlaceholders, briefText, unknownPlaceholders, signature, applyKit };

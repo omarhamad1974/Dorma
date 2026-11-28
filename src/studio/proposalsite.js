@@ -4,11 +4,13 @@
    and a link to the full website. An unknown, switched-off or expired proposal shows a short note instead.
    The first open in a visit is counted (editors' own opens never are). */
 import './proposals.css';
-import { $, h, mediaItem, mediaUrl, logoNode, ui, fmtDate, LANG, setDocLang, applyTheme } from './core';
+import { $, h, mediaItem, mediaUrl, logoNode, ui, fmtDate, LANG, setDocLang, applyTheme, renderProse } from './core';
 import { Store, openProposal } from './store';
 import { Site, renderSite, SECTIONS, disposePage, closeModal } from './site';
 import { buildProposalSite, deviceOf, PR_WORDS, proposalPrint, inLang } from './proposals';
 
+/* Light Markdown in the brief, made plain for print: **bold**, *italic*, [text](link) and ## headings. */
+const stripLinks = t => String(t || "").replace(/\r/g, "").replace(/^#{1,6}\s*/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
 const CACHE = { slug: "", res: null, at: 0, draft: false };
 const fullSiteHref = (hash = "") => location.pathname + location.search + (hash ? "#" + hash : "");
 
@@ -83,8 +85,32 @@ function forCover(cfg, sec, page) {
     h("span", { class: "pr-x", "aria-hidden": "true", text: "×" }),
     clientLogo(cfg, sec.client || {}, "pr-client"));
   inner.prepend(lock);
+  /* the client's name, large, between "Prepared for" and the headline */
+  const name = typeof sec.clientName === "string" ? sec.clientName : "";
+  const h1 = inner.querySelector("h1");
+  if (name && h1) { h1.before(h("p", { class: "pr-name", "data-in": "", text: name })); h1.classList.add("pr-headline"); }
   const d = fmtDate(sec.date); if (d) lock.after(h("p", { class: "mono pr-date", text: d }));
   return el;
+}
+
+/* The signature: "Kind regards," · sender name · Dorma Advertising (or Dorma Production). */
+function signBlock(sg) {
+  if (!sg || !(sg.name || sg.company)) return null;
+  return h("div", { class: "pr-sign", "data-rv": "" },
+    sg.off ? h("p", { class: "pr-sign-off", text: sg.off }) : null,
+    sg.name ? h("p", { class: "pr-sign-name", text: sg.name }) : null,
+    sg.company ? h("p", { class: "pr-sign-co", text: sg.company }) : null);
+}
+/* The brief: the letter right after the header ("Dear …"), with the signature under it when set to go there. */
+function forBrief(cfg, sec) {
+  const letter = h("div", { class: "pr-letter", "data-rv": "" }, renderProse(cfg, sec.text || ""));
+  const sg = signBlock(sec.sign); if (sg) letter.append(sg);
+  return h("section", { class: "sec pr-brief" }, h("div", { class: "wrap" }, letter));
+}
+/* The signature at the end of the overview, before the contact band. */
+function forSign(cfg, sec) {
+  const sg = signBlock(sec.sign); if (!sg) return h("section", { hidden: true });
+  return h("section", { class: "sec pr-brief pr-end" }, h("div", { class: "wrap" }, h("div", { class: "pr-letter" }, sg)));
 }
 
 /* Header band and footer line on every proposal page (called by renderSite). */
@@ -95,7 +121,9 @@ function decorate(cfg, app) {
   const head = $(".site-head", app);
   if (head) {
     const bar = h("div", { class: "pr-bar" },
-      h("a", { class: "pr-who", href: "#" + P.base }, clientLogo(cfg, P.client, "pr-mini"), h("span", { text: P.preparedFor }), date ? h("span", { class: "mono pr-when", text: date }) : null),
+      h("a", { class: "pr-who", href: "#" + P.base }, P.client.name && !clientLogo(cfg, P.client, "pr-mini").querySelector("img") ? null : clientLogo(cfg, P.client, "pr-mini"),
+        P.client.name ? h("span", { class: "pr-for" }, h("small", { text: P.forWord || "" }), h("b", { class: "pr-nm", text: P.client.name })) : h("span", { text: P.preparedFor }),
+        date ? h("span", { class: "mono pr-when", text: date }) : null),
       h("span", { class: "pr-links" },
         P.pdf ? h("a", { class: "pr-full pr-pdf", href: "#" + P.base + "/pdf/" + (cfg.__lang || "en"), text: P.pdf }) : null,
         h("a", { class: "pr-full", href: fullSiteHref(), target: "_blank", rel: "noopener", text: P.fullSite + " ↗" })));
@@ -107,7 +135,7 @@ function decorate(cfg, app) {
 /** Pages and posts that are not part of the proposal open on the full website in a new tab. */
 function openOnSite(hash) { const a = h("a", { href: fullSiteHref(hash), target: "_blank", rel: "noopener" }); document.body.append(a); a.click(); a.remove(); }
 /* Hooked into the site renderer on first use (not at load: the modules import each other). */
-function install() { if (SECTIONS.forCover) return; SECTIONS.forCover = forCover; Site.forDecorate = decorate; Site.forOpen = openOnSite; }
+function install() { if (SECTIONS.forCover) return; SECTIONS.forCover = forCover; SECTIONS.forBrief = forBrief; SECTIONS.forSign = forSign; Site.forDecorate = decorate; Site.forOpen = openOnSite; }
 
 /* ---------- printable version (Save as PDF) ----------
    #for/<code>/pdf/en or /ar: a clean, white, A4 document made for the browser's Print → Save as PDF. A bar at the top
@@ -138,11 +166,18 @@ function renderPrint(cfg, res, slug, want) {
   const coverImg = img(P.cover, "pp-cover-img");
   doc.append(h("section", { class: "pp-cover" },
     h("div", { class: "pr-lockup pp-lockup" }, logoNode(cfg, "header", "light", { alt: P.brand, cls: "pr-dorma" }), h("span", { class: "pr-x", "aria-hidden": "true", text: "×" }), clientLogo(cfg, P.client, "pr-client")),
-    h("p", { class: "pp-eyebrow", text: P.preparedFor }),
-    h("h1", { text: P.title }),
+    P.client.name ? h("p", { class: "pp-eyebrow", text: P.forWord }) : h("p", { class: "pp-eyebrow", text: P.preparedFor }),
+    P.client.name ? h("p", { class: "pp-client-name", text: P.client.name }) : null,
+    h("h1", { class: P.client.name ? "pp-headline" : "", text: P.title }),
     P.date ? h("p", { class: "pp-date", text: fmtDate(P.date) }) : null,
-    ...para(P.welcome).map(x => { x.className = "pp-lede"; return x; }),
     coverImg));
+  const signEl = () => P.sign && (P.sign.name || P.sign.company) ? h("div", { class: "pp-sign" },
+    P.sign.off ? h("p", { text: P.sign.off }) : null, P.sign.name ? h("p", { class: "pp-sign-name", text: P.sign.name }) : null, P.sign.company ? h("p", { class: "pp-sign-co", text: P.sign.company }) : null) : null;
+  if (P.brief) {
+    const b = h("section", { class: "pp-brief" }, ...para(stripLinks(P.brief)));
+    if (P.sign && P.sign.place === "brief") { const sg = signEl(); if (sg) b.append(sg); }
+    doc.append(b);
+  }
   if (P.services.length) {
     doc.append(h("section", { class: "pp-toc" }, h("h2", { text: P.servicesTitle }),
       h("ol", {}, ...P.services.map(s => h("li", {}, h("b", { text: s.title }), s.summary ? h("span", { text: s.summary }) : null)))));
@@ -165,6 +200,7 @@ function renderPrint(cfg, res, slug, want) {
     doc.append(h("section", { class: "pp-work" }, h("h2", { text: P.workTitle }),
       h("div", { class: "pp-work-grid" }, ...P.work.map(w => h("figure", {}, img(w.media, "", w.title), w.title || w.text ? h("figcaption", {}, w.title ? h("b", { text: w.title }) : null, w.text ? h("span", { text: w.text }) : null) : null)))));
   }
+  if (P.sign && (P.sign.place === "end" || !P.brief)) { const sg = signEl(); if (sg) doc.append(h("section", { class: "pp-end" }, sg)); }
   const site = location.origin + location.pathname;
   doc.append(h("section", { class: "pp-close" }, h("h2", { text: P.closing }),
     h("p", {}, P.brand ? h("b", { text: P.brand }) : null),
