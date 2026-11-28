@@ -269,7 +269,7 @@ export async function saveSocial(): Promise<void> {
    Visitors never read the table: openProposal() asks the database for one proposal by its code, which also counts
    the open. Offline (or before the table exists) proposals stay in this browser. */
 export interface ProposalRow { id: string; slug: string; data: Config; status: 'live' | 'off' | 'archived'; expires_on: string | null; searchable: boolean; created_at?: string; updated_at?: string }
-export interface ProposalStat { opens: number; last: string | null }
+export interface ProposalStat { opens: number; last: string | null; fresh: number }
 export interface ProposalOpen { opened_at: string; lang: string | null; device: string | null }
 export const Proposals = {
   rows: null as ProposalRow[] | null,
@@ -291,8 +291,8 @@ export async function loadProposals(force = false): Promise<ProposalRow[]> {
       Proposals.where = 'db'; Proposals.rows = (data as ProposalRow[]) || [];
       const st = await db().rpc('proposal_stats');
       Proposals.stats = {};
-      ((st.data as Array<{ proposal_id: string; opens: number; last_opened: string }>) || []).forEach((r) => {
-        Proposals.stats[r.proposal_id] = { opens: Number(r.opens) || 0, last: r.last_opened };
+      ((st.data as Array<{ proposal_id: string; opens: number; last_opened: string; new_opens?: number }>) || []).forEach((r) => {
+        Proposals.stats[r.proposal_id] = { opens: Number(r.opens) || 0, last: r.last_opened, fresh: Number(r.new_opens) || 0 };
       });
       return Proposals.rows;
     }
@@ -351,6 +351,71 @@ export async function openProposal(slug: string, opts: { count?: boolean; lang?:
   const { data, error } = await db().rpc('open_proposal', { p_slug: slug, p_count: !!opts.count, p_lang: opts.lang || null, p_device: opts.device || null });
   if (error) return { ok: false, code: 'unreachable' };
   return (data as OpenedProposal) || { ok: false, code: 'missing' };
+}
+
+/** Marks a proposal's opens as seen (the studio's "new opens" badge). */
+export async function markOpensSeen(id: string): Promise<boolean> {
+  if (Proposals.where !== 'db') return false;
+  const { error } = await db().from('proposal_opens').update({ seen: true }).eq('proposal_id', id).eq('seen', false);
+  if (error) return false;
+  if (Proposals.stats[id]) Proposals.stats[id].fresh = 0;
+  return true;
+}
+
+/* ---------- studio badges ----------
+   Unread messages (Inbox) and proposal opens nobody has looked at yet (Content → Proposals). */
+export const Badges = { unread: 0, newOpens: 0, at: 0, listeners: [] as Array<() => void> };
+export async function loadBadges(): Promise<typeof Badges> {
+  if (Store.mode === 'db' && Store.canEdit) {
+    const { data, error } = await db().rpc('studio_badges');
+    if (!error && data) { const d = data as { unread?: number; new_opens?: number }; Badges.unread = Number(d.unread) || 0; Badges.newOpens = Number(d.new_opens) || 0; }
+  } else { Badges.unread = localEnquiries().filter((e) => e.status === 'new').length; Badges.newOpens = 0; }
+  Badges.at = Date.now(); Badges.listeners.forEach((f) => f());
+  return Badges;
+}
+
+/* ---------- enquiries (site forms → studio → Inbox) ----------
+   Visitors send a message through submit_enquiry() (0007_inbox_proposal_alerts.sql), which filters bots and
+   limits how many messages one sender can send. Only editors can read the table. Offline, messages stay in this
+   browser so the Inbox can still be tried out. */
+export interface Enquiry { id: string; created_at: string; kind: 'contact' | 'quote' | 'proposal'; status: 'new' | 'read' | 'archived'; name: string; email: string; phone: string; company: string; service: string; quantity: string; deadline: string; message: string; lang: string | null; page: string; proposal_id: string | null; proposal_slug: string; client: string; replied_at: string | null }
+export interface EnquiryForm { kind: 'contact' | 'quote'; name: string; email: string; phone?: string; company?: string; service?: string; quantity?: string; deadline?: string; message?: string; lang?: string; page?: string; proposal?: string; website?: string; elapsed: number }
+const ENQ_COLS = 'id, created_at, kind, status, name, email, phone, company, service, quantity, deadline, message, lang, page, proposal_id, proposal_slug, client, replied_at';
+const localEnquiries = (): Enquiry[] => (LS.get('dorma.enquiries') as Enquiry[]) || [];
+/** ok = saved (or quietly dropped as a bot); code: missing | email | busy | unreachable | offline. */
+export async function submitEnquiry(f: EnquiryForm): Promise<{ ok: boolean; code?: string }> {
+  if (Store.mode !== 'db') {
+    if (f.website || f.elapsed < 2500) return { ok: true };
+    const row: Enquiry = { id: String(Date.now()) + Math.random().toString(16).slice(2), created_at: new Date().toISOString(), kind: f.proposal ? 'proposal' : f.kind,
+      status: 'new', name: f.name, email: f.email, phone: f.phone || '', company: f.company || '', service: f.service || '', quantity: f.quantity || '', deadline: f.deadline || '',
+      message: f.message || '', lang: f.lang || null, page: f.page || '', proposal_id: null, proposal_slug: f.proposal || '', client: '', replied_at: null };
+    LS.set('dorma.enquiries', [row, ...localEnquiries()].slice(0, 500));
+    return { ok: true, code: 'offline' };
+  }
+  try {
+    const { data, error } = await db().rpc('submit_enquiry', { p: f });
+    if (error) return { ok: false, code: 'unreachable' };
+    return (data as { ok: boolean; code?: string }) || { ok: false, code: 'unreachable' };
+  } catch { return { ok: false, code: 'unreachable' }; }
+}
+export async function listEnquiries(): Promise<{ rows: Enquiry[]; where: 'db' | 'local' }> {
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('enquiries').select(ENQ_COLS).order('created_at', { ascending: false }).limit(1000);
+    if (!error) return { rows: (data as Enquiry[]) || [], where: 'db' };
+  }
+  return { rows: localEnquiries(), where: 'local' };
+}
+export async function updateEnquiry(ids: string[], patch: Partial<Pick<Enquiry, 'status' | 'replied_at'>>, where: 'db' | 'local'): Promise<boolean> {
+  if (!ids.length) return true;
+  if (where === 'db') { const { error } = await db().from('enquiries').update(patch).in('id', ids); if (error) return false; }
+  else LS.set('dorma.enquiries', localEnquiries().map((e) => ids.includes(e.id) ? { ...e, ...patch } : e));
+  void loadBadges(); return true;
+}
+export async function deleteEnquiries(ids: string[], where: 'db' | 'local'): Promise<boolean> {
+  if (!ids.length) return true;
+  if (where === 'db') { const { error } = await db().from('enquiries').delete().in('id', ids); if (error) return false; }
+  else LS.set('dorma.enquiries', localEnquiries().filter((e) => !ids.includes(e.id)));
+  void loadBadges(); return true;
 }
 
 /* ---------- edge functions (studio → Write with AI) ----------

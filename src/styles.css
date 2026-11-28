@@ -941,6 +941,7 @@ html.ta-lock,html.ta-lock body{overflow:hidden}
 .qf-go{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
 .qf-status{margin:0;font-size:.7rem;color:var(--muted);white-space:pre-wrap}
 .qf-hint{margin:0;color:var(--muted);font-size:.86rem}
+.qf-trap{position:absolute!important;left:-10000px!important;width:1px;height:1px;overflow:hidden}
 @media (max-width:860px){.qf-wrap{grid-template-columns:1fr}.qf{grid-template-columns:1fr}}
 .cat-filters{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .cat-filters select{padding:10px 14px;border:1px solid var(--faint);border-radius:100px;background:var(--glass);color:var(--fg);font:inherit;font-size:.82rem}
