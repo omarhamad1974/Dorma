@@ -1,5 +1,7 @@
 /* ================= WRITE WITH AI: plain helpers =================
    No DOM and no network here, so tests/ai.test.ts can check them. The dialog is in ai.js. */
+import { TUNE, TUNE_KEYS } from '../../supabase/functions/ai-write/prompt';
+export { TUNE, TUNE_KEYS };
 
 /** Fields whose picture can be described (Library › SEO). */
 export const DESCRIBE_KEYS = ["alt","title","caption","description"];
@@ -22,15 +24,55 @@ export function defaultAction({ text={}, langs=["en"], canDescribe=false }){
 export const translateFrom = (text={}, pref) => pref && String(text[pref]||"").trim() ? pref : String(text.en||"").trim() ? "en" : "ar";
 
 /** The body sent to the ai-write edge function. */
-export function requestBody({ action, langs, text, from, brief, field, context, ai={}, image=null }){
+/** @param {{action:string, langs:string[], text:Record<string,any>, from?:string, brief?:string, field:object, context?:string, ai?:Record<string,any>, image?:any, general?:boolean, tune?:Record<string,any>, refs?:string[]}} o */
+export function requestBody({ action, langs, text, from, brief="", field, context="", ai={}, image=null, general, tune, refs }){
   const t={}; ["en","ar"].forEach(l=>{ const v=String(text?.[l]||""); if (v.trim()) t[l]=v; });
   return {
     action, langs: action==="translate" ? ["en","ar"] : langs, text: t,
     from: action==="translate" ? translateFrom(t, from) : undefined,
     brief: String(brief||"").trim(), field, context: String(context||"").slice(0,4000),
     brand: ai.brand||"", arabic: ai.arabic||"", avoid: ai.avoid||"", model: ai.model==="lite"?"lite":"flash",
+    general: general==null ? ai.general===true : !!general,
     image: action==="describe" ? image : null,
+    tune: tune || ai.style || {},
+    refs: (refs || []).filter(u=>typeof u==="string" && /^https?:\/\//i.test(u.trim())).slice(0,3),
   };
+}
+
+/** A short line describing a style, e.g. "Short · Friendly · Social media post". */
+export function tuneSummary(t={}){
+  const parts=[];
+  TUNE_KEYS.forEach(k=>{ const v=t[k]; if (!v||v==="auto") return;
+    if (k==="length"&&v==="words"){ if (t.words) parts.push(t.words+" words"); return; }
+    const o=TUNE[k].options.find(x=>x[0]===v); if (o) parts.push(o[1]); });
+  if (t.audience) parts.push("for "+t.audience);
+  return parts.join(" · ")||"Automatic";
+}
+
+/** The reference links used by default: saved ones that are switched on, plus one typed for this time. */
+export function pickRefs(saved=[], extra=""){
+  const out=(saved||[]).filter(r=>r&&r.on&&r.url).map(r=>String(r.url).trim());
+  const x=String(extra||"").trim(); if (x) out.push(/^https?:\/\//i.test(x)?x:"https://"+x);
+  return [...new Set(out)].slice(0,3);
+}
+
+/** An archive entry from an AI result. */
+export function archiveEntry({ result={}, brief="", label="", group="", action="", tune={}, refs=[], general=false }){
+  const t=String(brief||"").trim().replace(/\s+/g," ");
+  const first=String(result.en||result.ar||"").trim().replace(/\s+/g," ");
+  const title=(t||first).slice(0,80)||label||"AI text";
+  const tags=[group,label].map(x=>String(x||"").trim()).filter((x,i,a)=>x&&a.indexOf(x)===i).slice(0,3);
+  return { title, tags, en:String(result.en||""), ar:String(result.ar||""), meta:{ action, box:label, where:group, brief:t, tune, refs, general } };
+}
+
+/** Archive search: words in the title, tags, text or brief; and an optional tag. */
+export function filterArchive(items=[], q="", tag=""){
+  const words=String(q||"").toLowerCase().split(/\s+/).filter(Boolean);
+  return items.filter(it=>{
+    if (tag && !(it.tags||[]).includes(tag)) return false;
+    const hay=[it.title,(it.tags||[]).join(" "),it.en,it.ar,it.meta&&it.meta.brief].join(" ").toLowerCase();
+    return words.every(w=>hay.includes(w));
+  });
 }
 
 /** Plain-language status for the studio, from the edge function's status answer (or an error). */

@@ -14,7 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
-| **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing |
+| **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing, AI archive |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
@@ -98,7 +98,11 @@ A proposal is a small website made for one client, showing only the services the
   - **Describe the picture** (Library → an image → SEO): alt text, title, caption and description written from the picture itself.
 - Nothing changes until you press **Use this**. You can edit the suggestion first, and untick a language to keep what you had. Then it saves like any other edit, and visitors only see it after **Publish**.
 - The AI uses only real facts: your notes under **What the AI should know**, the box itself and the boxes around it. It never makes up clients, projects, numbers or results; where a fact is missing it writes **[To be supplied by Dorma]** (Arabic: [تُضاف من دورما]) for you to fill in. Always read it before you publish.
-- **AI writing** tab: the status (Ready, or what is missing), the AI buttons on or off, the model (**Flash** for better writing, **Flash-Lite** for more free uses), the brand notes, Arabic notes, words to avoid, and a **Try it** box.
+- **Use general industry knowledge** (a tick box in the AI window, on by default; change the default under AI writing): the AI may also explain general topics that aren't on the site, such as how offset and digital printing differ, paper and finishes, or how a booth goes up. Facts about Dorma itself (clients, results, numbers, and which services or machines Dorma offers) still come only from your site and notes. Untick it when the text must stick strictly to what the site says.
+- **Style and references** (fold-out in the AI window): pick a **preset** (Social media post, Service page, Technical guide, or your own) or set each choice for this text: **Length** (fits the box, short, medium, long, or an exact number of words), **Tone**, **Purpose** (marketing, informative, technical, storytelling, social media post, search engines), **Formality**, **Reading level**, **Sentences**, **Arabic style** (formal, modern marketing, light Gulf flavour) and **Call to action**, plus **Audience** and **Extra instructions**. **Save as preset** keeps the current choices.
+- **Reference websites**: tick saved websites or paste a link just for this time (up to 3 per request). The AI reads those pages for facts and the right terms, writes in its own words, and never presents another company's clients or numbers as Dorma's. Under the result it shows which pages it read and which it couldn't (pages that need a login or JavaScript can't be read).
+- **Save to archive** keeps any AI text with its brief and style. **Content → AI archive** lists them with search and tags: edit or copy the text, **Add to Social calendar** (a drafted post on the platform and date you pick), or delete it. **Write something new with AI** there writes text that isn't tied to a box (for example a LinkedIn post) straight into the archive. To use an archived text in a box, open the box's AI window and choose **From archive**.
+- **AI writing** tab: the status (Ready, or what is missing), the AI buttons on or off, general industry knowledge on or off by default, the model, the **Default style**, **Saved styles (presets)**, **Reference websites** (**Flash** for better writing, **Flash-Lite** for more free uses), the brand notes, Arabic notes, words to avoid, and a **Try it** box.
 - It uses Google's free **Gemini** service through your Supabase project. The key is kept in Supabase, never on the site or in GitHub. Each editor can make 150 AI requests a day (and 8 a minute); Google's free allowance also has limits, and the studio tells you in plain words when one is reached.
 - **One-time setup** (also shown step by step in the AI writing tab):
   1. Open **Google AI Studio → API keys** (aistudio.google.com/app/apikey), sign in with your Google account, press **Create API key** and copy it. No billing needed; leave billing off to stay free.
