@@ -42,6 +42,7 @@ const SECTION={
   features:svg(T(10,8,44,4)+[0,1,2].map(c=>[0,1].map(rw=>cir(15+c*35,28+rw*24,4,rw+c===0?C.ac:C.bl)+L(22+c*35,25+rw*24,20,C.fg)+L(22+c*35,30+rw*24,16)).join("")).join("")),
   quotes:svg(`<text x="10" y="36" font-size="32" fill="${C.ac}" font-family="serif">“</text>`+T(30,22,74,4.4)+L(30,32,70)+L(30,37,60)+cir(35,56,6,C.bl)+L(45,52,30,C.fg)+L(45,58,20)),
   quote:svg(T(10,8,50,4)+O(10,20,48,10)+O(62,20,48,10)+O(10,35,100,10)+O(10,50,100,14)+B(10,69,28)),
+  contact:svg(T(10,8,50,4)+O(10,20,48,10)+O(62,20,48,10)+O(10,35,100,22)+B(10,64,28)),
   catalog:svg([0,1,2,3].map(i=>r(10+i*22,8,18,6,i===0?C.ac:C.fa,3)).join("")+[0,1,2].map(c=>[0,1].map(rw=>P(10+c*35,20+rw*30,30,18)+L(10+c*35,41+rw*30,20,C.fg)).join("")).join("")),
   blog:svg(T(10,8,36,4)+[0,1,2].map(i=>P(10+i*35,18,30,24)+`<text x="${10+i*35}" y="50" font-size="4.5" fill="${C.mu}" font-family="monospace">12 NOV</text>`+L(10+i*35,54,28,C.fg)+L(10+i*35,60,22)).join("")),
   photo:svg(`<defs><clipPath id="tpPhA"><path d="M20 70 V34 A40 30 0 0 1 100 34 V70Z"/></clipPath></defs><g clip-path="url(#tpPhA)" opacity=".75">`+P(20,4,80,66,0)+`</g>`+`<path d="M20 70 V34 A40 30 0 0 1 100 34 V70Z" fill="none" stroke="${C.ac}" stroke-width="1" stroke-dasharray="2 2"/>`),

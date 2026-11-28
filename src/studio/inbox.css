@@ -1,0 +1,40 @@
+/* ================= STUDIO › INBOX ================= */
+.adm .ib-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.adm .ib-tools select,.adm .ib-find{padding:7px 9px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font:inherit;font-size:.84rem;color-scheme:inherit}
+.adm .ib-tools select{width:auto}
+.adm .ib-tools select:focus,.adm .ib-find:focus{outline:none;border-color:var(--accent)}
+.adm .ib-find{flex:1 1 220px;min-width:0}
+.adm .ib-bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--faint)}
+.adm .ib-bulk .grow{flex:1}
+.adm .ib-list{display:grid;gap:0}
+.adm .ib-row{border-bottom:1px solid var(--faint)}
+.adm .ib-line{display:flex;align-items:flex-start;gap:10px;padding:4px 0}
+.adm .ib-line > input{margin-top:16px;flex:none}
+.adm .ib-head{flex:1;min-width:0;display:grid;grid-template-columns:12px minmax(140px,1.1fr) minmax(0,2fr) auto;gap:4px 12px;align-items:center;text-align:start;background:none;border:0;color:inherit;font:inherit;padding:10px 6px;border-radius:8px;cursor:pointer}
+.adm .ib-head:hover,.adm .ib-head:focus-visible{background:var(--field-bg)}
+.adm .ib-dot{width:8px;height:8px;border-radius:50%;background:transparent}
+.adm .ib-row.unread .ib-dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.adm .ib-who{display:grid;min-width:0}
+.adm .ib-who b,.adm .ib-who small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm .ib-row:not(.unread) .ib-who b{font-weight:500}
+.adm .ib-who small{color:var(--muted);font-size:.78rem}
+.adm .ib-snip{color:var(--muted);font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.adm .ib-meta{display:flex;gap:8px;align-items:center;font-size:.68rem;white-space:nowrap;color:var(--muted)}
+.adm .ib-kind{padding:2px 8px;border-radius:999px;border:1px solid var(--faint)}
+.adm .ib-kind.k-proposal{border-color:var(--accent);color:var(--accent)}
+.adm .ib-detail{display:grid;gap:12px;padding:4px 6px 16px 36px}
+.adm .ib-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 16px}
+.adm .ib-f{display:grid;gap:2px;font-size:.88rem;min-width:0;overflow-wrap:anywhere}
+.adm .ib-f .mono{font-size:.64rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.adm .ib-f a{color:var(--accent)}
+.adm .ib-msg{white-space:pre-wrap;padding:12px 14px;border-radius:10px;border:1px solid var(--faint);background:var(--field-bg);line-height:1.6;overflow-wrap:anywhere}
+.adm .ib-prop{margin:0;font-size:.88rem}
+.adm .ib-notes{margin:0;padding-inline-start:18px;display:grid;gap:6px;font-size:.9rem}
+.adm .adm-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-inline-start:6px;border-radius:999px;background:var(--accent);color:#0b1630;font-size:.66rem;font-weight:700;line-height:1;vertical-align:middle}
+.adm .pr-new{color:var(--accent);font-weight:600}
+@media (max-width:760px){
+  .adm .ib-head{grid-template-columns:12px minmax(0,1fr);}
+  .adm .ib-snip{grid-column:2}
+  .adm .ib-meta{grid-column:2}
+  .adm .ib-detail{padding-inline-start:6px}
+}

@@ -23,6 +23,7 @@ const PR_WORDS = {
   unavailable: T("This proposal is no longer available", "هذا العرض لم يعد متاحاً"),
   unavailableText: T("Contact Dorma Advertising for an updated proposal, or browse the full website.", "تواصل مع دورما للإعلان للحصول على عرض محدّث، أو تصفّح الموقع الكامل."),
   missing: T("This proposal link isn't valid", "رابط العرض غير صحيح"),
+  pdf: T("Save as PDF", "حفظ كملف PDF"),
   missingText: T("Check the link you received, or browse the full website.", "تحقّق من الرابط الذي وصلك، أو تصفّح الموقع الكامل.")
 };
 
@@ -42,7 +43,9 @@ function proposalDefaults(today = "") {
     words: {},           // per-proposal changes to PR_WORDS (e.g. a different "Prepared for")
     langs: "site",       // site | en | ar | both
     defaultLang: "site", // site | en | ar
-    internal: ""         // studio note, never sent to the client
+    internal: "",        // studio note, never sent to the client
+    pdfLink: true,       // show "Save as PDF" in the proposal's header band
+    frozen: null         // null = live (follows the published site); else a snapshot (see freezeSnapshot)
   };
 }
 
@@ -68,6 +71,9 @@ function normalizeProposal(d, today = "") {
   out.langs = ["site", "en", "ar", "both"].includes(src.langs) ? src.langs : "site";
   out.defaultLang = ["site", "en", "ar"].includes(src.defaultLang) ? src.defaultLang : "site";
   out.internal = typeof src.internal === "string" ? src.internal : "";
+  out.pdfLink = src.pdfLink !== false;
+  const fz = isObj(src.frozen) ? src.frozen : null;
+  out.frozen = fz && Array.isArray(fz.pages) ? { at: String(fz.at || ""), pages: fz.pages.filter(isObj), media: (fz.media || []).filter(isObj), modals: (fz.modals || []).filter(isObj), flows: (fz.flows || []).filter(isObj), posts: (fz.posts || []).filter(isObj) } : null;
   return out;
 }
 
@@ -136,8 +142,9 @@ function proposalTitle(data) {
  * contact button, and the proposal's languages. __pageMap sends "Go to page" buttons to the proposal's copy of a page;
  * pages outside the proposal open on the full website.
  */
-function buildProposalSite(cfg, rawData, slug) {
+function buildProposalSite(liveCfg, rawData, slug) {
   const data = normalizeProposal(rawData);
+  const cfg = withFrozen(liveCfg, data);
   const base = "for/" + slug, pages = cfg.pages || [];
   const chosen = data.services.map(s => ({ s, page: pages.find(p => p.id === s.page) })).filter(x => x.page);
   const pageMap = {}; chosen.forEach(({ page }) => { pageMap[page.id] = base + "/" + page.id; });
@@ -169,7 +176,92 @@ function buildProposalSite(cfg, rawData, slug) {
     site: { ...cfg.site, homePage: base, languages: langs, defaultLang, cta: contact || { label: "", action: { type: "none", target: "" } } },
     theme: navCount > 5 ? { ...cfg.theme, menu: { ...(cfg.theme && cfg.theme.menu || {}), mode: "overlay" } } : cfg.theme,
     __pageMap: pageMap,
-    __proposal: { slug, base, client: data.client, date: data.date, preparedFor: preparedFor(data), fullSite: word(data, "fullSite") }
+    __proposal: { slug, base, client: data.client, date: data.date, preparedFor: preparedFor(data), fullSite: word(data, "fullSite"), pdf: data.pdfLink ? word(data, "pdf") : null, frozen: !!data.frozen }
+  };
+}
+
+/* ---------- frozen proposals ----------
+   Live (the default): service pages, pictures, modals and flows follow what is published on the main site.
+   Frozen: the proposal keeps a copy of everything its pages use, taken when it was frozen, so later edits to the
+   main site don't change what this client sees. The proposal's own words (welcome, client, notes) stay editable.
+   The site's colours, fonts and logo still follow the main site. */
+function idsIn(v, out = new Set()) {
+  if (typeof v === "string") { if (v && v.length < 200) out.add(v); }
+  else if (Array.isArray(v)) v.forEach(x => idsIn(x, out));
+  else if (isObj(v)) Object.values(v).forEach(x => idsIn(x, out));
+  return out;
+}
+/** A copy of what the proposal shows from the main site: its chosen pages and the library items, modals, flows and
+    blog posts they point to (followed through modals and flows too). */
+function freezeSnapshot(cfg, rawData, at = new Date().toISOString()) {
+  const data = normalizeProposal(rawData);
+  const pages = data.services.map(s => (cfg.pages || []).find(p => p.id === s.page)).filter(Boolean);
+  const want = idsIn([pages, data.cover, data.client.logo, data.work, data.contact]);
+  const pick = list => (list || []).filter(x => x && want.has(x.id));
+  let modals = [], flows = [], n = -1;
+  while (n !== modals.length + flows.length) { // modals can open flows and flows can open modals
+    n = modals.length + flows.length;
+    modals = pick(cfg.modals); flows = pick(cfg.flows); idsIn([modals, flows], want);
+  }
+  const posts = pick(cfg.posts); idsIn(posts.map(p => p.cover), want);
+  return JSON.parse(JSON.stringify({ at, pages, media: pick(cfg.media), modals, flows, posts }));
+}
+/** The site settings with a frozen proposal's copies put back in place of the current pages, items, modals and flows. */
+function withFrozen(cfg, data) {
+  const fz = data && data.frozen; if (!fz) return cfg;
+  const merge = (live, kept) => { const ids = new Set(kept.map(x => x.id)); return [...kept, ...(live || []).filter(x => x && !ids.has(x.id))]; };
+  return { ...cfg, pages: merge(cfg.pages, fz.pages), media: merge(cfg.media, fz.media), modals: merge(cfg.modals, fz.modals), flows: merge(cfg.flows, fz.flows), posts: merge(cfg.posts, fz.posts) };
+}
+/** Services added after the proposal was frozen (they show the live page until the copy is updated). */
+function notInFrozen(rawData) {
+  const d = normalizeProposal(rawData); if (!d.frozen) return [];
+  const kept = new Set(d.frozen.pages.map(p => p.id));
+  return d.services.map(s => s.page).filter(id => !kept.has(id));
+}
+const snapshotBytes = fz => fz ? new Blob([JSON.stringify(fz)]).size : 0;
+
+/* ---------- printable proposal (Save as PDF) ----------
+   A plain, print-friendly version of the proposal in one language: the cover (Dorma and client logos, "Prepared
+   for", the date, the headline and welcome), then each chosen service with its picture and the text of its
+   sections, related work, and the closing with how to get in touch. Forms, buttons and animations are left out. */
+const inLang = (v, lang) => { if (!isObj(v) || !("en" in v || "ar" in v)) return typeof v === "string" ? v : ""; const a = v[lang], b = v[lang === "ar" ? "en" : "ar"]; return String((a != null && a !== "") ? a : (b ?? "")); };
+const stripMd = t => String(t || "").replace(/\r/g, "").replace(/^#{1,6}\s*/gm, "").replace(/\*\*?([^*]+)\*\*?/g, "$1").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/^>\s?/gm, "").trim();
+const SKIP_PRINT = new Set(["quote", "contact", "cta", "photo", "logo", "blog", "banner", "forCover", "flowStrip"]);
+function printBlock(sec, lang) {
+  const L = v => stripMd(inLang(v, lang));
+  const items = [];
+  const listOf = sec.type === "heroCarousel" ? sec.slides : sec.items;
+  (Array.isArray(listOf) ? listOf : []).filter(it => isObj(it) && !it.hidden).forEach(it => {
+    const title = L(it.title) || L(it.label) || L(it.name) || L(it.value);
+    const text = L(it.text) || L(it.detail) || L(it.quote) || L(it.caption) || L(it.role);
+    if (title || text) items.push({ title, text });
+  });
+  const body = [L(sec.lede), L(sec.text), L(sec.body)].filter(Boolean).join("\n\n");
+  return { id: sec.id, eyebrow: L(sec.eyebrow), title: L(sec.title), text: body, items, media: typeof sec.media === "string" ? sec.media : "" };
+}
+function proposalPrint(liveCfg, rawData, lang = "en") {
+  const data = normalizeProposal(rawData), cfg = withFrozen(liveCfg, data), L = v => inLang(v, lang);
+  const pages = cfg.pages || [];
+  const services = data.services.map(s => ({ s, page: pages.find(p => p.id === s.page) })).filter(x => x.page).map(({ s, page }) => {
+    const blocks = (page.sections || []).filter(sec => sec && !sec.hidden && !sec.previewOnly && !s.hide.includes(sec.id) && !SKIP_PRINT.has(sec.type))
+      .map(sec => printBlock(sec, lang));
+    const note = L(s.note), summary = note || stripMd(L(pageSummary(page)));
+    blocks.forEach(b => { if (b.text === summary) b.text = ""; }); // the page's summary is already under its title
+    return { id: page.id, title: L(page.title), summary, media: pageMedia(page), blocks: blocks.filter(b => b.title || b.text || b.items.length) };
+  });
+  const media = id => (cfg.media || []).find(m => m.id === id);
+  const work = [
+    ...data.work.media.map(media).filter(Boolean).map(m => ({ media: m.id, title: L(m.title) || "", text: L(m.caption) || "" })),
+    ...data.work.posts.map(id => (cfg.posts || []).find(p => p.id === id && p.published)).filter(Boolean).map(p => ({ media: p.cover || "", title: L(p.title), text: L(p.excerpt) }))
+  ];
+  const cover = (data.cover && media(data.cover) ? data.cover : "") || services.map(x => x.media).find(Boolean) || "";
+  const site = cfg.site || {};
+  return {
+    lang, dir: lang === "ar" ? "rtl" : "ltr",
+    brand: L(site.brand), preparedFor: L(preparedFor(data)), title: L(proposalTitle(data)), welcome: L(data.welcome),
+    date: data.date, client: { name: L(data.client.name), logo: data.client.logo, logoSrc: data.client.logoSrc, logoBg: data.client.logoBg },
+    cover, services, work, workTitle: L(word(data, "work")), servicesTitle: L(word(data, "services")),
+    closing: L(data.closing) || L(word(data, "closing")), email: String(site.quoteEmail || "").trim(), frozen: data.frozen ? data.frozen.at : ""
   };
 }
 
@@ -183,4 +275,5 @@ function proposalsUsing(rows, { page = "", media = "" } = {}) {
 const deviceOf = (w, coarse = false) => w < 700 ? "phone" : (w < 1100 && coarse) ? "tablet" : "computer";
 
 export { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, slugPart, proposalState, pageSummary, pageMedia,
-  proposalPages, preparedFor, proposalTitle, buildProposalSite, proposalsUsing, deviceOf, word };
+  proposalPages, preparedFor, proposalTitle, buildProposalSite, proposalsUsing, deviceOf, word,
+  freezeSnapshot, withFrozen, notInFrozen, snapshotBytes, proposalPrint, inLang, stripMd };

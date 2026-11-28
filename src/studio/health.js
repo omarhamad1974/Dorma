@@ -215,8 +215,9 @@ function checkHidden(cfg, add) {
 
 function checkSettings(cfg, add) {
   const S = cfg.site || {};
-  const hasQuote = (cfg.pages || []).some(p => (p && p.sections || []).some(s => s && s.type === "quote" && !s.hidden)) || (cfg.modals || []).some(m => m && (m.sections || []).some(s => s && s.type === "quote"));
-  if (hasQuote && !String(S.quoteEmail || "").trim()) add({ id: "set:quoteEmail", check: "settings", level: "warn", title: "Quote requests have nowhere to go", detail: "Set the email for quote requests under Site and titles.", where: "Site and titles", go: { panel: "site" } });
+  const hasQuote = (cfg.pages || []).some(p => (p && p.sections || []).some(s => s && (s.type === "quote" || s.type === "contact") && !s.hidden)) || (cfg.modals || []).some(m => m && (m.sections || []).some(s => s && (s.type === "quote" || s.type === "contact")));
+  const viaEmail = (S.forms && S.forms.mode) === "email";
+  if (hasQuote && viaEmail && !String(S.quoteEmail || "").trim()) add({ id: "set:quoteEmail", check: "settings", level: "warn", title: "Quote requests have nowhere to go", detail: "Forms use the email app, but no email is set. Set it under Site and titles, or send forms to the Inbox.", where: "Site and titles", go: { panel: "site" } });
   if (S.homePage && !(cfg.pages || []).some(p => p && p.id === S.homePage)) add({ id: "set:home", check: "settings", level: "error", title: "The home page doesn't exist", detail: "Choose the home page under Site and titles.", where: "Site and titles", go: { panel: "site" } });
 }
 

@@ -1,7 +1,7 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
 import { libraryUrl, mediaUrl, flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
 import { gsap } from 'gsap';
-import { Store, draftDiffers, loadDraft, media, normalize, publishDraft, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
+import { Store, Badges, loadBadges, draftDiffers, loadDraft, media, normalize, publishDraft, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
@@ -22,6 +22,7 @@ import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './
 import { DESCRIBE_KEYS } from './aitext';
 import { panelProposals } from './proposalpanel';
 import { panelHealth, panelBackups } from './carepanel';
+import { panelInbox, panelInboxSettings } from './inboxpanel';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -50,11 +51,12 @@ const IC={
   social:'<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/></svg>',
   pv:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><rect x="11" y="10" width="8" height="5" rx="1"/><path d="M8 21h8"/></svg>',
   care:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.3-9.4C1.4 8.1 3.6 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.6 0 5.8 3.6 4.5 7.1C19.5 16.4 12 21 12 21z"/><path d="M3.5 12.5h4l1.7-3 2.6 6 1.9-3h6.8"/></svg>',
+  inbox:'<svg viewBox="0 0 24 24"><path d="M3 13l2.6-7.2A2 2 0 0 1 7.5 4.5h9a2 2 0 0 1 1.9 1.3L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"],["inbox","Messages"],["inboxSet","Form settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["inbox","Inbox","inbox",["inbox","inboxSet"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
 /* Outline: the whole site as a tree of pages and sections (src/studio/outline.js). First in the sidebar, and a button just before Live preview. */
 PANELS.push(["outline","Site outline"]); GROUPS.unshift(["outline","Outline","outline",["outline"]]); IC.outline=OIC.outline;
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
@@ -101,6 +103,7 @@ async function renderAdmin(){
   LP=mountLivePreview($(".adm"),{draft:()=>Store.draft,where:()=>({panel:Admin.panel,sel:Admin.sel}),onChange:()=>updateTop()});
   Store.listeners=[updateTop,()=>LP&&LP.changed()];
   openPanel(Admin.panel);
+  watchBadges();
 }
 function updateTop(){
   const top=$("#admTop"); if (!top) return;
@@ -135,12 +138,26 @@ function openPanel(k){
   closePop();
   const sub=$("#admSub"); if (sub){ sub.textContent="";
     const tabs=h("span",{class:"tabs",role:"tablist"}); sub.append(tabs);
-    G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
+    G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","data-k":s,"aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  if (k==="outline"){ panelOutline(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); return; }
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups})[k](body);
-  updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
+  if (k==="outline"){ panelOutline(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges(); return; }
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups,inbox:panelInbox,inboxSet:b=>panelInboxSettings(b,formsCard)})[k](body);
+  updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges();
+}
+/* Badges: unread messages on Inbox, proposal opens nobody has looked at on Content and Proposals.
+   Checked when the studio opens, every two minutes while it is open and visible, and after each change. */
+function drawBadges(){
+  const put=(el,n,what)=>{ if (!el) return; const old=el.querySelector(".adm-badge"); if (old) old.replaceWith(); if (n>0) el.append(h("span",{class:"adm-badge","aria-label":n+" "+what,title:n+" "+what,text:n>99?"99+":String(n)})); };
+  $$(".adm-side button[data-g=inbox],.adm-mobile-nav button[data-g=inbox]").forEach(b=>put(b,Badges.unread,"unread"));
+  $$(".adm-side button[data-g=content],.adm-mobile-nav button[data-g=content]").forEach(b=>put(b,Badges.newOpens,"new proposal opens"));
+  $$("#admSub .tabs button").forEach(b=>{ const t=b.dataset.k; if (t==="inbox") put(b,Badges.unread,"unread"); else if (t==="proposals") put(b,Badges.newOpens,"new opens"); });
+}
+let badgeTimer=0;
+function watchBadges(){
+  Badges.listeners=[drawBadges]; void loadBadges();
+  clearInterval(badgeTimer);
+  badgeTimer=setInterval(()=>{ if (!$(".adm")) { clearInterval(badgeTimer); return; } if (document.visibilityState==="visible") void loadBadges(); },120e3);
 }
 
 /* ---------- generic field engine ---------- */
@@ -503,14 +520,23 @@ function masterDetail(body,{items,selKey,label,kind,onAdd,addLabel,detail}){
 }
 function idOk(v,list,self){ return /^[a-z][a-z0-9-]{1,30}$/.test(v) && !["admin","settings","sidebar","customize","upgrade","downloads"].includes(v) && !list.some(x=>x!==self&&x.id===v); }
 
+/* Contact and quote request forms: where messages go, the thank-you line and Dorma's email. */
+function formsCard(D){
+  if (!D.site.forms||typeof D.site.forms!=="object") D.site.forms={mode:"inbox",thanks:{en:"",ar:""}};
+  const unread=Badges.unread?" ("+Badges.unread+" unread)":"";
+  return card("Forms and enquiries",h("p",{class:"adm-intro",style:"margin:0"},"Contact and quote request forms (service pages, catalogs, the Request a Quote modal and proposals) save each message to ",
+      h("button",{type:"button",class:"linkish",text:"Inbox"+unread,onclick:()=>openPanel("inbox")}),". Nobody else can read them. If the Inbox can't be reached, the visitor's email app opens with the message instead, addressed to the email below. Publish to apply."),
+    fieldsFor(D.site.forms,[["mode","select","Messages from the site's forms go to",{options:[["inbox","Studio Inbox (recommended)"],["email","The visitor's email app (nothing is saved)"]]}],["thanks","area","Thank-you message after sending",{wide:true,rows:2}]]),
+    fieldsFor(D.site,[["quoteEmail","text","Dorma's email (email app fallback, and shown on printable proposals)",{placeholder:"name@company.com"}]]));
+}
+
 /* ---------- panels ---------- */
 function panelSite(body){
   const D=Store.draft;
   body.append(h("p",{class:"adm-intro",text:"The brand name, header button and footer appear on every page. Page titles here are the names shown in the menu and browser tab."}));
   body.append(card("Brand and header",fieldsFor(D.site,[["brand","text","Brand name"],["footer","text","Footer text"],["homePage","page","Home page"],["showStudioLink","toggle","Studio button in the site header (only you see it, when signed in on that browser; publish to apply)"]]),
     h("div",{class:"fields"},F(D.site,"cta","button","Header button"))));
-  body.append(card("Quote requests",h("p",{class:"adm-intro",style:"margin:0",text:"Quote request forms (service pages, catalogs and the Request a Quote modal) open the visitor's email app with the request filled in, addressed to this email. Nothing is stored on the site. Without an email, visitors can copy their request instead."}),
-    fieldsFor(D.site,[["quoteEmail","text","Send quote requests to (email)",{placeholder:"name@company.com"}]])));
+  body.append(formsCard(D));
   body.append(card("Languages and numbering",h("p",{class:"adm-intro",text:"Choose the languages visitors can read. With both, a switch in the header lets them change language. When Arabic is on, every text box in the studio shows English and Arabic side by side. A language left empty shows the other language's text."}),
     fieldsFor(D.site,[["languages","select","Site languages",{options:[["en","English only"],["ar","Arabic only"],["both","English and Arabic"]]}],["defaultLang","select","Language for first-time visitors",{options:[["en","English"],["ar","العربية"]]}],["showNumbers","toggle","Show numbering (01, 02… counters, steps and badges)"]],(v,k)=>{ if (k==="languages") openPanel("site"); })));
   body.append(card("Logo",h("p",{class:"adm-intro",style:"margin:0"},"The logo versions (white, colour, silver and your SVGs) and their sizes in the header, menu, footer and loader are under ",h("button",{type:"button",class:"linkish",text:"Design → Logo",onclick:()=>openPanel("logo")}),".")));
