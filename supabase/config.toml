@@ -6,3 +6,8 @@ major_version = 17
 
 [db.seed]
 enabled = false
+
+# Studio "Write with AI". The function checks the editor's sign-in itself (public.ai_take),
+# so the gateway's older JWT check is off (it doesn't understand the new publishable keys).
+[functions.ai-write]
+verify_jwt = false

@@ -21,7 +21,7 @@ Section lines:
 
 - Section: the section type. One of: Hero carousel, Hero, Division, Chapters, Numbers, About, Clients,
   Card grid, Accordion, Timeline, Flow strip, Wide banner, Call to action, Blog posts, Text article,
-  Feature list, Testimonials, Quote request form, Catalog.
+  Feature list, Testimonials, Quote request form, Catalog, Photo only, Logo.
 - Hidden: yes adds the section hidden (you can show it later with one tap in Pages).
 - Any text line can have an Arabic twin on its own line: "Title (Arabic): …".
 - Images: a file path (exhibitions/booth-01.jpg), a name as shown in the Library, or an https:// link.
@@ -30,6 +30,9 @@ Section lines:
 - Lists (chapters, linked items, cards, rows, figures, clients, slides): one item per line starting with "- ",
   and that item's own lines indented by two spaces under it.
 - Timing and colour settings are set in the studio after the import.
+- Icons by titles, Hide the subtitle / title / text, and the logo and button blocks of any section are set
+  in the studio (Pages → section → Icon, text, logo and button). Cards and rows also take
+  "Hide the subtitle: yes" and "Hide the text: yes".
 
 The example below shows every section type. Delete the ones you don't need.
 Everything above the first --- line is ignored.
@@ -240,3 +243,24 @@ Filter names:
 Section: Call to action
 Heading: What are you planning next? Let's bring it to life.
 Button: [Contact Dorma](modal:md-quote)
+Button size: Large
+Button style: Site button
+Align: Start
+
+---
+Section: Photo only
+Photo: Placeholder · Ocean motion
+Mask shape: Arch
+Opacity: 0.85
+Height: Wide 16:9
+Width: Narrow
+Align: Centre
+Black and white: no
+Moves with the scroll: 12
+
+---
+Section: Logo
+Height in px: 140
+Align: Centre
+Entrance: Pop
+Keeps moving: Light sweeps across

@@ -23,6 +23,30 @@ const STARTER = {
     logoHeight: 34,
     logos: JSON.parse(JSON.stringify(LOGO_DEFAULTS))   // Design → Logo: versions (white, colour, silver, added SVGs) and where each is used
   },
+  /* Studio → Content → AI writing: the "Write with AI" buttons (Gemini through the ai-write edge function).
+     The notes are sent with every request so the AI writes in Dorma's voice and only uses real facts. */
+  ai: {
+    enabled: true,
+    model: "flash",
+    general: true,   // may explain general industry topics (offset, digital printing…); Dorma facts still only from the site
+    brand: "Dorma Advertising, established in 2000. Two divisions under one roof:\n" +
+      "- Agency: Creative & Design; Photography, Video & Music; Digital Marketing & Social Media; Websites & Mobile Apps; Event & Activation Logistics.\n" +
+      "- Printing & Production: Printing & Finishing; Giveaways & Branded Merchandise; Packaging; Signage & Displays; In-Store Branding; Booth Production; Custom Fabrication; Event & Activation Accessories.\n" +
+      "Dorma brings agency services and in-house print and production together, from concept and design to manufacturing, delivery, and setup.\n" +
+      "Voice: clear, practical and confident. Explain what Dorma does and how it helps the client. Speak to the client as \"you\".",
+    arabic: "Write Dorma as دورما. Use the same service names as the Arabic site.",
+    avoid: "world-class, cutting-edge, best-in-class, unleash, elevate, synergy, one-stop shop",
+    /* default length and style (choices in supabase/functions/ai-write/prompt.ts TUNE); "auto" lets the box decide */
+    style: { length:"auto", words:"", tone:"auto", purpose:"auto", formality:"auto", level:"auto", sentences:"auto", arabicStyle:"auto", cta:"auto", audience:"", extra:"" },
+    /* named styles to pick in the AI window */
+    presets: [
+      { id:"pr-social", name:"Social media post", style:{ length:"short", tone:"friendly", purpose:"social", sentences:"short", cta:"yes" } },
+      { id:"pr-service", name:"Service page", style:{ length:"medium", tone:"confident", purpose:"marketing", level:"standard" } },
+      { id:"pr-guide", name:"Technical guide", style:{ length:"long", tone:"calm", purpose:"technical", level:"expert", sentences:"varied", cta:"no" } },
+    ],
+    /* reference websites the AI reads for facts and focus: [{ url, note, on }] (on = used by default) */
+    refs: [],
+  },
   loader: { enabled: true, mark: "image", image: "", bg: "theme", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {
     ink: "#040915", panel: "#0b1630", fg: "#eef2fa", accent: "#ffc93c",
@@ -66,7 +90,9 @@ const STARTER = {
     imageFx: { reveal: "none", dir: "left", duration: 1.2, color: "", shape: "none", hover: "none" },
     /* Every section's entrance as it scrolls in and exit as it leaves (each section can use its own). */
     sectionFx: { in: "none", out: "none", duration: 1 },
-    modalClose: "auto"
+    modalClose: "auto",
+    /* Headings, icons and cards on every section (each section can use its own: Pages → section → Icon, text, logo and button). */
+    deco: { headStyle: "none", headIn: "", cardHover: "none", iconAnim: "pop", iconSize: 0.9 }
   },
   /* Generated placeholder scenes. Replace them with real project photos in the studio (Images). */
   media: [
@@ -122,7 +148,11 @@ const STARTER = {
   /* Pictures uploaded from the studio are made smaller in the browser first (studio › Library › Picture optimizing). */
   uploads: { optimize:true, maxSide:2400, quality:0.85, format:"webp", keepPng:true },
   /* GitHub files deleted from the Library (or copied to Supabase under a new name), so Check GitHub doesn't add them back. */
-  libIgnore: []
+  libIgnore: [],
+  /* Studio › Site care › Backups: how many versions (publishes and snapshots) the database keeps; pinned ones are extra. */
+  backups: { keep: 30 },
+  /* Studio › Site care › Health check: problems the editor chose to ignore (by id), and the big-file warning size. */
+  health: { ignore: [], bigFileKB: 1500 }
 };
 
 /* ================= FIELD SCHEMAS =================
@@ -182,8 +212,27 @@ const OPT = {
   statStyles: [["band","Band"],["hud","HUD tiles"],["meters","Meters"]],
   clientStyles: [["grid","Logo grid"],["marquee","Scrolling logos"],["table","Table"]],
   modalTypes: [[1,"Type 1 · Media"],[2,"Type 2 · Gallery"],[3,"Type 3 · Flow"],[4,"Type 4 · Service list"],[5,"Type 5 · Sections (any page sections, each with a label)"]],
-  scenes: [["nebula","Nebula"],["ridges","Ridges"],["city","City"],["ocean","Ocean"]]
+  scenes: [["nebula","Nebula"],["ridges","Ridges"],["city","City"],["ocean","Ocean"]],
+  /* ---- section extras (extras.js): heading icons, logo and button blocks, photo sections, heading styles ---- */
+  iconPos: [["before","Before the title"],["after","After the title"],["above","Above the title"]],
+  iconAnim: [["none","None (just shows)"],["pop","Pop in"],["spin","Spin in"],["draw","Draw its lines"],["rise","Rise"],["float","Float (keeps moving)"],["pulse","Pulse (keeps moving)"],["glow","Glow (keeps glowing)"],["swing","Swing (keeps moving)"]],
+  blockIn: [["none","None (just shows)"],["fade","Fade"],["rise","Rise"],["pop","Pop (grow with a bounce)"],["blur","Blur into focus"],["spin","Spin in"],["drop","Drop and bounce"],["wipe","Wipe across"],["flip","Flip in (3D)"]],
+  blockLoop: [["none","None"],["float","Float"],["pulse","Pulse"],["glow","Glow"],["shine","Light sweeps across"],["breathe","Breathe (slow grow)"],["nudge","Nudge now and then"]],
+  blockAlign: [["start","Start"],["center","Centre"],["end","End"]],
+  blockPos: [["top","Above the section's content"],["bottom","Below the section's content"]],
+  ctaSizes: [["s","Small"],["m","Medium"],["l","Large"],["xl","Extra large"]],
+  ctaStyles: [["site","Site button (soft, glows)"],["solid","Solid accent"],["outline","Outline"],["ring","Glowing ring"],["link","Text with an arrow"]],
+  headStyles: [["none","As designed"],["gradient","Gradient (text colour to accent)"],["shimmer","Shimmer (light runs through)"],["glow","Glow"],["outline","Outline letters"],["marker","Marker highlight"],["underline","Underline draws in"],["cmyk","CMYK print offset"]],
+  headIn: [["","Site default (the block rises)"],["chars","Letter by letter"],["words","Word by word"],["blur","Blur in"],["type","Typewriter"],["fade","Fade up"]],
+  cardHover: [["none","None"],["lift","Lift with a shadow"],["glow","Glow"],["tilt","3D tilt with the pointer"],["zoom","Picture zooms"],["border","Accent border"],["shine","Light sweeps across"]],
+  photoMasks: [["none","None (rectangle)"],["rounded","Rounded corners"],["pill","Pill"],["arch","Arch"],["circle","Circle or oval"],["hexagon","Hexagon"],["diamond","Diamond"],["slant","Slanted bottom"],["notch","Cut corners"],["leaf","Leaf"],["blob","Soft blob"],["frame","Frame (hole in the middle)"],
+    ["fadeBottom","Fade out at the bottom"],["fadeTop","Fade out at the top"],["fadeSides","Fade out at the sides"],["soft","Soft oval (fades at every edge)"],["wave","Wave at the bottom"],["stripes","Diagonal stripes"],["halftone","Halftone dots (print)"],["word","Inside a word"]],
+  photoRatios: [["21/9","Cinema 21:9"],["16/9","Wide 16:9"],["3/2","Photo 3:2"],["4/3","Classic 4:3"],["1/1","Square"],["4/5","Portrait 4:5"],["screen","Full screen height"]],
+  photoWidths: [["full","Edge to edge"],["page","Page width"],["narrow","Narrow (about two thirds)"],["small","Small (about a third)"]]
 };
+/* Settings every list item that has a title can use (cards, accordion rows, chapters, linked items, catalog items, slides). */
+const ITEM_ICON=[["headIcon","icon","Icon by the title (optional)",{wide:true}],["headIconPos","select","Icon position",{options:OPT.iconPos}]];
+const ITEM_HIDE=(sub="Hide the subtitle")=>[["hideSub","toggle",sub],["hideText","toggle","Hide the text"]];
 const ACTION_FIELDS = [["action","action","Action"]];
 const SECTION_TYPES = {
   heroCarousel: { label:"Hero carousel", fields:[
@@ -193,28 +242,36 @@ const SECTION_TYPES = {
     ["timing","timing","Timing for every slide",{parts:[["eyebrow",.05],["title",0],["text",.5],["flow",1.5],["stagger",.2]],hint:"Seconds from when each slide starts. Empty follows the global slide timing (Design → Global style), shown in grey. Each slide can override these below."}],
     ["look","look","Colours and filter for this carousel",{level:"carousel"}],
     ["replayFlow","toggle","Replay the flow animation on every slide, even when it is the same flow"],
-    ["slides","list","Slides",{ itemName:"slide", title:"title", hideable:true, fields:[["media","media","Background image",{wide:true}],["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on",{aka:["stay on this slide"]}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
+    ["slides","list","Slides",{ itemName:"slide", title:"title", hideable:true, fields:[["media","media","Background image",{wide:true}],["eyebrow","text","Eyebrow"],["title","text","Title"],["lede","area","Short paragraph",{wide:true}],["flowId","flow","This slide's flow (buttons under the text; empty uses the default)"],["hold","toggle","Stay on this slide until the visitor moves on",{aka:["stay on this slide"]}],["timing","timing","This slide's timing",{parts:[["duration",null],["eyebrow",null],["title",null],["text",null],["flow",null],["stagger",null]],hint:"Seconds on screen (any length, no limit), and when each piece starts. Empty follows the carousel timing, then the global slide timing."}],["look","look","This slide's colours and filter",{level:"slide"}],...ITEM_ICON,["hideSub","toggle","Hide the eyebrow"],["hideText","toggle","Hide the short paragraph"]], blank:()=>({eyebrow:"New",title:"New slide",lede:"",media:"m-nebula"}) }]
   ]},
   hero: { label:"Hero", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["lede","area","Short paragraph",{wide:true}],["button","button","Button (empty label hides it)"],["height","select","Height",{options:OPT.heights}],["flowId","flow","Flow"],["media","media","Background image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",.1],["title",.15],["text",.2],["flow",.4]],hint:"Seconds from when the page opens. Empty uses the default shown. Lower numbers come first."}]] },
-  chapters: { label:"Chapters", fields:[["items","list","Chapters",{ itemName:"chapter", title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
+  chapters: { label:"Chapters", fields:[["items","list","Chapters",{ itemName:"chapter", title:"title", fields:[["title","text","Title"],["text","area","Text",{wide:true}],["bullets","strings","Bullet points (one per line)",{wide:true}],["caption","strings","Caption items (one per line)",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}],...ITEM_ICON,...ITEM_HIDE("Hide the caption")], blank:()=>({title:"New chapter",text:"",bullets:[],caption:[],media:"m-ridges",more:{label:"More",action:A()}}) }]] },
   stats: { label:"Numbers", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["style","select","Style",{options:OPT.statStyles}],["items","list","Figures",{ title:"label", fields:[["label","text","Label"],["value","number","Value"],["suffix","text","Suffix"],["decimals","number","Decimals"],["meter","range","Meter %",{min:0,max:100,step:1}]], blank:()=>({label:"New figure",value:10,suffix:"",decimals:0,meter:50}) }]] },
   about: { label:"About", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement (wrap words in *stars* to highlight)",{wide:true}],["link","button","Link"],["media","media","Image (optional)",{wide:true,allowNone:true}]] },
   clients: { label:"Clients", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["style","select","Style",{options:OPT.clientStyles}],["items","list","Clients",{ title:"name", fields:[["name","text","Name"],["sector","text","Sector"],["since","text","Since"],["work","text","Work"]], blank:()=>({name:"New client",sector:"",since:"",work:""}) }]] },
-  grid: { label:"Card grid", fields:[["title","text","Heading"],["filters","toggle","Show tag filters as a flow"],["items","list","Cards",{ itemName:"card", title:"title", fields:[["code","text","Code"],["tag","text","Tag"],["title","text","Title"],["text","area","Text",{wide:true}],["action","action","On click"],["media","media","Image",{wide:true}]], blank:()=>({code:"X-00",tag:"Tag",title:"New card",text:"",media:"m-city",action:A()}) }]] },
-  accordion: { label:"Accordion", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Rows",{ itemName:"row", title:"title", fields:[["title","text","Title"],["tags","strings","Tags (one per line)"],["text","area","Text",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}]], blank:()=>({title:"New row",tags:[],text:"",media:"m-ocean",more:{label:"More",action:A()}}) }]] },
+  grid: { label:"Card grid", fields:[["title","text","Heading"],["filters","toggle","Show tag filters as a flow"],["items","list","Cards",{ itemName:"card", title:"title", fields:[["code","text","Code"],["tag","text","Tag"],["title","text","Title"],["text","area","Text",{wide:true}],["action","action","On click"],["media","media","Image",{wide:true}],...ITEM_ICON,...ITEM_HIDE("Hide the code and tag")], blank:()=>({code:"X-00",tag:"Tag",title:"New card",text:"",media:"m-city",action:A()}) }]] },
+  accordion: { label:"Accordion", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Rows",{ itemName:"row", title:"title", fields:[["title","text","Title"],["tags","strings","Tags (one per line)"],["text","area","Text",{wide:true}],["more","button","More button"],["media","media","Image",{wide:true}],...ITEM_ICON,...ITEM_HIDE("Hide the tags")], blank:()=>({title:"New row",tags:[],text:"",media:"m-ocean",more:{label:"More",action:A()}}) }]] },
   timeline: { label:"Timeline", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["text","area","Statement",{wide:true}],["flowId","flow","Timeline flow (each item's detail text shows on click)"],["timing","timing","Timing",{parts:[["eyebrow",0],["text",.1],["flow",.2],["detail",.5]]}]] },
   flowStrip: { label:"Flow strip", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["flowId","flow","Flow"],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["flow",.2]]}]] },
   banner: { label:"Wide banner", fields:[["caption","strings","Caption items (one per line)",{wide:true}],["media","media","Image",{wide:true}]] },
   division: { label:"Division (image, text, button and linked items)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Title",{wide:true}],["text","area","Short paragraph",{wide:true}],["button","button","Button (e.g. open a modal; empty label hides it)"],["flip","toggle","Image on the right"],
-    ["items","list","Linked items (each opens a page, modal or link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["action","action","On click"]], blank:()=>({title:"New item",text:"",action:A()}) }],
+    ["items","list","Linked items (each opens a page, modal or link)",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Brief",{wide:true}],["action","action","On click"],...ITEM_ICON,["hideText","toggle","Hide the brief"]], blank:()=>({title:"New item",text:"",action:A()}) }],
     ["media","media","Image",{wide:true}],["timing","timing","Timing",{parts:[["eyebrow",0],["title",.1],["text",.2],["more",.3],["flow",.4],["stagger",.08]],hint:"Seconds from when the section comes into view. \"Flow\" is the linked items, \"Gap between flow items\" the time between them."}]] },
-  cta: { label:"Call to action", fields:[["title","text","Heading",{wide:true}],["button","button","Button"]] },
+  cta: { label:"Call to action (heading and button)", fields:[["title","text","Heading",{wide:true}],["text","area","Short line under the heading (optional)",{wide:true}],["button","button","Button"],
+    ["size","select","Button size",{options:OPT.ctaSizes}],["style","select","Button style",{options:OPT.ctaStyles}],["align","select","Align",{options:OPT.blockAlign}],["in","select","Button entrance",{options:OPT.blockIn}],["loop","select","Button keeps moving",{options:OPT.blockLoop}],["delay","number","Button starts after (seconds)",{min:0,step:.1}]] },
+  photo: { label:"Photo only (mask, opacity, filter)", fields:[["media","media","Photo",{wide:true}],["mask","select","Mask shape",{options:OPT.photoMasks}],["maskWord","text","Word for \"Inside a word\" (e.g. DORMA)"],
+    ["opacity","range","Opacity (1 = solid, lower = see-through)",{min:0,max:1,step:.05}],["ratio","select","Height",{options:OPT.photoRatios}],["width","select","Width",{options:OPT.photoWidths}],["align","select","Align",{options:OPT.blockAlign}],
+    ["fit","select","Fit",{options:[["cover","Fill the shape (crops the edges)"],["contain","Show the whole photo"]]}],["bg","color","Colour behind the photo (shows through when see-through)",{optional:true,placeholder:"None",globalLabel:"None"}],
+    ["blur","range","Blur (px)",{min:0,max:20,step:1}],["gray","toggle","Black and white"],["zoom","toggle","Slow zoom as you scroll"],["parallax","range","Moves with the scroll (0 = off)",{min:0,max:30,step:1}],
+    ["overlay","overlay","Colour filter over the photo"],["caption","strings","Caption (optional, one item per line)",{wide:true}]] },
+  logo: { label:"Logo (size and animation)", fields:[["version","logoVersion","Logo version"],["size","number","Height in px",{min:12,step:2}],["phone","number","Height on phones in px (empty = same)",{optional:true,min:12,step:2}],
+    ["align","select","Align",{options:OPT.blockAlign}],["in","select","Entrance",{options:OPT.blockIn}],["loop","select","Keeps moving",{options:OPT.blockLoop}],["delay","number","Starts after (seconds)",{min:0,step:.1}],["action","action","On click (optional)"]] },
   features: { label:"Feature list (grid of items with icons)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["cols","select","Columns",{options:[[2,"2"],[3,"3"],[4,"4"]]}],
-    ["items","list","Items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Text (optional)",{wide:true}],["icon","icon","Icon (optional)",{wide:true}]], blank:()=>({title:"New item",text:"",icon:""}) }]] },
-  quotes: { label:"Testimonials", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Quotes",{ title:"name", hideable:true, fields:[["quote","area","Quote",{wide:true}],["name","text","Name"],["role","text","Role or company"]], blank:()=>({quote:"",name:"",role:""}) }]] },
+    ["items","list","Items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Text (optional)",{wide:true}],["icon","icon","Icon (optional)",{wide:true}],["hideText","toggle","Hide the text"]], blank:()=>({title:"New item",text:"",icon:""}) }]] },
+  quotes: { label:"Testimonials", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Quotes",{ title:"name", hideable:true, fields:[["quote","area","Quote",{wide:true}],["name","text","Name"],["role","text","Role or company"],["hideSub","toggle","Hide the role or company"]], blank:()=>({quote:"",name:"",role:""}) }]] },
   quote: { label:"Quote request form", fields:[["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["service","text","Service (filled in on the form)"],["hint","area","Note under the form (optional)",{wide:true}]] },
   catalog: { label:"Catalog (items with filters and quote requests)", fields:[["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["filters","strings","Filter names, one per line (1: item type, 2: package type, 3: price range)",{wide:true}],
-    ["items","list","Catalog items",{ itemName:"catalog item", title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}]], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
+    ["items","list","Catalog items",{ itemName:"catalog item", title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}],...ITEM_ICON,...ITEM_HIDE("Hide the type and price line")], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
   blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
   article: { label:"Text article", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["body","prose","Text",{wide:true}]] }
 };
@@ -227,7 +284,9 @@ const SECTION_BLANK = {
   accordion:()=>({num:"",eyebrow:"",items:[]}), timeline:()=>({num:"",eyebrow:"Story",text:"",flowId:""}),
   flowStrip:()=>({num:"",eyebrow:"",title:"",flowId:""}), banner:()=>({caption:[],media:"m-ocean"}),
   division:()=>({num:"",eyebrow:"Division",title:"New division",text:"",media:"m-ridges",flip:false,button:{label:"",action:A()},items:[]}),
-  cta:()=>({title:"Have a project in mind?",button:{label:"Get in touch",action:A()}}),
+  cta:()=>({title:"Have a project in mind?",text:"",button:{label:"Get in touch",action:A()},size:"l",style:"site",align:"start",in:"rise",loop:"none",delay:0}),
+  photo:()=>({media:"",mask:"none",maskWord:"DORMA",opacity:1,ratio:"16/9",width:"page",align:"center",fit:"cover",bg:"",blur:0,gray:false,zoom:false,parallax:0,overlay:{mode:"default"},caption:[]}),
+  logo:()=>({version:"auto",size:120,phone:"",align:"center",in:"pop",loop:"none",delay:0,action:A()}),
   features:()=>({num:"",eyebrow:"",title:"What's included",text:"",cols:3,items:[]}),
   quotes:()=>({num:"",eyebrow:"Testimonials",items:[]}),
   quote:()=>({anchor:"quote",eyebrow:"Request a Quote",title:"Request a Quote",text:"",service:"",hint:""}),
@@ -328,7 +387,7 @@ function mediaSlots(cfg,{all=false}={}){
    Starts from the image slots above (named places), then sweeps the rest of the site settings for any field that holds a
    library id (menu logo, loader, backgrounds…) and for [[id|caption]] written in text, so nothing that shows a picture is missed.
    Returns Map id → list of places (words). Hidden sections and draft posts count as used: the picture is still assigned there. */
-const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type" };
+const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type", ai:"AI writing" };
 function mediaUsage(cfg){
   const ids=new Set((cfg.media||[]).map(m=>m&&m.id).filter(Boolean)), use=new Map(), seen=new WeakMap();
   const P=v=>v&&typeof v==="object"?(v.en||v.ar||""):String(v??"");
@@ -395,7 +454,7 @@ function migrateFlow(f,g={}){
    A saved style is a snapshot of the global layer (colours, type, header, image filter, flow and slide defaults, animation).
    Per-item custom settings are not part of it, so applying a style never wipes a flow or slide that has its own look. */
 const STYLE_THEME=["accent","ink","panel","fg","heading","mutedOpacity","lineOpacity","display","body","mono","radius","grain","overlay","imageBrightness","imageOverlay","overlayIntensity","header","flow","slide","type","sections","modals","light","menu"];
-const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming","imageFx","sectionFx","modalClose"];
+const STYLE_MOTION=["speed","ease","titleReveal","scrollReveal","modalOpen","buttonGlow","transition","slideDuration","kenBurns","kbZoom","kbDuration","parallax","counters","flow","slideTiming","imageFx","sectionFx","modalClose","deco"];
 const pickKeys=(o,ks)=>JSON.parse(JSON.stringify(Object.fromEntries(ks.filter(k=>o&&o[k]!==undefined).map(k=>[k,o[k]]))));
 function snapshotStyle(cfg,name){ return { id:"st-"+Math.random().toString(36).slice(2,8), name:name||"My style", savedAt:new Date().toISOString(), theme:pickKeys(cfg.theme,STYLE_THEME), motion:pickKeys(cfg.motion,STYLE_MOTION) }; }
 function applyStyle(cfg,st){

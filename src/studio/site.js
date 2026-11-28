@@ -9,9 +9,10 @@ import { JUMP, arrive, jumpTo, labelKey } from './jump';
 import { sectionFx } from './fx';
 import { imageFx, sectionMotion, modalIn, modalOut } from './motionfx';
 import { fxPreview } from './fx';
+import { hideParts, sectionExtras, photoSection, logoSection, ctaSection } from './extras';
 
 /* ================= SITE RENDERER ================= */
-const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
+const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[], forDecorate:null, forOpen:null };
 function disposePage(){
   Site.disposers.splice(0).forEach(f=>{ try{ f(); }catch(e){} });
   if (ScrollTrigger) ScrollTrigger.getAll().forEach(t=>t.kill());
@@ -24,13 +25,18 @@ function renderSite(cfg,pageId){
   cfg=localize(cfg); NUM.on=cfg.site.showNumbers===true;
   Site.cfg=cfg; applyTheme(cfg,{mode:siteMode(cfg)}); gsap.globalTimeline.timeScale(+cfg.motion.speed||1); watchDeviceMode();
   // "#page/label" opens the page and travels to the section with that label
-  if (pageId && !/^post\//.test(pageId) && pageId.includes("/")){ const k=pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
-  const pages=cfg.pages||[], page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
+  // (page ids can hold "/" themselves, e.g. a proposal's "for/acme-k7p2/packaging": the longest matching page id wins)
+  const pages=cfg.pages||[];
+  if (pageId && !/^post\//.test(pageId) && pageId.includes("/") && !pages.some(p=>p.id===pageId)){
+    const base=pages.map(p=>p.id).filter(id=>pageId.startsWith(id+"/")).sort((a,b)=>b.length-a.length)[0];
+    const k=base?base.length:pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
+  if (!cfg.__proposal){ const rb=document.querySelector('meta[name="robots"][data-for]'); if (rb) rb.remove(); }
+  const page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
   const app=$("#app"); app.textContent=""; scrollTo(0,0);
   if (!page){ app.append(h("div",{class:"denied"},h("div",{},h("p",{class:"lede",text:ui("This site has no pages yet.")})))); return; }
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
   const sections=page.sections.filter(s=>!s.hidden && (!s.previewOnly || Site.preview)); // hidden in the studio = not shown to visitors; preview-only = draft preview only
-  const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
+  const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero"||first.type==="forCover");
   app.append(siteHeader(cfg,page,{overHero:!!heroFirst}));
   const main=h("main",{id:"main"});
   if (page.layout==="console"){
@@ -49,6 +55,7 @@ function renderSite(cfg,pageId){
   const fp=((cfg.site.logos||{}).places||{}).footer, footLogo=fp&&fp.show?logoNode(cfg,"footer",siteMode(cfg)==="light"?"light":"dark",{alt:cfg.site.brand||"",cls:"foot-logo"}):null;
   app.append(main, h("footer",{class:"wrap site-foot"},footLogo,h("span",{class:"mono",text:cfg.site.footer||""}),h("span",{class:"mono",html:`<b>${esc(page.title||"")}</b>`})));
   if (Site.preview) app.append(studioPill(cfg));
+  if (cfg.__proposal && Site.forDecorate) Site.forDecorate(cfg,app,page); // client proposal: header band and footer link (proposalsite.js)
   requestAnimationFrame(()=>afterRender(cfg,page));
 }
 /* ================= MENU =================
@@ -163,6 +170,7 @@ function studioPill(cfg){
 function buildSection(cfg,sec,page){
   const f=SECTIONS[sec.type]; if (!f) return null;
   if (sec.mediaHidden) sec={...sec,media:""}; // Pages → section → image → Hide on the site
+  sec=hideParts(sec); // Pages → section → Icon, text, logo and button → Hide the subtitle / title / text (also per card, row and slide)
   let el; try { el=f(cfg,sec,page); } catch(e){ console.error("section",sec.type,e); return null; }
   if (el) try { decorateSection(cfg,sec,el); } catch(e){ console.error("section extras",sec.type,e); }
   return el;
@@ -176,8 +184,9 @@ function decorateSection(cfg,sec,el){
     const fl=flowBlock(cfg,fu.flowId,{display:fu.display||""});
     if (fl){ const host=el.querySelector(".inner")||el.querySelector(".wrap")||el; const box=h("div",{class:"flow-under al-"+(fu.align||"start")},fl.el); host.append(box); el._flow=fl; }
   }
-  if (sec.type!=="heroCarousel"&&sec.type!=="hero"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start;
+  if (sec.type!=="heroCarousel"&&sec.type!=="hero"&&sec.type!=="forCover"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start;
     el._motion=(opts)=>{ try { imageFx(cfg,sec,el,opts); sectionMotion(cfg,sec,el,opts); } catch(e){ console.error("section animation",sec.type,e); } }; }
+  sectionExtras(cfg,sec,el); // heading icons, logo and button blocks, heading style and entrance, card hover (extras.js)
   if (sec.previewOnly) el.prepend(h("p",{class:"preview-only mono",text:ui("Preview only: fictional sample, not shown to visitors")}));
 }
 const SECTIONS={
@@ -232,6 +241,7 @@ const SECTIONS={
       if (modalIsOpen()) prog.pause(); };
     Site.pauseHero=()=>prog&&prog.pause(); Site.resumeHero=()=>prog&&prog.resume();
     const textIn=(delay=0)=>{ const s=slides[cur]; eyeIdx.textContent=pn(cur+1); eyeIdx.hidden=rule.hidden=!NUM.on; eyeTxt.textContent=s.eyebrow||""; lede.textContent=s.lede||"";
+      if (root._onSlide) root._onSlide(s); // this slide's icon by the title (extras.js)
       const T=timing(cur), tl=gsap.timeline({delay});
       if (!reduce){ gsap.set([eyeIdx,eyeTxt],{yPercent:100,autoAlpha:0}); gsap.set(lede,{y:18,autoAlpha:0}); gsap.set(title,{autoAlpha:0}); }
       tl.add(()=>{ gsap.set(title,{autoAlpha:1}); revealTitle(cfg,title,s.title||"",0); },T.title);
@@ -386,7 +396,7 @@ const SECTIONS={
     const w=h("div",{class:"wrap"}), head=h("div",{class:"head-row","data-rv":""},h("h2",{class:"h2",text:sec.title||""}));
     const count=h("span",{class:"mono"}); head.append(count); w.append(head);
     const grid=h("div",{class:"grid-cards"}), items=sec.items||[];
-    const cards=items.map(c=>{ const b=h("button",{class:"card",type:"button","data-tag":c.tag||"","data-rv":""},mediaBox(cfg,c.media,{ratio:4/3,res:800}),captionEl([c.code,c.tag]),h("h3",{class:"h3",text:c.title||""}),h("p",{text:c.text||""}));
+    const cards=items.map(c=>{ const b=h("button",{class:"card",type:"button","data-tag":c.tag||"","data-rv":""},mediaBox(cfg,c.media,{ratio:4/3,res:800}),captionEl(c.hideSub?[]:[c.code,c.tag]),h("h3",{class:"h3",text:c.title||""}),h("p",{text:c.text||""}));
       b.addEventListener("click",()=>runAction(cfg,c.action)); grid.append(b); return b; });
     const setCount=n=>count.innerHTML=`<b>${n}</b> ${ui("items")}`; setCount(items.length);
     if (sec.filters){
@@ -513,17 +523,18 @@ const SECTIONS={
       const s=h("select",{"aria-label":names[i]},h("option",{value:"",text:names[i]+" · "+ui("All")}),...vals.map(v=>h("option",{value:v,text:v}))); s.addEventListener("change",()=>{ sel[k]=s.value; apply(); }); bar.append(s); });
     if (bar.children.length) w.append(bar);
     const grid=h("div",{class:"grid-cards"}), quoteId=((page&&page.sections)||[]).find(x=>x.type==="quote"&&!x.hidden);
-    const cards=items.map(it=>{ const c=h("div",{class:"card cat-card","data-rv":""},mediaBox(cfg,it.media,{ratio:4/3,res:800}),captionEl([it.itemType,it.packageType,it.price].filter(Boolean)),h("h3",{class:"h3",text:it.title||""}),it.text?h("p",{text:it.text}):null);
+    const cards=items.map(it=>{ const c=h("div",{class:"card cat-card","data-rv":""},mediaBox(cfg,it.media,{ratio:4/3,res:800}),captionEl(it.hideSub?[]:[it.itemType,it.packageType,it.price].filter(Boolean)),h("h3",{class:"h3",text:it.title||""}),it.text?h("p",{text:it.text}):null);
       c._it=it; if (quoteId) c.append(h("button",{class:"arrow-link",type:"button",html:esc(ui("Request a quote for this item"))+ARROW_SVG,onclick:()=>{ dispatchEvent(new CustomEvent("dorma:quote",{detail:{section:quoteId.id,text:it.title}})); jumpTo(quoteId.anchor||quoteId.id); }}));
       grid.append(c); return c; });
     const apply=()=>{ const show=cards.filter(c=>keys.every(k=>!sel[k]||c._it[k]===sel[k])); setCount(show.length);
       gsap.to(cards,{autoAlpha:0,y:10,duration:.2,ease:"power2.in",onComplete(){ cards.forEach(c=>c.hidden=!show.includes(c)); gsap.fromTo(show,{autoAlpha:0,y:20},{autoAlpha:1,y:0,duration:.55,ease:"power3.out",stagger:.05}); }}); };
     w.append(grid); return h("section",{class:"sec catalog"},w);
   },
-  cta(cfg,sec){
-    const w=h("div",{class:"wrap cta","data-rv":""},h("h2",{class:"display",text:sec.title||""})); const b=buttonEl(cfg,sec.button); if (b) w.append(b);
-    return h("section",{class:"sec"},w);
-  }
+  /* Call to action: heading, an optional line and a button with its own size, style and animation (extras.js). */
+  cta(cfg,sec){ return ctaSection(cfg,sec); },
+  /* Photo only: one picture with a mask, opacity and filters. Logo: the logo at any size with an animation. */
+  photo(cfg,sec){ return photoSection(cfg,sec); },
+  logo(cfg,sec){ return logoSection(cfg,sec); }
 };
 function fmtNum(v,dec){ v=+v||0; dec=+dec||0; return dec?v.toFixed(dec):Math.round(v).toLocaleString("en-US"); }
 

@@ -44,9 +44,7 @@ function panelOutline(body){
   const tree = h("div", { class: "ol-tree" });
   body.append(
     h("p", { class: "adm-intro", text: "Your whole site on one screen: every page in menu order, with its sections in the order visitors see them. Add, remove, hide, duplicate and reorder here, or press Jump to design to edit that part. Changes go into the draft; Publish makes them live." }),
-    h("div", { class: "ol-bar" }, summary,
-      h("button", { class: "btn sm", type: "button", text: "Open all", onclick: () => { D.pages.forEach(p => OPEN.add(p.id)); draw(); } }),
-      h("button", { class: "btn sm", type: "button", text: "Close all", onclick: () => { OPEN.clear(); draw(); } })),
+    h("div", { class: "ol-bar" }, summary),
     undoBar, tree, addPageRow());
 
   /* every change goes through here: remembered for Undo, saved, redrawn */
@@ -181,6 +179,8 @@ function panelOutline(body){
     drawSummary(); drawUndo();
   }
   Admin.refresh = () => { drawSummary(); drawUndo(); };
+  /* Open all / Close all in the studio toolbar open or close every page here */
+  body.addEventListener("studio:foldall", e => { if (e.detail && e.detail.folded) OPEN.clear(); else D.pages.forEach(p => OPEN.add(p.id)); draw(); });
   draw();
 }
 

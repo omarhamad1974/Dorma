@@ -1,10 +1,11 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
 import { libraryUrl, mediaUrl, flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
 import { gsap } from 'gsap';
-import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
+import { Store, draftDiffers, loadDraft, media, normalize, publishDraft, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
+import { decoEditor, decoGlobal } from './decoeditor';
 import Sortable from 'sortablejs';
 import { loaderLogo, markHtml, previewLoader } from '../loader';
 import { optimizeImage, uploadSettings, fmtBytes, UPLOAD_FORMATS, MAX_UPLOAD_BYTES } from './optimize';
@@ -16,6 +17,11 @@ import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
 import { panelOutline, OIC } from './outline';
 import { mountLivePreview } from './livepreview';
+import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager, pageInfo } from './comfort';
+import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './ai';
+import { DESCRIBE_KEYS } from './aitext';
+import { panelProposals } from './proposalpanel';
+import { panelHealth, panelBackups } from './carepanel';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -43,11 +49,12 @@ const IC={
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   social:'<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/></svg>',
   pv:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><rect x="11" y="10" width="8" height="5" rx="1"/><path d="M8 21h8"/></svg>',
+  care:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.3-9.4C1.4 8.1 3.6 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.6 0 5.8 3.6 4.5 7.1C19.5 16.4 12 21 12 21z"/><path d="M3.5 12.5h4l1.7-3 2.6 6 1.9-3h6.8"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
 /* Outline: the whole site as a tree of pages and sections (src/studio/outline.js). First in the sidebar, and a button just before Live preview. */
 PANELS.push(["outline","Site outline"]); GROUPS.unshift(["outline","Outline","outline",["outline"]]); IC.outline=OIC.outline;
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
@@ -59,6 +66,7 @@ function setStudioMode(m){ try { localStorage.setItem("dorma.studioMode",m); } c
 const Admin={ panel:"pages", sel:{}, refresh:null, liveChanged(){ updateTop(); } };
 let assetsApi=null;
 let LP=null; // the floating live preview (livepreview.js)
+let CF=null; // reading comfort: folding groups, Find, text size (comfort.js)
 
 function toast(msg){ const t=h("div",{class:"toast",role:"status",text:msg}); document.body.append(t); gsap.fromTo(t,{y:20,autoAlpha:0},{y:0,autoAlpha:1,duration:.3}); setTimeout(()=>gsap.to(t,{autoAlpha:0,duration:.3,onComplete:()=>t.remove()}),2400); }
 function touch(opts={}){ scheduleSave(); if (opts.theme) applyTheme(Store.draft); if (Admin.refresh) Admin.refresh(); updateTop(); }
@@ -68,6 +76,7 @@ async function renderAdmin(){
   const tok=++renderTok; setDocLang("en");
   disposePage(); closeModal(true);
   const app=$("#app");
+  applyStudioText();
   if (!Store.canEdit){ app.textContent=""; app.append(Store.session?notEditor():signInForm()); return; }
   await loadDraft();
   if (tok!==renderTok) return; // a newer render started while the draft was loading
@@ -85,9 +94,10 @@ async function renderAdmin(){
     h("button",{type:"button",id:"admMode",onclick:()=>setStudioMode(studioMode()==="light"?"dark":"light")}),
     Store.mode==="db"?h("button",{type:"button",html:IC.x+"Sign out",onclick:async()=>{ await signOut(); route(); }}):"");
   const top=h("div",{class:"adm-top",id:"admTop"});
-  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub",role:"tablist"});
+  const body=h("div",{class:"adm-body",id:"admBody"}), sub=h("div",{class:"adm-subtabs",id:"admSub"});
   app.append(h("div",{class:"adm"},side,h("div",{class:"adm-main"},h("div",{class:"adm-head"},top,mnav,sub),body)));
   setStudioMode(studioMode());
+  if (CF) CF.stop(); CF=mountComfort($(".adm"),{body:()=>$("#admBody"),panel:()=>Admin.panel});
   LP=mountLivePreview($(".adm"),{draft:()=>Store.draft,where:()=>({panel:Admin.panel,sel:Admin.sel}),onChange:()=>updateTop()});
   Store.listeners=[updateTop,()=>LP&&LP.changed()];
   openPanel(Admin.panel);
@@ -122,11 +132,14 @@ function openPanel(k){
   if (!PANELS.some(p=>p[0]===k)) k="pages";
   if (cpClose) cpClose(); stopPreviews(); Admin.panel=k; Admin.refresh=null; const G=groupOf(k); lastSub[G[0]]=k;
   $$(".adm-side button[data-g],.adm-mobile-nav button[data-g]").forEach(b=>b.classList.toggle("on",b.dataset.g===G[0]));
-  const sub=$("#admSub"); if (sub){ sub.textContent=""; sub.hidden=G[3].length<2;
-    G[3].forEach(s=>sub.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)}))); }
+  closePop();
+  const sub=$("#admSub"); if (sub){ sub.textContent="";
+    const tabs=h("span",{class:"tabs",role:"tablist"}); sub.append(tabs);
+    G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
+    sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   if (k==="outline"){ panelOutline(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); return; }
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
 }
 
@@ -138,12 +151,12 @@ const MEDIA_KINDS=new Set(["image","video","scene","article"]);
 function bilingual(obj,key,kind){
   const D=Store.draft; if (!D || D.site.languages==="en" || !D.site.languages) return false;
   if (!["text","area","strings","prose"].includes(kind) || MONO_KEYS.has(key) || Array.isArray(obj)) return false;
-  return !(obj===D.loader || (obj && MEDIA_KINDS.has(obj.kind)));
+  return !(obj===D.loader || obj===D.ai || (obj && MEDIA_KINDS.has(obj.kind)));
 }
 function F(obj,key,kind,label,opts={},onChange=()=>{}){
   if (!opts.lang && bilingual(obj,key,kind)) return biField(obj,key,kind,label,opts,onChange);
   if (!opts.lang && isTx(obj[key])){ // English-only site: edit the English text and keep any Arabic already written
-    const v=obj[key], tmp={x:v.en??""}; return F(tmp,"x",kind,label,{...opts,lang:"en"},(nv)=>{ obj[key]=blankTx(v.ar)?nv:{en:nv,ar:v.ar}; onChange(obj[key],key); });
+    const v=obj[key], tmp={x:v.en??""}; return withAi(F(tmp,"x",kind,label,{...opts,lang:"en",noAi:true},(nv)=>{ obj[key]=blankTx(v.ar)?nv:{en:nv,ar:v.ar}; onChange(obj[key],key); }),obj,key,kind,label,opts,onChange,["en"]);
   }
   const D=Store.draft, wrap=h("div",{class:"field"+(opts.wide?" wide":"")}), id=uid("f");
   const lab=h("label",{for:id,text:label}); wrap.append(lab);
@@ -216,8 +229,39 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       wrap.append(g); if (!opts.hint) wrap.append(h("span",{class:"hint",text:"Seconds from when this comes into view. Empty uses the default shown. Lower numbers come first, so you can change the order."})); break; }
     case "list": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(listEditor(obj,key,opts,onChange)); break; }
     case "look": { lab.removeAttribute("for"); wrap.classList.add("wide"); wrap.append(lookEditor(obj,key,opts,onChange)); break; }
+    /* a colour filter of its own, or "as set in the Library" (Photo only sections) */
+    case "overlay": { lab.removeAttribute("for"); wrap.classList.add("wide"); if (!obj[key]||typeof obj[key]!=="object") obj[key]={mode:"default"};
+      wrap.append(overlayEditor(obj,key,{allowDefault:true,preview:true,defaultLabel:"As set in the Library",onChange:()=>onChange(obj[key],key)})); break; }
+    /* any logo version (Design → Logo), including silver and added versions */
+    case "logoVersion": { const s=h("select",{id}); logoVersionOptions(D).forEach(([v,l])=>{ const o=h("option",{value:v,text:l}); if ((obj[key]||"auto")===v) o.selected=true; s.append(o); });
+      s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
+  if (!opts.lang) withAi(wrap,obj,key,kind,label,opts,onChange,[(Store.draft&&Store.draft.site.languages)==="ar"?"ar":"en"]);
+  return wrap;
+}
+/* ---------- Write with AI (ai.js): a small AI button in the corner of text boxes ----------
+   It reads and writes the setting itself, then redraws the field, so the box shows the text that was used. */
+const AI_KINDS=new Set(["text","area","prose","strings"]);
+function aiAllowed(obj,key,kind,opts){
+  const D=Store.draft; if (!D || !aiEnabled() || opts.noAi || !AI_KINDS.has(kind) || MONO_KEYS.has(key) || !obj || Array.isArray(obj)) return false;
+  if (obj===D.loader || obj===D.ai) return false;
+  return !(MEDIA_KINDS.has(obj.kind) && !DESCRIBE_KEYS.includes(key));
+}
+function withAi(wrap,obj,key,kind,label,opts,onChange,langs){
+  if (!aiAllowed(obj,key,kind,opts)) return wrap;
+  const get=()=>{ const v=obj[key]; return isTx(v)?{en:toText(v.en,kind),ar:toText(v.ar,kind)}:{[langs[0]]:toText(v,kind)}; };
+  const set=val=>{
+    const v=obj[key], two=langs.length>1;
+    if (two||isTx(v)){ const cur=isTx(v)?v:{en:v??(kind==="strings"?[]:""),ar:kind==="strings"?[]:""}, nx={en:cur.en,ar:cur.ar};
+      Object.keys(val).forEach(l=>{ nx[l]=fromText(val[l],kind); });
+      obj[key]=!two&&blankTx(nx.ar)?nx.en:nx; }
+    else obj[key]=fromText(val[langs[0]]??"",kind);
+    const nw=F(obj,key,kind,label,opts,onChange); wrap.replaceWith(nw); onChange(obj[key],key); touch();
+  };
+  const image=()=>obj.kind==="image"?mediaUrl(obj)||null:null;
+  wrap.classList.add("has-ai");
+  wrap.append(aiButton({label,group:opts.groupLabel||"",kind,key,langs,get,set,image,root:wrap}));
   return wrap;
 }
 const blankTx=x=>x==null||x===""||(Array.isArray(x)&&!x.length);
@@ -262,7 +306,8 @@ function biField(obj,key,kind,label,opts,onChange){
     const f=F(tmp,"x",kind,l==="en"?"English":"العربية",{...opts,wide:false,hint:l==="en"?opts.hint:"",lang:l,groupLabel:label},nv=>{ cur[l]=nv; obj[key]={en:cur.en,ar:cur.ar}; onChange(obj[key],key); });
     f.classList.add("bi-"+l); if (l==="ar") $$("input,textarea",f).forEach(i=>{ i.dir="rtl"; i.lang="ar"; });
     row.append(f); });
-  wrap.append(row); return wrap;
+  wrap.append(row);
+  return withAi(wrap,obj,key,kind,label,opts,onChange,["en","ar"]);
 }
 function fieldsFor(obj,schema,onChange){ const g=h("div",{class:"fields"}); schema.forEach(([k,kind,l,o])=>g.append(F(obj,k,kind,l,o||{},onChange))); return g; }
 function actionEditor(a,onChange){
@@ -424,16 +469,34 @@ function sortable(box,arr,onMove){
   Sortable.create(box,{handle:".handle",draggable:".sub-item",animation:180,ghostClass:"sortable-ghost",onEnd(e){ if (e.oldIndex===e.newIndex) return; const [m]=arr.splice(e.oldIndex,1); arr.splice(e.newIndex,0,m); onMove(); }});
 }
 function card(title,...kids){ return h("section",{class:"card-a"},h("h2",{},title),...kids); }
+/* Long lists on the left page in 12s, with a filter box once there are more than 8.
+   On a phone the list folds into one row showing the item being edited; tap it to choose another. */
+const LIST_PAGE=12, MD={};
+const textOf=x=>x==null?"":typeof x==="object"&&x.nodeType?x.textContent:plain(x);
 function masterDetail(body,{items,selKey,label,kind,onAdd,addLabel,detail}){
-  const list=h("div",{class:"list",role:"list"}), det=h("div",{style:"display:flex;flex-direction:column;gap:20px;min-width:0"});
+  const st=MD[selKey]=MD[selKey]||{page:0,q:"",all:false};
+  const list=h("div",{class:"list md-list",role:"list"}), det=h("div",{style:"display:flex;flex-direction:column;gap:20px;min-width:0"});
+  const head=h("button",{class:"md-head",type:"button","aria-expanded":"false"}), rows=h("div",{class:"md-rows"}), pg=h("div",{class:"md-pager"}), addSlot=h("div",{class:"md-add"});
+  const find=h("input",{type:"search",class:"md-find",placeholder:"Filter this list…","aria-label":"Filter this list",value:st.q});
+  find.addEventListener("input",()=>{ st.q=find.value; st.page=0; drawList(); });
+  head.addEventListener("click",()=>{ const o=!list.classList.contains("open"); list.classList.toggle("open",o); head.setAttribute("aria-expanded",String(o)); if (o&&!find.hidden) find.focus({preventScroll:true}); });
+  list.append(head,find,rows,pg,addSlot);
+  const shown=()=>{ const q=st.q.trim().toLowerCase(); return q?items().filter(x=>(textOf(label(x))+" "+(kind?textOf(kind(x)):"")).toLowerCase().includes(q)):items(); };
   /* Editing a name only redraws the list on the left. The detail is built once per selection,
      so a text box being typed in is never replaced (that is what used to drop the focus). */
-  const drawList=()=>{ list.textContent="";
-    items().forEach(x=>list.append(h("button",{class:"li"+(x.id===Admin.sel[selKey]?" on":""),type:"button",onclick:()=>{ Admin.sel[selKey]=x.id; draw(); }},label(x),kind?h("small",{text:kind(x)}):null)));
-    if (onAdd) list.append(h("button",{class:"btn sm",type:"button",style:"margin-top:6px",html:IC.plus+esc(addLabel),onclick:()=>{ const n=onAdd(); Admin.sel[selKey]=n.id; touch(); draw(); }}));
+  const drawList=()=>{ rows.textContent=""; pg.textContent=""; addSlot.textContent="";
+    const all=items(), sh=shown(), I=pageInfo(sh.length,LIST_PAGE,st.page); st.page=I.page;
+    find.hidden=all.length<=8&&!st.q;
+    const cur=all.find(x=>x.id===Admin.sel[selKey]);
+    head.textContent=""; head.append(h("span",{class:"md-cur",text:cur?textOf(label(cur)):"Choose…"}),h("small",{text:all.length+(all.length===1?" item":" items")}),h("i",{"aria-hidden":"true"}));
+    (st.all?sh:sh.slice(I.start,I.end)).forEach(x=>rows.append(h("button",{class:"li"+(x.id===Admin.sel[selKey]?" on":""),type:"button",onclick:()=>{ Admin.sel[selKey]=x.id; list.classList.remove("open"); head.setAttribute("aria-expanded","false"); draw(); }},label(x),kind?h("small",{text:kind(x)}):null)));
+    if (!sh.length) rows.append(h("p",{class:"md-none",text:"Nothing matches “"+st.q+"”."}));
+    const p=pager({total:sh.length,size:LIST_PAGE,page:st.page,all:st.all,compact:true,noun:"items",onPage:n=>{ st.page=n; drawList(); },onAll:v=>{ st.all=v; drawList(); }}); if (p) pg.append(p);
+    if (onAdd) addSlot.append(h("button",{class:"btn sm",type:"button",style:"margin-top:6px",html:IC.plus+esc(addLabel),onclick:()=>{ const n=onAdd(); Admin.sel[selKey]=n.id; st.q=""; find.value=""; touch(); draw(); }}));
   };
   const draw=()=>{
     if (!items().some(x=>x.id===Admin.sel[selKey])) Admin.sel[selKey]=items()[0]?.id;
+    const i=shown().findIndex(x=>x.id===Admin.sel[selKey]); if (i>=0) st.page=Math.floor(i/LIST_PAGE); // keep the item being edited in view
     drawList(); det.textContent=""; const cur=items().find(x=>x.id===Admin.sel[selKey]); if (cur) det.append(...[].concat(detail(cur,drawList)));
   };
   body.append(h("div",{class:"cols"},list,det)); draw(); return draw;
@@ -455,7 +518,7 @@ function panelSite(body){
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(plain(p.title)||p.id)+" in menu")); });
   body.append(card("Page titles",titles));
-  body.append(card("Backup",h("p",{class:"adm-intro",text:"Copy every setting as text to keep a backup, or paste a backup to replace the draft."}),
+  body.append(card("Backup",h("p",{class:"adm-intro"},"Copy every setting as text, or paste settings to replace the draft. Backup files, snapshots and the published versions are under ",h("button",{type:"button",class:"linkish",text:"Site care → Backups",onclick:()=>openPanel("backups")}),"."),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn",type:"button",text:"Copy settings",onclick:async()=>{ const s=JSON.stringify(Store.draft); try { await navigator.clipboard.writeText(s); toast("Settings copied"); } catch(e){ area.value=s; area.select(); toast("Select all and copy the text below"); } }}),
       h("button",{class:"btn",type:"button",text:"Replace draft with pasted settings",onclick:()=>{ try { const c=JSON.parse(area.value); Store.draft=normalize(c); touch({theme:true}); toast("Draft replaced"); openPanel("site"); } catch(e){ toast("That text isn't a valid settings backup."); } }}),
@@ -463,7 +526,6 @@ function panelSite(body){
       h("button",{class:"btn danger",type:"button",text:"Reset to starter template",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with the starter template?",()=>{ Store.draft=clone(STARTER); touch({theme:true}); openPanel("site"); })})),
     (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);font-family:var(--mono);font-size:.74rem"}))));
   var area;
-  if (Store.mode==="db") body.append(versionsCard());
 }
 /* ---------- Design → Logo ----------
    Versions (white, colour, silver, added SVGs or library images) and the places that use them, each with a version for
@@ -576,16 +638,6 @@ function loaderCard(){
       h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),
       h("button",{class:"btn primary",type:"button",text:"Preview loader",onclick:()=>previewLoader(D)}),file),note);
   redraw(); return c;
-}
-function versionsCard(){
-  const list=h("div",{class:"fields"},h("p",{class:"mono",text:"Loading…"}));
-  listVersions().then(vs=>{ list.textContent="";
-    if (!vs.length){ list.append(h("p",{class:"adm-intro",text:"Nothing has been published yet."})); return; }
-    vs.forEach((v,i)=>list.append(h("div",{style:"display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"},
-      h("span",{text:new Date(v.published_at).toLocaleString()+(i===0?" · live now":"")}),
-      i===0?null:h("button",{class:"btn sm",type:"button",text:"Put in draft",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with this version? Publish afterwards to make it live.",async()=>{ if (await restoreVersion(v.id)){ touch({theme:true}); toast("That version is now the draft"); openPanel("site"); } else toast("Couldn't load that version."); })}))));
-  });
-  return card("Published versions",h("p",{class:"adm-intro",text:"The last 30 published versions. Putting one in the draft lets you check it before publishing it again."}),list);
 }
 function signInForm(){
   const email=h("input",{type:"email",autocomplete:"username",required:true,id:"si-email"}), pw=h("input",{type:"password",autocomplete:"current-password",required:true,id:"si-pw"});
@@ -1020,6 +1072,8 @@ function panelStyle(body){
       h("p",{class:"hint",style:"margin:0"},"Title, subtitle and body sizes and fonts for the whole site are under ",h("button",{type:"button",class:"linkish",text:"Colours and type → Type",onclick:()=>openPanel("theme")}),"."),
       h("p",{class:"hint",style:"margin:0",text:"Background effect for every section that has none of its own"}),
       fxEditor(T.sections.bgfx,{global:true})),
+    card("Headings, icons and cards",h("p",{class:"adm-intro",style:"margin:0",text:"How section headings look and arrive, how icons by titles move, and what cards, rows and items do under the pointer. Any section can use its own (Pages → section → Icon, text, logo and button)."}),
+      decoGlobal(M)),
     card("Section entrance and exit",h("p",{class:"adm-intro",style:"margin:0",text:"How every section arrives as it scrolls into view and how it leaves. A section can use its own (Pages → section → More options → Animation)."}),
       sectionAnimEditor(M.sectionFx,{global:true})),
     card("Pictures: masks, reveals and hover",h("p",{class:"adm-intro",style:"margin:0",text:"Every picture in sections and modals (not the full-screen hero backgrounds). Reveal plays once as the picture scrolls in; the shape stays on as a mask. A section can use its own."}),
@@ -1223,6 +1277,7 @@ function panelCarousels(body){
       return [
         card(h("span",{class:"grow"},"Carousel on "+(plain(p.title)||p.id)),h("button",{class:"btn sm",type:"button",html:IC.eye+"Preview page",onclick:()=>{ Admin.sel.pages=p.id; Site.preview=true; if (location.hash.slice(1)===p.id) route(); else location.hash=p.id; }}),
           F(s,"hidden","toggle","Hide this carousel from visitors",{},()=>redraw()),fieldsFor(s,setF,()=>redraw())),
+        card("Icon, logo, button and title style",decoEditor(s,{carousel:true,G:M.deco})),
         card("Slides · drag to reorder or duplicate",F(s,"slides",slidesF[1],slidesF[2],slidesF[3],()=>redraw())),
         card(h("span",{class:"grow"},"Import slides from Markdown"),importBox("slides",{fixed:{carousel:s.id},done:()=>openPanel("carousels")}))
       ];
@@ -1258,7 +1313,8 @@ function panelPages(body){
    - quick uploads to Supabase Storage (item.url)
    - generated scenes and articles written in the studio */
 IC.link='<svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>';
-const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set() };
+const LIB={ cat:"", kind:"", q:"", hidden:false, use:"", sort:"order", dupes:false, selecting:false, sel:new Set(), page:0, all:false, sig:"" };
+const LIB_PAGE=48; // library cards per page
 const NEWCAT={ id:"" }; // category for new uploads, articles and scenes, chosen in the Library
 let libIndex=null;
 const prettyName=p=>p.split("/").pop().replace(/\.[^.]+$/,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim().replace(/^./,c=>c.toUpperCase());
@@ -1372,7 +1428,7 @@ function panelMedia(body){
   /* Category strip: tap to show one category; drop pictures on it to move them there */
   const strip=h("div",{class:"cat-strip",role:"group","aria-label":"Categories. Drop pictures here to move them"});
   const bulk=h("div",{class:"lib-bulk",role:"region","aria-label":"Selected items"});
-  const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"});
+  const grid=h("div",{class:"lib-grid"}), det=h("div"), countEl=h("p",{class:"mono"}), libPager=h("div",{class:"lib-pager"});
   const drawFilters=()=>{ kinds.textContent=""; OPT.libKinds.forEach(([v,l])=>kinds.append(h("button",{type:"button",class:"chip"+(LIB.kind===v?" on":""),text:l,onclick:()=>{ LIB.kind=v; drawFilters(); drawGrid(); }})));
     $(".cat-slot",filters).replaceWith(Object.assign(categorySelect(LIB.cat,v=>{ LIB.cat=v; drawGrid(); }),{className:"cat-slot"})); };
   /** Moves items to a category; returns how many changed. */
@@ -1410,7 +1466,12 @@ function panelMedia(body){
     const free=D.media.filter(m=>m.kind!=="article"&&!m.hidden&&!usage.has(m.id)).length;
     countEl.textContent=list.length+" of "+D.media.length+" items · "+free+" pictures not used on the site yet";
     if (!list.length) grid.append(h("p",{class:"adm-intro",text:LIB.dupes?"No duplicates found here.":"Nothing matches. Add files on GitHub (below), or change the filters."}));
-    list.forEach(m=>{ const b=bytesOf(m,libIndex), dg=dupes.get(m.id), on=LIB.selecting?LIB.sel.has(m.id):m.id===Admin.sel.media;
+    /* Pages of 48: a new filter starts at page 1; picking an item keeps its page */
+    const sig=[LIB.cat,LIB.kind,LIB.q,LIB.hidden,LIB.use,LIB.sort,LIB.dupes].join("|"); if (sig!==LIB.sig){ LIB.sig=sig; LIB.page=0; }
+    const I=pageInfo(list.length,LIB_PAGE,LIB.page); LIB.page=I.page; libPager.textContent="";
+    const lp=pager({total:list.length,size:LIB_PAGE,page:LIB.page,all:LIB.all,noun:"items",onPage:n=>{ LIB.page=n; drawGrid(); countEl.scrollIntoView({behavior:"smooth",block:"start"}); },onAll:v=>{ LIB.all=v; drawGrid(); }});
+    if (lp){ libPager.append(lp); countEl.append(" · page "+(I.page+1)+" of "+I.pages); }
+    (LIB.all?list:list.slice(I.start,I.end)).forEach(m=>{ const b=bytesOf(m,libIndex), dg=dupes.get(m.id), on=LIB.selecting?LIB.sel.has(m.id):m.id===Admin.sel.media;
       const c=h("button",{class:"lib-card"+(on?" on":"")+(m.hidden?" is-hidden":"")+(dg?" is-dupe":""),type:"button",draggable:"true","aria-pressed":LIB.selecting?String(on):null,onclick:()=>{
           if (LIB.selecting){ if (LIB.sel.has(m.id)) LIB.sel.delete(m.id); else LIB.sel.add(m.id); drawGrid(); return; }
           Admin.sel.media=m.id; drawGrid(); drawDetail(); det.scrollIntoView({behavior:"smooth",block:"nearest"}); }},
@@ -1502,7 +1563,7 @@ function panelMedia(body){
   let draw=()=>{ if (LIB.cat && !NEWCAT.id) NEWCAT.id=LIB.cat; drawNewCat(); drawFilters(); drawGrid(); drawDetail(); };
   const optSlot=h("div"); const drawOpt=()=>optSlot.replaceChildren(optimizeCard(drawOpt));
   const draw0=draw; draw=()=>{ draw0(); drawOpt(); };
-  body.append(bar,linkSlot,strip,filters,tools,bulk,countEl,grid,det,optSlot,githubCard(),categoriesCard(()=>draw()));
+  body.append(bar,linkSlot,strip,filters,tools,bulk,countEl,grid,libPager,det,optSlot,githubCard(),categoriesCard(()=>draw()));
   draw();
   syncLibrary(true).then(n=>{ if (n){ touch(); } draw(); });
 }
@@ -1725,7 +1786,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
       secs.append(subCard(s,{title:()=>(s.previewOnly?"[Preview only] ":"")+secTitle(s),kind:T.label+(s.anchor?" · #"+plain(s.anchor):""),open:false,
         body:()=>s.type==="heroCarousel"?h("div",{class:"fields"},h("p",{class:"adm-intro",style:"margin:0",text:"Carousel and slide settings have their own tab."}),
             h("button",{class:"btn sm",type:"button",style:"align-self:flex-start",html:IC.carousels+"Edit in Carousels",onclick:()=>{ Admin.sel.carousels=s.id; openPanel("carousels"); }})):
-          h("div",{class:"sec-body"},fieldsFor(s,T.fields),sectionExtras(s)),
+          h("div",{class:"sec-body"},fieldsFor(s,T.fields),decoEditor(s,{G:Store.draft.motion.deco}),sectionExtras(s)),
         onRemove:()=>{ list.splice(i,1); drawSecs(); touch(); },
         onToggleHidden:()=>{ s.hidden=!s.hidden; touch(); drawVis(); },
         onDuplicate:()=>{ const c=clone(s); c.id=uid("s"); c.hidden=!!s.hidden; if (c.anchor) c.anchor=plain(c.anchor)+"-copy"; list.splice(i+1,0,c); drawSecs(); touch(); toast("Section duplicated. The copy is right below the original."); }})); secs.lastElementChild.dataset.sec=s.id; });
@@ -1737,7 +1798,7 @@ function sectionsEditor(list,{inModal=false,onVis=()=>{}}={}){
   drawSecs();
   /* Arriving from Missing images: open that section and bring it into view */
   if (Admin.openSec){ const i=list.findIndex(s=>s.id===Admin.openSec); Admin.openSec=""; const el=i>=0?[...secs.querySelectorAll(":scope > .sub-item")][i]:null;
-    if (el){ el._open?.(); setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60); } }
+    if (el){ el._open?.(); setTimeout(()=>{ revealEl(el,Admin.panel); el.scrollIntoView({behavior:"smooth",block:"start"}); },60); } }
   return {el:secs,visBar,draw:drawSecs};
 }
 /** What every section can have: a label, a flow under it, its own look, a background effect, preview only. */
@@ -1764,5 +1825,5 @@ function sectionExtras(s){
       ["titleFont","select","Title font",{options:[["","Global"],...OPT.fonts]}],["title","color","Title colour",{optional:true,placeholder:"Global"}],["text","color","Text colour",{optional:true,placeholder:"Global"}],["accent","color","Accent",{optional:true,placeholder:"Global"}]])]}));
   return box;
 }
-export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, goToSlot, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
 export { PAGE_TEMPLATES, secTitle };

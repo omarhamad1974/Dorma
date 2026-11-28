@@ -11,6 +11,8 @@ export { normalize };
 import { clone } from './core';
 import { Site, renderSite } from './site';
 import { renderAdmin } from './admin';
+import { leaveStudioText } from './comfort';
+import { renderProposal } from './proposalsite';
 
 // The settings object is free-form JSON shaped like STARTER.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,18 +144,75 @@ export async function publishDraft(): Promise<boolean> {
 
 export const draftDiffers = (): boolean => JSON.stringify(Store.draft) !== JSON.stringify(Store.live);
 
-/* ---------- published versions ---------- */
-export interface Version { id: number; published_at: string }
+/* ---------- published versions and backups (studio → Site care → Backups) ----------
+   site_versions holds every publish, hand-saved snapshots and the automatic "before restore / import" copies
+   (migration 0006). Until 0006 is applied, the older columns still work: the list falls back to id and date. */
+export interface Version { id: number; published_at: string; kind?: 'publish' | 'snapshot' | 'auto'; label?: string; pinned?: boolean; bytes?: number; mine?: boolean }
 export async function listVersions(): Promise<Version[]> {
   if (Store.mode !== 'db') return [];
-  const { data } = await db().from('site_versions').select('id, published_at').order('id', { ascending: false }).limit(30);
-  return (data as Version[]) || [];
+  const full = await db().rpc('version_list');
+  if (!full.error) return (full.data as Version[]) || [];
+  const { data } = await db().from('site_versions').select('id, published_at').order('id', { ascending: false }).limit(100);
+  return ((data as Version[]) || []).map((v) => ({ ...v, kind: 'publish' as const }));
 }
-/** Puts an earlier published version into the draft, so it can be checked and published again. */
-export async function restoreVersion(id: number): Promise<boolean> {
+/** The full settings of one version (for restoring, downloading or comparing). */
+export async function versionConfig(id: number): Promise<Config | null> {
+  if (Store.mode !== 'db') return null;
   const { data, error } = await db().from('site_versions').select('config').eq('id', id).maybeSingle();
-  if (error || !data) return false;
-  Store.draft = normalize(data.config); scheduleSave(); return true;
+  return error || !data ? null : data.config;
+}
+/** Saves the current draft as a version without publishing it. kind 'auto' marks the safety copy made before a restore. */
+export async function saveSnapshot(label: string, kind: 'snapshot' | 'auto' = 'snapshot'): Promise<boolean> {
+  if (Store.mode !== 'db') return false;
+  await saveDraft();
+  if (Store.status === 'error') return false;
+  const { error } = await db().rpc('save_snapshot', { p_label: label.slice(0, 120), p_kind: kind });
+  return !error;
+}
+export async function updateVersion(id: number, label: string, pinned: boolean): Promise<boolean> {
+  const { error } = await db().rpc('update_version', { p_id: id, p_label: label.slice(0, 120), p_pinned: pinned });
+  return !error;
+}
+export async function deleteVersion(id: number): Promise<boolean> {
+  const { data, error } = await db().rpc('delete_version', { p_id: id });
+  return !error && data === true;
+}
+/** Puts an earlier version (or imported settings) into the draft, keeping a copy of the current draft first. */
+export async function replaceDraft(config: Config, safetyLabel: string): Promise<boolean> {
+  if (Store.mode === 'db') { const ok = await saveSnapshot(safetyLabel, 'auto'); if (!ok) return false; }
+  else LS.set('dorma.draftBefore', Store.draft);
+  Store.draft = normalize(config); await saveDraft();
+  return Store.status !== 'error';
+}
+export async function restoreVersion(id: number): Promise<boolean> {
+  const c = await versionConfig(id);
+  return c ? replaceDraft(c, 'Before restoring version ' + id) : false;
+}
+/** Database size in bytes (Supabase free plan: 500 MB), or 0 when unknown. */
+export async function databaseSize(): Promise<number> {
+  if (Store.mode !== 'db') return 0;
+  const { data, error } = await db().rpc('database_size');
+  return error ? 0 : Number(data) || 0;
+}
+
+/* ---------- keep-alive (studio → Site care → Health check) ----------
+   A GitHub Actions job pings keep_alive() every day so the free Supabase project never pauses from being idle. */
+export interface Ping { at: string; source: string; note: string }
+export async function keepAliveLog(): Promise<{ ok: boolean; rows: Ping[] }> {
+  if (Store.mode !== 'db') return { ok: false, rows: [] };
+  const { data, error } = await db().rpc('keepalive_status');
+  return { ok: !error, rows: (data as Ping[]) || [] };
+}
+export async function pingNow(): Promise<boolean> {
+  if (Store.mode !== 'db') return false;
+  const { error } = await db().rpc('keep_alive', { p_source: 'studio', p_note: 'Ping from the studio' });
+  return !error;
+}
+
+/** Editors-only data that is not part of the site settings, for the backup file. */
+export async function backupExtras(): Promise<{ social: Config; proposals: ProposalRow[] }> {
+  const [social, proposals] = await Promise.all([loadSocial().catch(() => null), loadProposals(true).catch(() => [])]);
+  return { social: social ? clone(social) : null, proposals: clone(proposals || []) };
 }
 
 /* ---------- social plan (studio → Social) ----------
@@ -205,6 +264,150 @@ export async function saveSocial(): Promise<void> {
   if (Social.queued) { Social.queued = false; void saveSocial(); }
 }
 
+/* ---------- client proposals (studio → Content → Proposals; site → #for/<code>) ----------
+   Each proposal is a row in its own table (0005_proposals.sql), saved as soon as it changes, like the social plan.
+   Visitors never read the table: openProposal() asks the database for one proposal by its code, which also counts
+   the open. Offline (or before the table exists) proposals stay in this browser. */
+export interface ProposalRow { id: string; slug: string; data: Config; status: 'live' | 'off' | 'archived'; expires_on: string | null; searchable: boolean; created_at?: string; updated_at?: string }
+export interface ProposalStat { opens: number; last: string | null }
+export interface ProposalOpen { opened_at: string; lang: string | null; device: string | null }
+export const Proposals = {
+  rows: null as ProposalRow[] | null,
+  stats: {} as Record<string, ProposalStat>,
+  where: 'local' as 'db' | 'local',
+  status: 'saved' as Status,
+  message: '',
+  timers: {} as Record<string, ReturnType<typeof setTimeout>>,
+  listeners: [] as Array<() => void>,
+};
+const PROPOSAL_COLS = 'id, slug, data, status, expires_on, searchable, created_at, updated_at';
+function proposalStatus(s: Status, msg = ''): void { Proposals.status = s; Proposals.message = msg; Proposals.listeners.forEach((f) => f()); }
+const localProposals = (): ProposalRow[] => (LS.get('dorma.proposals') as ProposalRow[]) || [];
+export async function loadProposals(force = false): Promise<ProposalRow[]> {
+  if (Proposals.rows && !force) return Proposals.rows;
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('proposals').select(PROPOSAL_COLS).order('created_at', { ascending: false });
+    if (!error) {
+      Proposals.where = 'db'; Proposals.rows = (data as ProposalRow[]) || [];
+      const st = await db().rpc('proposal_stats');
+      Proposals.stats = {};
+      ((st.data as Array<{ proposal_id: string; opens: number; last_opened: string }>) || []).forEach((r) => {
+        Proposals.stats[r.proposal_id] = { opens: Number(r.opens) || 0, last: r.last_opened };
+      });
+      return Proposals.rows;
+    }
+  }
+  Proposals.where = 'local'; Proposals.rows = localProposals();
+  return Proposals.rows;
+}
+/** Saves one proposal shortly after its last change. */
+export function scheduleProposalSave(row: ProposalRow): void {
+  proposalStatus('pending'); clearTimeout(Proposals.timers[row.id]);
+  Proposals.timers[row.id] = setTimeout(() => { void saveProposal(row); }, 700);
+}
+export async function saveProposal(row: ProposalRow): Promise<boolean> {
+  clearTimeout(Proposals.timers[row.id]); proposalStatus('saving');
+  try {
+    if (Proposals.where === 'db') {
+      const { error } = await db().from('proposals').upsert({ id: row.id, slug: row.slug, data: clone(row.data), status: row.status, expires_on: row.expires_on || null, searchable: row.searchable });
+      if (error) throw error;
+    } else LS.set('dorma.proposals', Proposals.rows);
+    proposalStatus('saved'); return true;
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    proposalStatus('error', err.code === '23505' ? 'That link code is already used by another proposal.' : saveError(err)); return false;
+  }
+}
+export async function deleteProposal(row: ProposalRow): Promise<boolean> {
+  clearTimeout(Proposals.timers[row.id]);
+  if (Proposals.where === 'db') { const { error } = await db().from('proposals').delete().eq('id', row.id); if (error) return false; }
+  Proposals.rows = (Proposals.rows || []).filter((r) => r.id !== row.id);
+  if (Proposals.where === 'local') LS.set('dorma.proposals', Proposals.rows);
+  return true;
+}
+/** The latest opens of one proposal (newest first), for the studio. */
+export async function proposalOpens(id: string): Promise<ProposalOpen[]> {
+  if (Proposals.where !== 'db') return [];
+  const { data } = await db().from('proposal_opens').select('opened_at, lang, device').eq('proposal_id', id).order('opened_at', { ascending: false }).limit(25);
+  return (data as ProposalOpen[]) || [];
+}
+export async function clearProposalOpens(id: string): Promise<boolean> {
+  if (Proposals.where !== 'db') return false;
+  const { error } = await db().from('proposal_opens').delete().eq('proposal_id', id);
+  if (!error) delete Proposals.stats[id];
+  return !error;
+}
+export interface OpenedProposal { ok: boolean; code?: string; slug?: string; data?: Config; searchable?: boolean; status?: string; expires_on?: string | null }
+/** What the site shows at #for/<code>. count = record one open (sent once per visit). */
+export async function openProposal(slug: string, opts: { count?: boolean; lang?: string; device?: string } = {}): Promise<OpenedProposal> {
+  if (Store.mode !== 'db') {
+    const r = localProposals().find((x) => x.slug === slug);
+    if (!r) return { ok: false, code: 'missing' };
+    const today = new Date().toISOString().slice(0, 10);
+    if (r.status !== 'live' && !Store.canEdit) return { ok: false, code: 'off' };
+    if (r.expires_on && r.expires_on < today && !Store.canEdit) return { ok: false, code: 'expired' };
+    return { ok: true, slug: r.slug, data: r.data, searchable: r.searchable, status: r.status, expires_on: r.expires_on };
+  }
+  const { data, error } = await db().rpc('open_proposal', { p_slug: slug, p_count: !!opts.count, p_lang: opts.lang || null, p_device: opts.device || null });
+  if (error) return { ok: false, code: 'unreachable' };
+  return (data as OpenedProposal) || { ok: false, code: 'missing' };
+}
+
+/* ---------- edge functions (studio → Write with AI) ----------
+   Calls a Supabase edge function as the signed-in editor. Always resolves: app-level problems come back as
+   { ok: false, code, message } so the studio can explain them in plain words. */
+export interface FnReply { ok: boolean; code?: string; message?: string; [k: string]: unknown }
+export async function callFunction(name: string, body: Record<string, unknown>): Promise<FnReply> {
+  if (Store.mode !== 'db') return { ok: false, code: 'offline', message: 'AI writing needs the online studio (this copy saves in the browser only).' };
+  if (!Store.session) return { ok: false, code: 'signed_out', message: 'Sign in to the studio to use AI writing.' };
+  try {
+    const { data, error } = await db().functions.invoke(name, { body });
+    if (!error) return (data as FnReply) || { ok: false, code: 'empty', message: 'No answer came back. Try again.' };
+    const status = (error as { context?: Response }).context?.status;
+    if (status === 404) return { ok: false, code: 'not_deployed', message: 'The AI writing service is not set up on Supabase yet.' };
+    if (status === 546 || status === 504) return { ok: false, code: 'gemini_down', message: 'The AI took too long to answer. Try again in a moment.' };
+    return { ok: false, code: 'unreachable', message: "Couldn't reach the AI writing service. Check your connection and try again." };
+  } catch {
+    return { ok: false, code: 'unreachable', message: "Couldn't reach the AI writing service. Check your connection and try again." };
+  }
+}
+
+/* ---------- AI archive (studio → Content → AI archive) ----------
+   AI texts kept to reuse later on the site or in Social posts. Editors-only table ai_archive (migration 0004);
+   offline, or until the table exists, they stay in this browser. Newest first. */
+export interface ArchiveItem { id: string; created_at: string; title: string; tags: string[]; en: string; ar: string; meta: Record<string, unknown> }
+const ARCH_LS = 'dorma.aiArchive';
+const archLocal = (): ArchiveItem[] => (LS.get(ARCH_LS) as ArchiveItem[]) || [];
+export async function listArchive(): Promise<{ items: ArchiveItem[]; where: 'db' | 'local' }> {
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('ai_archive').select('id, created_at, title, tags, en, ar, meta').order('created_at', { ascending: false }).limit(500);
+    if (!error) return { items: (data as ArchiveItem[]) || [], where: 'db' };
+  }
+  return { items: archLocal(), where: 'local' };
+}
+export async function addArchive(item: Omit<ArchiveItem, 'id' | 'created_at'>): Promise<ArchiveItem> {
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('ai_archive').insert(item).select('id, created_at, title, tags, en, ar, meta').single();
+    if (!error && data) return data as ArchiveItem;
+    // keep it in this browser only while the table doesn't exist yet; any other problem is reported
+    if (!(error && /PGRST205|42P01|does not exist|schema cache/i.test((error.code || '') + ' ' + (error.message || '')))) throw new Error(error?.message || 'Could not save to the archive.');
+  }
+  const it: ArchiveItem = { ...item, id: 'loc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created_at: new Date().toISOString() };
+  LS.set(ARCH_LS, [it, ...archLocal()]); return it;
+}
+export async function updateArchive(id: string, patch: Partial<ArchiveItem>): Promise<boolean> {
+  if (Store.mode === 'db' && !id.startsWith('loc-')) {
+    const { error } = await db().from('ai_archive').update(patch).eq('id', id); return !error;
+  }
+  LS.set(ARCH_LS, archLocal().map((x) => (x.id === id ? { ...x, ...patch } : x))); return true;
+}
+export async function deleteArchive(id: string): Promise<boolean> {
+  if (Store.mode === 'db' && !id.startsWith('loc-')) {
+    const { error } = await db().from('ai_archive').delete().eq('id', id); return !error;
+  }
+  LS.set(ARCH_LS, archLocal().filter((x) => x.id !== id)); return true;
+}
+
 /* ---------- sign-in (editors) ---------- */
 export async function signIn(email: string, password: string): Promise<string | null> {
   const { error } = await db().auth.signInWithPassword({ email, password });
@@ -218,7 +421,7 @@ export async function signIn(email: string, password: string): Promise<string | 
   return null;
 }
 export async function signOut(): Promise<void> {
-  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null; Social.data = null;
+  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null; Social.data = null; Proposals.rows = null;
 }
 export const signedInEmail = (): string => Store.session?.user?.email || '';
 
@@ -275,6 +478,8 @@ export const isMediaUrl = (u: unknown): u is string =>
 export function route(): void {
   const id = (location.hash || '').slice(1);
   if (id === 'admin') { Site.preview = false; void renderAdmin(); return; }
+  if (/^for\//.test(id)) { leaveStudioText(); void renderProposal(id); return; }
+  leaveStudioText(); // the studio's text size is for the studio only
   // Remember the page the editor was on, so the studio's "View site" brings them back to it.
   try { sessionStorage.setItem('dorma.lastPage', id); } catch { /* storage blocked */ }
   if (Site.preview && Store.draft) { renderSite(Store.draft, id); return; }

@@ -44,6 +44,8 @@ const SECTION={
   quote:svg(T(10,8,50,4)+O(10,20,48,10)+O(62,20,48,10)+O(10,35,100,10)+O(10,50,100,14)+B(10,69,28)),
   catalog:svg([0,1,2,3].map(i=>r(10+i*22,8,18,6,i===0?C.ac:C.fa,3)).join("")+[0,1,2].map(c=>[0,1].map(rw=>P(10+c*35,20+rw*30,30,18)+L(10+c*35,41+rw*30,20,C.fg)).join("")).join("")),
   blog:svg(T(10,8,36,4)+[0,1,2].map(i=>P(10+i*35,18,30,24)+`<text x="${10+i*35}" y="50" font-size="4.5" fill="${C.mu}" font-family="monospace">12 NOV</text>`+L(10+i*35,54,28,C.fg)+L(10+i*35,60,22)).join("")),
+  photo:svg(`<defs><clipPath id="tpPhA"><path d="M20 70 V34 A40 30 0 0 1 100 34 V70Z"/></clipPath></defs><g clip-path="url(#tpPhA)" opacity=".75">`+P(20,4,80,66,0)+`</g>`+`<path d="M20 70 V34 A40 30 0 0 1 100 34 V70Z" fill="none" stroke="${C.ac}" stroke-width="1" stroke-dasharray="2 2"/>`),
+  logo:svg(`<g transform="translate(36 26)"><path d="M0 0h14c11 0 18 7 18 14s-7 14-18 14H0Z" fill="${C.bl}"/><path d="M5 5h9c6 0 10 4 10 9s-4 9-10 9H5Z" fill="#0b1528"/><path d="M5 9 L14 9 M5 14 L18 14 M5 19 L14 19" stroke="${C.mg}" stroke-width="1.6"/>`+`<text x="36" y="20" font-size="11" font-weight="700" fill="${C.fg}" font-family="sans-serif">DORMA</text></g>`+L(46,62,28)),
   article:svg(T(22,10,62,6)+L(22,20,30,C.ac)+[28,33,38,43,51,56,61,66].map((y,i)=>L(22,y,i%4===3?50:76)).join("")),
 };
 const MODAL={
@@ -271,6 +273,58 @@ function easeAnim(v){ const fn=EASES[v]; if (!fn&&v!=="elastic") return null;
 let FXG={}; // background effect → its family (Lines, Colour…), given by registerLists
 function fxGlyph(v){ const g=FXG[v]; return g&&FXGROUP[g]?thumb(FXGROUP[g],"tp-fx"):null; }
 
+/* ---------- section extras: icons by titles, logo and button blocks, heading styles, card hover, photo masks ---------- */
+PRIM.spinIn=["opacity:0;transform:rotate(-180deg) scale(.4)","opacity:1;transform:rotate(0deg) scale(1)"];
+PRIM.drop=["opacity:0;transform:translateY(-70%)","opacity:1;transform:translateY(0)"];
+PRIM.flipX=["opacity:0;transform:perspective(120px) rotateX(-80deg)","opacity:1;transform:perspective(120px) rotateX(0deg)"];
+PRIM.lFloat=["transform:translateY(-14%)","transform:translateY(0)"];
+PRIM.lPulse=["transform:scale(1.14)","transform:scale(1)"];
+PRIM.lGlow=["filter:drop-shadow(0 0 5px #ffcb08)","filter:drop-shadow(0 0 0 transparent)"];
+PRIM.lSwing=["transform:rotate(14deg)","transform:rotate(-10deg)"];
+CUSTOM.nudge="0%,60%,100%{transform:translateX(0)}66%{transform:translateX(-12%)}72%{transform:translateX(12%)}78%{transform:translateX(-6%)}84%{transform:translateX(0)}";
+CUSTOM.shineRun="0%,20%{transform:translateX(-120%)}70%,100%{transform:translateX(120%)}";
+CUSTOM.typeOn="0%,8%{clip-path:inset(0 100% 0 0)}60%,86%{clip-path:inset(0 0% 0 0)}100%{clip-path:inset(0 0% 0 0);opacity:0}";
+const ICON_G=`<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z" fill="none" stroke="${C.ac}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+const icoPart=(style="",x=46,y=24,s=28)=>part("tp-ico",`left:${x/1.2}%;top:${y/.8}%;width:${s/1.2}%;height:${s/.8}%;${style}`,ICON_G);
+const ICONPOS={ before:svg(`<g transform="translate(12 28) scale(1)">${ICON_G.replace('width="100%" height="100%"','width="22" height="22"')}</g>`+T(40,34,64,9)+L(40,52,48)),
+  after:svg(T(12,34,64,9)+`<g transform="translate(82 28)">${ICON_G.replace('width="100%" height="100%"','width="22" height="22"')}</g>`+L(12,52,48)),
+  above:svg(`<g transform="translate(12 10)">${ICON_G.replace('width="100%" height="100%"','width="22" height="22"')}</g>`+T(12,40,70,9)+L(12,58,50)) };
+const ICONANIM={ pop:"pop", spin:"spinIn", rise:"rise", float:"~lFloat", pulse:"~lPulse", glow:"~lGlow", swing:"~lSwing" };
+function iconAnim(v){ if (v==="draw") return thumb(part("tp-ico tp-ico-draw","left:38%;top:24%;width:24%;height:40%",ICON_G.replace('stroke-width="1.8"',`stroke-width="1.8" stroke-dasharray="120" style="${anim("draw")}"`)));
+  const p=ICONANIM[v]; if (!p) return null; return thumb(part("tp-ico","left:38%;top:24%;width:24%;height:40%;"+(p[0]==="~"?anim(p.slice(1),"loop"):anim(p)),ICON_G)); }
+const BLOCKIN={ fade:"fade", rise:"rise", pop:"pop", blur:"blur", spin:"spinIn", drop:"drop", wipe:"wipe", flip:"flipX" };
+const logoGlyph=(style)=>part("tp-lg",style,`<b></b><i></i>`);
+function blockIn(v){ const p=BLOCKIN[v]; return p?thumb(logoGlyph(anim(p))):null; }
+const BLOCKLOOP={ float:"lFloat", pulse:"lPulse", glow:"lGlow", breathe:"lPulse" };
+function blockLoop(v){ if (v==="shine") return thumb(`<div class="tp-lgwrap">${logoGlyph("")}${part("tp-shine",anim("shineRun"))}</div>`);
+  if (v==="nudge") return thumb(part("tp-cb",anim("nudge")));
+  const p=BLOCKLOOP[v]; return p?thumb(logoGlyph(anim(p,"loop",v==="breathe"?"animation-duration:5s;":""))):null; }
+const HEADST={
+  gradient:`<defs><linearGradient id="tpHg" x1="0" x2="1"><stop offset="0" stop-color="${C.fg}"/><stop offset="1" stop-color="${C.ac}"/></linearGradient></defs>`+r(12,30,96,14,"url(#tpHg)",3),
+  shimmer:`<defs><linearGradient id="tpHs" x1="0" x2="1"><stop offset="0" stop-color="${C.fg}"/><stop offset=".5" stop-color="${C.ac}"/><stop offset="1" stop-color="${C.fg}"/></linearGradient></defs>`+r(12,30,96,14,"url(#tpHs)",3),
+  glow:`<defs><filter id="tpHgl" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>`+r(12,30,96,14,C.ac,3).replace("/>",' filter="url(#tpHgl)" opacity=".7"/>')+r(12,30,96,14,C.fg,3),
+  outline:`<rect x="12" y="30" width="96" height="14" rx="3" fill="none" stroke="${C.fg}" stroke-width="1.4"/>`,
+  marker:r(10,36,100,11,"rgba(255,203,8,.55)",1)+r(12,30,96,12,C.fg,3),
+  underline:r(12,28,96,13,C.fg,3)+r(12,47,96,2.4,C.ac,1),
+  cmyk:r(10,29,96,14,"rgba(0,174,239,.8)",3)+r(14,31,96,14,"rgba(237,6,119,.75)",3)+r(12,30,96,14,C.fg,3),
+};
+function headStyle(v){ if (v==="none") return thumb(svg(r(12,30,96,14,C.fg,3)+L(12,54,70))); const b=HEADST[v]; return b?thumb(svg(b+L(12,56,70))):null; }
+function headIn(v){ if (v===""||v==="keep") return scrollReveal("rise"); if (v==="type") return thumb(`<div class="tp-title" style="${anim("typeOn")}">${[0,1,2].map(()=>part("w")).join("")}</div>`,"tp-light"); return titleReveal(v); }
+const CARDHOVER={ lift:"hLift", glow:"hGlow", zoom:"hZoom", border:"hGlow" };
+function cardHoverPrev(v){ if (v==="tilt") return imageHover("tilt"); if (v==="shine") return thumb(`<div class="tp-clip">${sPic()}${part("tp-shine",anim("shineRun"))}</div>`+cursor());
+  if (v==="zoom") return imageHover("zoom"); const p=CARDHOVER[v]; return p?thumb(`<div class="tp-clip">${sPic(anim(p,"loop")+(v==="border"?";outline:2px solid #ffcb08;outline-offset:-2px":""))}</div>`+cursor()):null; }
+const FADE_MASK={ fadeBottom:"linear-gradient(#000 40%,transparent)", fadeTop:"linear-gradient(transparent,#000 60%)", fadeSides:"linear-gradient(90deg,transparent,#000 22%,#000 78%,transparent)",
+  soft:"radial-gradient(ellipse 60% 60% at 50% 50%,#000 40%,transparent 100%)", stripes:"repeating-linear-gradient(115deg,#000 0 6px,transparent 6px 9px)", halftone:"radial-gradient(circle,#000 55%,transparent 60%) 0 0/6px 6px",
+  wave:`url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 0H100V80C84 96 68 70 50 84S16 98 0 80Z"/></svg>')}") 0 0/100% 100% no-repeat` };
+function photoMask(v){ if (v==="word") return thumb(`<div class="tp-word">DOR</div>`);
+  if (v==="frame") return thumb(sPic("inset:10% 8%;clip-path:polygon(0 0,100% 0,100% 100%,0 100%,0 0,10% 14%,10% 86%,90% 86%,90% 14%,10% 14%)"));
+  if (FADE_MASK[v]) return thumb(sPic(`-webkit-mask:${FADE_MASK[v]};mask:${FADE_MASK[v]}`));
+  return imageShape(v); }
+const CTA_ST={ site:B(34,34,52,"rgba(255,203,8,.25)")+`<rect x="34" y="34" width="52" height="12" rx="6" fill="none" stroke="${C.ac}" stroke-width=".8"/>`, solid:r(34,34,52,12,C.ac,6), outline:`<rect x="34" y="34" width="52" height="12" rx="6" fill="none" stroke="${C.ac}" stroke-width="1.4"/>`,
+  ring:`<rect x="30" y="30" width="60" height="20" rx="10" fill="none" stroke="rgba(255,203,8,.35)" stroke-width="2"/><rect x="34" y="34" width="52" height="12" rx="6" fill="none" stroke="${C.ac}" stroke-width="1"/>`,
+  link:L(34,39,40,C.fg)+`<path d="M78 40.3h8 l-3 -3 M86 40.3 l-3 3" stroke="${C.ac}" stroke-width="1.3" fill="none"/>` };
+const ctaStyle=v=>CTA_ST[v]?thumb(svg(CTA_ST[v]+(v==="link"?"":L(42,39.2,28,C.fg)))):null;
+
 /* ---------- which preview goes with which list ---------- */
 const st=(map)=>v=>map[v]?thumb(map[v]):null;
 const KINDS={
@@ -278,6 +332,7 @@ const KINDS={
   menuMode:st(MENUMODE), linkStyle:st(LINKSTYLE), colorMode:st(COLORMODE), palette:st(PALETTE), fxDir:st(DIR), dir4:st(DIR4), fxPos:st(POS), fxSoften:st(SOFTEN),
   modalOpen:v=>modalAnim(v,"in"), modalClose:v=>v==="auto"?thumb(MATCH):modalAnim(v,"out"),
   sectionIn:v=>sectionAnim(v,"in"), sectionOut:v=>sectionAnim(v,"out"),
+  iconPos:st(ICONPOS), iconAnim, blockIn, blockLoop, headStyle, headIn, cardHover:cardHoverPrev, photoMask, ctaStyle,
   imageReveal, imageShape, imageHover, preset:presetAnim, menuOpen, menuItems, menuHover, transition, titleReveal, scrollReveal, ease:easeAnim, bgfx:fxGlyph,
   /* the studio's "New" menu: page templates, modal types and flows in one list */
   create:v=>{ const [k,x]=String(v).split(":"); return k==="page"?KINDS.pageTemplate(x):k==="modal"?KINDS.modalType(x):k==="flow"?KINDS.flowDisplay(x):null; },
@@ -299,7 +354,8 @@ function registerLists(OPT,{fxGroups=null,...extra}={}){
   const map={ modalTypes:"modalType", layouts:"layout", flowDisplays:"flowDisplay", kinds:"itemKind", presets:"preset", imageReveal:"imageReveal", imageShape:"imageShape", imageHover:"imageHover",
     sectionIn:"sectionIn", sectionOut:"sectionOut", modalOpen:"modalOpen", modalClose:"modalClose", menuModes:"menuMode", menuLinkStyles:"linkStyle", menuHover:"menuHover",
     menuOpen:"menuOpen", menuItems:"menuItems", transition:"transition", titleReveal:"titleReveal", scrollReveal:"scrollReveal", ease:"ease", colorModes:"colorMode",
-    fxPalettes:"palette", fxDirs:"fxDir", dirs4:"dir4", fxPos:"fxPos", fxSoften:"fxSoften", bgfx:"bgfx", ...extra };
+    fxPalettes:"palette", fxDirs:"fxDir", dirs4:"dir4", fxPos:"fxPos", fxSoften:"fxSoften", bgfx:"bgfx",
+    iconPos:"iconPos", iconAnim:"iconAnim", blockIn:"blockIn", blockLoop:"blockLoop", headStyles:"headStyle", headIn:"headIn", cardHover:"cardHover", photoMasks:"photoMask", ctaStyles:"ctaStyle", ...extra };
   Object.entries(map).forEach(([k,kind])=>{ const list=OPT[k]; if (Array.isArray(list)) list.forEach(o=>{ if (o&&typeof o==="object") LISTS.set(o,kind); }); });
 }
 /** Which preview kind fits these options (or "" for an ordinary dropdown). */
