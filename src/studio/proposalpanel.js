@@ -5,12 +5,13 @@
    they are not part of the site settings); the service pages they show follow the published site.
    The list shows each proposal's state and how often the client opened it. */
 import './proposals.css';
-import { h, esc, plain, clone, mediaItem, mediaUrl, mediaNode, fmtDate } from './core';
-import { Store, Proposals, loadProposals, scheduleProposalSave, saveProposal, deleteProposal, proposalOpens, clearProposalOpens, markOpensSeen, loadBadges } from './store';
+import { h, esc, plain, clone, mediaItem, mediaUrl, mediaNode, fmtDate, inlineMd } from './core';
+import { Store, scheduleSave, Proposals, loadProposals, scheduleProposalSave, saveProposal, deleteProposal, proposalOpens, clearProposalOpens, markOpensSeen, loadBadges } from './store';
 import { Site } from './site';
 import { IC, card, toast, openPanel, F, confirmInline, masterDetail, Admin, libBrowser } from './admin';
 import { SECTION_TYPES } from './data';
-import { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, proposalState, proposalPages, pageSummary, freezeSnapshot, notInFrozen, snapshotBytes } from './proposals';
+import { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, proposalState, proposalPages, pageSummary, freezeSnapshot, notInFrozen, snapshotBytes,
+  PLACEHOLDERS, normalizeKit, placeholderValues, fillPlaceholders, unknownPlaceholders, applyKit, word } from './proposals';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const VIEW = { show: "active" };
@@ -48,16 +49,17 @@ function drawPanel(body) {
   const rows = Proposals.rows, T0 = today();
   const archived = rows.filter(r => r.status === "archived"), active = rows.filter(r => r.status !== "archived");
   body.append(h("p", { class: "adm-intro" },
-    "A proposal is a small website made for one client, with only the services they need. It shows their name and logo, the date, your welcome message and the service pages you pick, in the site's look. ",
+    "A proposal is a small website made for one client, with only the services they need. It shows their name and logo, the date, your brief (a short letter to them), the service pages you pick and your signature, in the site's look. ",
     "Send the client its link. Changes save straight away, and service pages follow what you publish on the main site."));
   body.append(saveNote());
-  const add = () => { const r = newRow(proposalDefaults(T0)); rows.unshift(r); Admin.sel.proposal = r.id; VIEW.show = "active"; void saveProposal(r); openPanel("proposals"); };
+  const add = () => { const r = newRow(applyKit(proposalDefaults(T0), Store.draft.proposalKit)); rows.unshift(r); Admin.sel.proposal = r.id; VIEW.show = "active"; void saveProposal(r); openPanel("proposals"); };
   const bar = h("div", { class: "pr-tools" },
     h("button", { class: "btn primary sm", type: "button", html: IC.plus + "New proposal", onclick: add }),
     h("div", { class: "pr-view", role: "group", "aria-label": "Show" },
-      ...[["active", "Active", active.length], ["archived", "Archived", archived.length]].map(([k, l, n]) =>
-        h("button", { type: "button", class: "btn sm" + (VIEW.show === k ? " on" : ""), "aria-pressed": String(VIEW.show === k), text: l + " (" + n + ")", onclick: () => { VIEW.show = k; openPanel("proposals"); } }))));
+      ...[["active", "Active", active.length], ["archived", "Archived", archived.length], ["kit", "Templates and signature"]].map(([k, l, n]) =>
+        h("button", { type: "button", class: "btn sm" + (VIEW.show === k ? " on" : ""), "aria-pressed": String(VIEW.show === k), text: l + (n == null ? "" : " (" + n + ")"), onclick: () => { VIEW.show = k; openPanel("proposals"); } }))));
   body.append(bar);
+  if (VIEW.show === "kit") { kitPanel(body); return; }
   const list = VIEW.show === "archived" ? archived : active;
   if (!list.length) {
     body.append(card(VIEW.show === "archived" ? "No archived proposals" : "No proposals yet",
@@ -72,11 +74,15 @@ function drawPanel(body) {
 
 /* ---------- one proposal ---------- */
 function detail(r, redrawList) {
+  const hadSign = !!(r.data && r.data.sign);
   const d = r.data = normalizeProposal(r.data, today());
   const changed = () => { save(r); redrawList(); };
   const st = Proposals.stats[r.id];
+  /* proposals made before signatures existed get the saved default sender */
+  const K = kit();
+  if (!d.sign.name.en && !d.sign.name.ar && (K.sender.en || K.sender.ar)) { d.sign.name = { ...K.sender }; if (!hadSign) { d.sign.company = K.company; d.sign.place = K.place; } save(r); }
   if (st && st.fresh) setTimeout(async () => { if (await markOpensSeen(r.id)) { redrawList(); void loadBadges(); } }, 1500); // seen once the editor has looked
-  return [linkCard(r, changed, redrawList), versionCard(r, d, changed), clientCard(r, d, changed), servicesCard(r, d, changed), wordsCard(d, changed), workCard(d, changed), moreCard(r, d, changed)];
+  return [linkCard(r, changed, redrawList), versionCard(r, d, changed), clientCard(r, d, changed), briefCard(r, d, changed), servicesCard(r, d, changed), signCard(r, d, changed), wordsCard(d, changed), workCard(d, changed), moreCard(r, d, changed)];
 }
 
 function linkCard(r, changed, redrawList) {
@@ -212,16 +218,16 @@ function wordField(d, k, label, changed) {
   return F(tmp, "v", "text", label, { noAi: true }, v => { d.words[k] = v; changed(); });
 }
 function wordsCard(d, changed) {
-  return card("Welcome and contact",
+  return card("Headline and contact",
     h("div", { class: "fields" },
-      F(d, "title", "text", "Headline (empty = “A proposal for <client>”)", { wide: true }, changed),
-      F(d, "welcome", "area", "Welcome message", { wide: true, rows: 4 }, changed),
+      F(d, "title", "text", "Headline under the client's name (empty = “Our proposal for you”)", { wide: true }, changed),
       F(d, "cover", "media", "Overview picture (empty = the first service's picture)", { wide: true }, changed),
       F(d, "contact", "button", "Contact button (header, overview and the last band)", {}, changed),
       F(d, "closing", "text", "Title of the last band (empty = “Let's talk about your project”)", { wide: true }, changed)),
     h("details", { class: "pr-fold" }, h("summary", { text: "Words around the proposal" }),
       h("div", { class: "fields" }, wordField(d, "preparedFor", "Before the client's name", changed), wordField(d, "overview", "First page in the menu", changed),
-        wordField(d, "services", "Services heading", changed), wordField(d, "work", "Related work heading", changed), wordField(d, "fullSite", "Link to the full website", changed))));
+        wordField(d, "services", "Services heading", changed), wordField(d, "work", "Related work heading", changed), wordField(d, "fullSite", "Link to the full website", changed),
+        wordField(d, "signOff", "Signature: line before the name", changed), wordField(d, "advertising", "Signature: Dorma Advertising", changed), wordField(d, "production", "Signature: Dorma Production", changed))));
 }
 
 /* Related work: library pictures and published blog posts shown on the overview. */
@@ -266,6 +272,154 @@ function moreCard(r, d, changed) {
       h("button", { class: "btn sm", type: "button", text: r.status === "archived" ? "Restore from archive" : "Archive", onclick: arch }),
       h("button", { class: "btn sm danger", type: "button", text: "Delete", onclick: e => confirmInline(e.currentTarget.parentNode, "Delete this proposal and its open count? The link stops working.", async () => {
         if (await deleteProposal(r)) { toast("Proposal deleted"); openPanel("proposals"); } else toast("Couldn't delete. Try again."); }, "Delete") })));
+}
+
+/* ---------- brief (letter after the header), templates and signature ---------- */
+const KIT_OK = new WeakSet(); // normalized once, so editors keep working on the same object
+const kit = () => { const k = Store.draft.proposalKit; if (k && KIT_OK.has(k)) return k; const n = Store.draft.proposalKit = normalizeKit(k); KIT_OK.add(n); return n; };
+const LANG_NAME = { en: "English", ar: "العربية" };
+const siteLangsNow = () => { const l = Store.draft.site.languages || "en"; return l === "both" ? ["en", "ar"] : [l === "ar" ? "ar" : "en"]; };
+
+/** Buttons that put a placeholder where the cursor is, in the last text box used inside `scope`. */
+function placeholderChips(scope) {
+  let last = null;
+  scope.addEventListener("focusin", e => { if (e.target && e.target.tagName === "TEXTAREA") last = e.target; });
+  const put = p => {
+    const t = last && last.isConnected ? last : scope.querySelector("textarea"); if (!t) return;
+    const tok = t.dir === "rtl" ? p.ar : p.en, a = t.selectionStart ?? t.value.length, b = t.selectionEnd ?? a;
+    t.value = t.value.slice(0, a) + tok + t.value.slice(b); t.focus(); t.setSelectionRange(a + tok.length, a + tok.length);
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  return h("div", { class: "pr-chips" }, h("span", { class: "hint", text: "Insert:" }),
+    ...PLACEHOLDERS.map(p => h("button", { type: "button", class: "btn sm pr-chip", title: p.label + " (" + p.en + " or " + p.ar + ")", text: p.en, onmousedown: e => e.preventDefault(), onclick: () => put(p) })));
+}
+/** The brief as the client will read it, in each language, with the placeholders filled in. */
+function briefPreview(getText, getData, langs, { sign = null } = {}) {
+  const box = h("div", { class: "pr-preview", "aria-live": "polite" });
+  const draw = () => {
+    box.textContent = ""; const text = getText() || {}, data = getData();
+    const warn = unknownPlaceholders([text.en, text.ar].join("\n"));
+    langs().forEach(l => {
+      const raw = String(text[l] || ""), vals = placeholderValues(data, Store.draft, l);
+      const col = h("div", { class: "pr-prev-col", lang: l, dir: l === "ar" ? "rtl" : "ltr" }, h("p", { class: "mono pr-prev-lang", text: "Preview · " + LANG_NAME[l] }));
+      if (!raw.trim()) col.append(h("p", { class: "hint", text: l === "ar" ? "لا يوجد نص عربي بعد (يظهر النص الإنجليزي)." : "Nothing written yet." }));
+      fillPlaceholders(raw, vals).replace(/\r/g, "").split(/\n{2,}/).filter(x => x.trim()).forEach(par => col.append(h("p", { html: par.split("\n").map(inlineMd).join("<br>") })));
+      const sg = sign && sign();
+      if (sg && sg.show && raw.trim()) col.append(h("div", { class: "pr-prev-sign" }, h("p", { text: plain(sg.off[l] ? sg.off[l] : sg.off.en) }), h("b", { text: (l === "ar" ? sg.name.ar || sg.name.en : sg.name.en || sg.name.ar) || "[sender name]" }), h("small", { text: sg.company[l] || sg.company.en })));
+      const miss = ["client", "sender"].filter(k => !vals[k] && new RegExp("\\[(" + PLACEHOLDERS.find(p => p.key === k).names.join("|") + ")\\]", "i").test(raw));
+      if (miss.length) col.append(h("p", { class: "pr-warn", text: (l === "ar" ? "فارغ: " : "Empty: ") + miss.map(k => PLACEHOLDERS.find(p => p.key === k).label).join(", ") }));
+      box.append(col);
+    });
+    if (warn.length) box.append(h("p", { class: "pr-warn", text: "Not a placeholder, shown as typed: " + warn.join(" ") + ". Use the Insert buttons for the right spelling." }));
+  };
+  draw(); return { el: box, draw };
+}
+
+function briefCard(r, d, changed) {
+  const K = kit(), tpls = K.templates;
+  const sel = h("select", { id: "pr-tpl", "aria-label": "Template" }, h("option", { value: "", text: tpls.length ? "Choose a template…" : "No templates yet" }),
+    ...tpls.map(t => h("option", { value: t.id, text: (t.name || "Untitled") + (t.id === K.defaultTemplate ? " (default)" : ""), selected: t.id === d.briefTemplate })));
+  const holder = h("div", { class: "pr-brief-edit" });
+  const sigNow = () => ({ show: d.sign.show, off: word(d, "signOff"), name: d.sign.name, company: word(d, d.sign.company) });
+  const prev = briefPreview(() => d.welcome, () => d, () => pdfLangs(r), { sign: () => d.sign.place === "brief" ? sigNow() : null });
+  const drawField = () => { holder.textContent = ""; holder.append(F(d, "welcome", "area", "Brief (shown right after the header)", { wide: true, rows: 8 }, () => { changed(); prev.draw(); })); };
+  drawField();
+  const use = () => {
+    const t = tpls.find(x => x.id === sel.value); if (!t) { toast("Pick a template first."); return; }
+    const apply = () => { d.welcome = { ...t.body }; d.briefTemplate = t.id; changed(); drawField(); prev.draw(); toast("Template “" + (t.name || "Untitled") + "” used. Edit the text for this client as you like."); };
+    const cur = d.welcome, same = cur.en === t.body.en && cur.ar === t.body.ar;
+    if ((cur.en || cur.ar) && !same) confirmInline(useBtn, "Replace this proposal's brief with the template?", apply, "Replace"); else apply();
+  };
+  const useBtn = h("button", { class: "btn sm primary", type: "button", text: "Use template", onclick: use });
+  const scope = card(h("span", { class: "grow" }, "Brief"),
+    h("p", { class: "adm-intro", style: "margin:0", text: "The letter the client reads first, right after the header with their name. Start from one of your templates, then change it for this client. Words in square brackets are filled in for you." }),
+    h("div", { class: "pr-tpl-row" }, sel, useBtn, h("button", { class: "btn sm", type: "button", text: "Edit templates", onclick: () => { VIEW.show = "kit"; openPanel("proposals"); } })),
+    holder, prev.el);
+  scope.querySelector(".pr-brief-edit").after(placeholderChips(scope));
+  return scope;
+}
+
+/** A name in English and Arabic side by side (or English only when the site is English only). */
+function biName(obj, key, label, onChange) {
+  const v = obj[key] = obj[key] && typeof obj[key] === "object" ? obj[key] : { en: "", ar: "" };
+  const hasAr = Store.draft.site.languages !== "en" || v.ar;
+  const en = F(v, "en", "text", hasAr ? "English" : label, { lang: "en", noAi: true }, onChange);
+  if (!hasAr) return en;
+  const ar = F(v, "ar", "text", "العربية", { lang: "ar", noAi: true }, onChange);
+  ar.querySelectorAll("input").forEach(i => { i.dir = "rtl"; i.lang = "ar"; });
+  en.classList.add("bi-en"); ar.classList.add("bi-ar");
+  return h("div", { class: "field bi wide" }, h("span", { class: "bi-label", text: label }), h("div", { class: "bi-row" }, en, ar));
+}
+const companyOpts = d => [["advertising", plain(word(d || {}, "advertising"))], ["production", plain(word(d || {}, "production"))]];
+const placeOpts = [["end", "At the end of the overview, before the contact band"], ["brief", "Under the brief, like a letter"]];
+
+function signCard(r, d, changed) {
+  const sg = d.sign, prevBox = h("div", { class: "pr-sign-prev" });
+  const drawPrev = () => { prevBox.textContent = ""; if (!sg.show) { prevBox.append(h("p", { class: "hint", text: "No signature on this proposal." })); return; }
+    pdfLangs(r).forEach(l => { const L = v => (v && (v[l] || v.en || v.ar)) || "";
+      prevBox.append(h("div", { lang: l, dir: l === "ar" ? "rtl" : "ltr" }, h("p", { text: L(word(d, "signOff")) }), h("b", { text: L(sg.name) || (l === "ar" ? "[اسم المرسل]" : "[sender name]") }), h("small", { text: L(word(d, sg.company)) }))); }); };
+  const ch = () => { changed(); drawPrev(); };
+  drawPrev();
+  const K = kit();
+  const saveDefault = () => { K.sender = { ...sg.name }; K.company = sg.company; K.place = sg.place; scheduleSave(); toast("Saved as the default for new proposals"); };
+  return card("Signature",
+    h("p", { class: "adm-intro", style: "margin:0", text: "Shown on the proposal and in the PDF: the sender's name, then Dorma Advertising or Dorma Production." }),
+    h("div", { class: "fields" },
+      F(sg, "show", "toggle", "Show a signature", {}, () => { ch(); openPanel("proposals"); }),
+      sg.show ? biName(sg, "name", "Sender name", ch) : null,
+      sg.show ? F(sg, "company", "select", "Sign as", { options: companyOpts(d), preview: false }, ch) : null,
+      sg.show ? F(sg, "place", "select", "Where it goes", { options: placeOpts, preview: false }, ch) : null),
+    prevBox,
+    sg.show ? h("div", { class: "pr-actions" }, h("button", { class: "btn sm", type: "button", text: "Save as my default", title: "New proposals start with this sender, company and place", onclick: saveDefault })) : null);
+}
+
+/* Content → Proposals → Templates and signature: the brief templates and the defaults for new proposals. */
+function kitPanel(body) {
+  const K = kit(), touchKit = () => scheduleSave();
+  body.append(h("p", { class: "adm-intro" }, "Templates are ready-made briefs. A new proposal starts with the default one, and any proposal can switch to another under Brief → Use template, then edit its own copy. Changing a template here doesn't change proposals that already used it. Templates are saved with the site settings, like the AI writing presets."));
+  /* preview with a real client */
+  const rows = (Proposals.rows || []).filter(x => x.status !== "archived");
+  const SAMPLE = { client: { name: { en: "Sample client", ar: "عميل تجريبي" } }, date: today(), services: [], sign: { name: K.sender, company: K.company } };
+  const pv = { id: rows[0] ? rows[0].id : "" };
+  const sampleData = () => { const x = rows.find(y => y.id === pv.id); return x ? { ...normalizeProposal(x.data), sign: { ...normalizeProposal(x.data).sign, name: (x.data.sign && x.data.sign.name && (x.data.sign.name.en || x.data.sign.name.ar)) ? x.data.sign.name : K.sender } } : SAMPLE; };
+  const pvSel = h("select", { "aria-label": "Preview with" }, ...rows.map(x => h("option", { value: x.id, text: nameOf(x) })), h("option", { value: "", text: "Sample client", selected: !rows.length }));
+  const previews = [];
+  pvSel.addEventListener("change", () => { pv.id = pvSel.value; previews.forEach(p => p.draw()); });
+  const list = h("div", { class: "pr-chosen" });
+  const draw = () => {
+    list.textContent = ""; previews.length = 0;
+    K.templates.forEach((t, i) => {
+      const prev = briefPreview(() => t.body, sampleData, siteLangsNow);
+      previews.push(prev);
+      const isDef = K.defaultTemplate === t.id;
+      const item = h("div", { class: "pr-item" },
+        h("div", { class: "pr-item-head" }, h("b", { text: (t.name || "Untitled") + (isDef ? " · default" : "") }),
+          h("span", { class: "pr-item-btns" },
+            h("button", { class: "btn sm", type: "button", disabled: isDef, text: isDef ? "Default" : "Make default", title: "New proposals start with this brief", onclick: () => { K.defaultTemplate = t.id; touchKit(); draw(); } }),
+            h("button", { class: "btn sm", type: "button", html: IC.copy + "Duplicate", onclick: () => { K.templates.splice(i + 1, 0, { id: "tpl-" + Date.now().toString(36), name: (t.name || "Untitled") + " (copy)", body: { ...t.body } }); touchKit(); draw(); } }),
+            h("button", { class: "btn sm danger", type: "button", text: "Remove", onclick: e => confirmInline(e.currentTarget.parentNode, "Remove this template? Proposals that used it keep their text.", () => { K.templates.splice(i, 1); if (isDef) K.defaultTemplate = K.templates[0] ? K.templates[0].id : ""; touchKit(); draw(); }, "Remove") }))),
+        h("div", { class: "fields" }, F(t, "name", "text", "Template name (only you see it)", { wide: true, noAi: true }, () => { touchKit(); item.querySelector(".pr-item-head b").textContent = (t.name || "Untitled") + (isDef ? " · default" : ""); }),
+          F(t, "body", "area", "Brief", { wide: true, rows: 7 }, () => { touchKit(); prev.draw(); })));
+      item.append(placeholderChips(item), prev.el);
+      list.append(item);
+    });
+    if (!K.templates.length) list.append(h("p", { class: "pr-empty", text: "No templates. Add one with New template." }));
+  };
+  draw();
+  body.append(card(h("span", { class: "grow" }, "Brief templates"),
+    h("div", { class: "pr-tpl-row" },
+      h("button", { class: "btn sm primary", type: "button", html: IC.plus + "New template", onclick: () => { K.templates.push({ id: "tpl-" + Date.now().toString(36), name: "New template", body: { en: "Dear [client name],\n\n", ar: Store.draft.site.languages === "en" ? "" : "عزيزنا [اسم العميل]،\n\n" } }); touchKit(); draw(); } }),
+      h("label", { class: "pr-pv" }, h("span", { class: "hint", text: "Preview with" }), pvSel)),
+    list));
+  /* placeholders */
+  body.append(card("Placeholders", h("p", { class: "adm-intro", style: "margin:0", text: "Type these in a brief (English or Arabic name, any capitals). They are filled in for each client and each language." }),
+    h("table", { class: "pr-ph" }, h("tbody", {}, ...PLACEHOLDERS.map(p => h("tr", {}, h("td", {}, h("code", { text: p.en })), h("td", {}, h("code", { text: p.ar, dir: "rtl" })), h("td", { text: p.label + (p.key === "client" ? " ([customer name] works too)" : p.key === "services" ? " (the proposal's service pages, “A, B and C”)" : p.key === "date" ? " (the proposal's date, “28 November 2026”)" : "") })))))));
+  /* signature defaults */
+  const def = h("div", { class: "fields" },
+    biName(K, "sender", "Default sender name", touchKit),
+    F(K, "company", "select", "Default sign as", { options: companyOpts(null), preview: false }, touchKit),
+    F(K, "place", "select", "Where the signature goes", { options: placeOpts, preview: false }, touchKit));
+  body.append(card("Signature defaults", h("p", { class: "adm-intro", style: "margin:0", text: "New proposals start with these. Each proposal can change its own sender and company under Signature. Proposals without a sender name get this one when you open them." }), def));
 }
 
 export { panelProposals, esc };
