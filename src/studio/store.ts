@@ -225,6 +225,42 @@ export async function callFunction(name: string, body: Record<string, unknown>):
   }
 }
 
+/* ---------- AI archive (studio → Content → AI archive) ----------
+   AI texts kept to reuse later on the site or in Social posts. Editors-only table ai_archive (migration 0004);
+   offline, or until the table exists, they stay in this browser. Newest first. */
+export interface ArchiveItem { id: string; created_at: string; title: string; tags: string[]; en: string; ar: string; meta: Record<string, unknown> }
+const ARCH_LS = 'dorma.aiArchive';
+const archLocal = (): ArchiveItem[] => (LS.get(ARCH_LS) as ArchiveItem[]) || [];
+export async function listArchive(): Promise<{ items: ArchiveItem[]; where: 'db' | 'local' }> {
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('ai_archive').select('id, created_at, title, tags, en, ar, meta').order('created_at', { ascending: false }).limit(500);
+    if (!error) return { items: (data as ArchiveItem[]) || [], where: 'db' };
+  }
+  return { items: archLocal(), where: 'local' };
+}
+export async function addArchive(item: Omit<ArchiveItem, 'id' | 'created_at'>): Promise<ArchiveItem> {
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('ai_archive').insert(item).select('id, created_at, title, tags, en, ar, meta').single();
+    if (!error && data) return data as ArchiveItem;
+    // keep it in this browser only while the table doesn't exist yet; any other problem is reported
+    if (!(error && /PGRST205|42P01|does not exist|schema cache/i.test((error.code || '') + ' ' + (error.message || '')))) throw new Error(error?.message || 'Could not save to the archive.');
+  }
+  const it: ArchiveItem = { ...item, id: 'loc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), created_at: new Date().toISOString() };
+  LS.set(ARCH_LS, [it, ...archLocal()]); return it;
+}
+export async function updateArchive(id: string, patch: Partial<ArchiveItem>): Promise<boolean> {
+  if (Store.mode === 'db' && !id.startsWith('loc-')) {
+    const { error } = await db().from('ai_archive').update(patch).eq('id', id); return !error;
+  }
+  LS.set(ARCH_LS, archLocal().map((x) => (x.id === id ? { ...x, ...patch } : x))); return true;
+}
+export async function deleteArchive(id: string): Promise<boolean> {
+  if (Store.mode === 'db' && !id.startsWith('loc-')) {
+    const { error } = await db().from('ai_archive').delete().eq('id', id); return !error;
+  }
+  LS.set(ARCH_LS, archLocal().filter((x) => x.id !== id)); return true;
+}
+
 /* ---------- sign-in (editors) ---------- */
 export async function signIn(email: string, password: string): Promise<string | null> {
   const { error } = await db().auth.signInWithPassword({ email, password });

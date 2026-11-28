@@ -9,6 +9,7 @@
    Deployed by the "Supabase" GitHub workflow on merge to main. */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { MODELS, cleanRequest, geminiBody, readReply } from './prompt.ts';
+import { readRefs } from './fetchref.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,6 +62,10 @@ Deno.serve(async (req) => {
   }
   if (!key) return fail('no_key', 'The Gemini key has not been added yet. See Content → AI writing.');
 
+  /* reference websites: read them now (public pages only); a page that can't be read is reported, not fatal */
+  let notes: string[] = [];
+  if (r.refUrls?.length) { const got = await readRefs(r.refUrls); r.refs = got.pages; notes = got.notes; }
+
   const choice = typeof body.model === 'string' && MODELS[body.model] ? body.model : 'flash';
   const models = Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...MODELS[choice]] : MODELS[choice];
 
@@ -84,7 +89,7 @@ Deno.serve(async (req) => {
     if (!res.ok) return fail('gemini_error', 'Gemini could not write this one: ' + (json?.error?.message || res.statusText));
     const out = readReply(r, json);
     if ('error' in out) return fail(out.error, out.error === 'blocked' ? 'Gemini declined to write this. Try rewording the brief.' : 'Gemini sent back an empty answer. Try again.');
-    return reply({ ok: true, text: out.text, model, used: t.used, limit: dayLimit });
+    return reply({ ok: true, text: out.text, model, used: t.used, limit: dayLimit, refs: (r.refs || []).map((p) => ({ url: p.url, title: p.title })), notes });
   }
   return fail('gemini_error', 'No Gemini model was available. Set GEMINI_MODEL in the Supabase secrets to a current model name.');
 });

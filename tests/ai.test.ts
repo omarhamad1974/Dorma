@@ -64,6 +64,26 @@ describe('ai-write prompt', () => {
   });
 });
 
+describe('general industry knowledge', () => {
+  it('is off unless asked, and keeps Dorma facts sourced when on', () => {
+    expect(req({ action: 'write', brief: 'x' }).general).toBe(false);
+    const off = systemPrompt(req({ action: 'write', brief: 'x' }));
+    expect(off).toMatch(/Use only facts found/);
+    const on = systemPrompt(req({ action: 'write', brief: 'Explain offset printing', general: true }));
+    expect(on).toMatch(/general knowledge/);
+    expect(on).toMatch(/offset/);
+    expect(on).toMatch(/never say Dorma offers a service/);
+    expect(on).toContain(GAP);
+    expect(on).not.toMatch(/Use only facts found/);
+  });
+  it('follows the studio default unless the window says otherwise', () => {
+    const base = { action: 'write', langs: ['en'], text: {}, brief: 'x', field: { label: 'T', kind: 'text' } };
+    expect(requestBody({ ...base, ai: { general: true } }).general).toBe(true);
+    expect(requestBody({ ...base, ai: { general: true }, general: false }).general).toBe(false);
+    expect(requestBody({ ...base, ai: {} }).general).toBe(false);
+  });
+});
+
 describe('ai-write reply', () => {
   const ok = (text: string, finishReason = 'STOP') => ({ candidates: [{ finishReason, content: { parts: [{ text }] } }] });
   it('reads the JSON answer and tidies single lines', () => {
@@ -116,5 +136,78 @@ describe('studio helpers', () => {
     expect(toText(['a', 'b'], 'strings')).toBe('a\nb');
     expect(fromText('a\n\n b ', 'strings')).toEqual(['a', 'b']);
     expect(fromText('a\nb', 'area')).toBe('a\nb');
+  });
+});
+
+import { cleanTune, tuneRules, cleanUrls, userPrompt as up2 } from '../supabase/functions/ai-write/prompt';
+import { publicIp, htmlToText } from '../supabase/functions/ai-write/refs';
+import { tuneSummary, pickRefs, archiveEntry, filterArchive } from '../src/studio/aitext';
+
+describe('tuning', () => {
+  it('keeps only known choices and sane word counts', () => {
+    expect(cleanTune({ tone: 'friendly', purpose: 'hack', length: 'words', words: 60, audience: ' buyers ', cta: 'auto' })).toEqual({ tone: 'friendly', length: 'words', words: 60, audience: 'buyers' });
+    expect(cleanTune({ length: 'words', words: 99999 })).toEqual({});
+  });
+  it('turns choices into style rules', () => {
+    const r = tuneRules({ tone: 'bold', length: 'words', words: 40, arabicStyle: 'gulf', extra: 'mention delivery' }, 'area', ['en', 'ar']);
+    expect(r.join(' ')).toMatch(/bold/);
+    expect(r.join(' ')).toMatch(/about 40 words in each language/);
+    expect(r.join(' ')).toMatch(/Gulf/);
+    expect(r.join(' ')).toMatch(/mention delivery/);
+    expect(tuneRules({ arabicStyle: 'gulf' }, 'area', ['en'])).toEqual([]);
+    expect(tuneRules({ length: 'short' }, 'text', ['en'])).toEqual([]); // a one-line box is short anyway
+  });
+  it('puts the style into the system prompt', () => {
+    expect(systemPrompt(req({ action: 'write', brief: 'x', tune: { purpose: 'social' } }))).toMatch(/STYLE[\s\S]*social media post/);
+  });
+  it('summarises a style for the studio', () => {
+    expect(tuneSummary({ length: 'short', tone: 'friendly', purpose: 'social' })).toBe('Short · Friendly · Social media post');
+    expect(tuneSummary({})).toBe('Automatic');
+  });
+});
+
+describe('reference websites', () => {
+  it('accepts only public http(s) pages', () => {
+    expect(cleanUrls(['https://example.com/a#x', 'http://localhost/x', 'http://127.0.0.1/', 'ftp://example.com', 'https://user:pw@example.com', 'https://example.com:8080/', 'https://intranet.corp/'])).toEqual(['https://example.com/a']);
+    expect(cleanUrls(['https://a.com', 'https://b.com', 'https://c.com', 'https://d.com'])).toHaveLength(3);
+  });
+  it('blocks private and special addresses', () => {
+    ['10.0.0.1', '127.0.0.1', '169.254.169.254', '172.16.5.4', '192.168.1.1', '100.64.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:10.0.0.1'].forEach((ip) => expect(publicIp(ip)).toBe(false));
+    ['8.8.8.8', '104.16.0.1', '2606:4700::1111'].forEach((ip) => expect(publicIp(ip)).toBe(true));
+  });
+  it('reads page text without menus and scripts', () => {
+    const r = htmlToText('<html><head><title>Paper &amp; Print</title><script>x()</script></head><body><nav>Menu</nav><h1>Offset printing</h1><p>Plates transfer ink&nbsp;to a blanket.</p><footer>©</footer></body></html>');
+    expect(r.title).toBe('Paper & Print');
+    expect(r.text).toContain('Offset printing');
+    expect(r.text).toContain('Plates transfer ink to a blanket.');
+    expect(r.text).not.toMatch(/Menu|x\(\)|©/);
+  });
+  it('tells the AI how to use them', () => {
+    const r = req({ action: 'write', brief: 'x' }); r.refs = [{ url: 'https://ex.com', title: 'Guide', text: 'Offset suits long runs.' }];
+    const u = up2(r);
+    expect(u).toMatch(/REFERENCE PAGES/);
+    expect(u).toMatch(/never present them as Dorma/);
+    expect(u).toContain('Offset suits long runs.');
+  });
+  it('picks saved defaults plus a one-off link', () => {
+    expect(pickRefs([{ url: 'https://a.com', on: true }, { url: 'https://b.com', on: false }], 'c.com')).toEqual(['https://a.com', 'https://c.com']);
+  });
+});
+
+describe('archive', () => {
+  const items = [
+    { id: '1', created_at: '', title: 'Booth intro', tags: ['Pages'], en: 'We build booths', ar: '', meta: {} },
+    { id: '2', created_at: '', title: 'LinkedIn post', tags: ['Social'], en: 'Offset printing tips', ar: 'نصائح', meta: { brief: 'paper' } },
+  ];
+  it('makes an entry with a title, tags and what it was for', () => {
+    const e = archiveEntry({ result: { en: 'Hello there', ar: 'مرحبا' }, brief: '', label: 'Title', group: 'Home', action: 'write' });
+    expect(e.title).toBe('Hello there');
+    expect(e.tags).toEqual(['Home', 'Title']);
+    expect(e.meta.action).toBe('write');
+  });
+  it('searches text, brief and tags', () => {
+    expect(filterArchive(items, 'offset').map((x) => x.id)).toEqual(['2']);
+    expect(filterArchive(items, 'paper').map((x) => x.id)).toEqual(['2']);
+    expect(filterArchive(items, '', 'Pages').map((x) => x.id)).toEqual(['1']);
   });
 });
