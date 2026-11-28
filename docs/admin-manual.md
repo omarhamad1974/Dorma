@@ -14,7 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
-| **Outline** | Site outline (also the **Outline** button just before Live preview) |
+| **Outline** | Site outline, Connections (also the **Outline** button just before Live preview) |
 | **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing, AI archive |
 | **Inbox** | Messages, Form settings |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
@@ -54,6 +54,14 @@ Next to the sub-tab names (Pages, Carousels…) there is a small toolbar. It onl
 - **Jump to design** (or tap a section's name) opens that page in Content → Pages with the section open and in view. Hero carousels open in Content → Carousels.
 - Removing asks first, and says if any buttons link to that page or section. After any change in Outline, an **Undo** button appears at the top. Undo goes back one step at a time, and only while you haven't changed the same pages somewhere else in the studio.
 - **Not live yet** marks pages and sections that are in the draft but not published.
+
+### What opens what (Outline → Connections)
+- One list of everything that opens something: the **menu**, every **button**, **card**, **flow item**, and every section or modal that shows a **flow**. Next to each one is what it opens: a page (and the section it travels to), a modal, a blog post, an article or a web link.
+- **What opens what** is grouped by page, then modals, then flows. When a section shows a flow, that flow's items are listed right under it, so you can follow a chain like *Home → hero carousel → flow → Printing button → Printing modal*.
+- **What opens this** turns it around: pick a page, modal, flow or blog post and see every button, card and flow item that opens it. Things nothing opens are marked **Nothing opens this**.
+- **Problems** lists links that lead nowhere (the page or modal was removed), buttons with nothing chosen, odd web addresses, and pages or modals nothing opens.
+- **Edit here** opens the button or item in its own editor. **Open** opens what it leads to (the page in Pages, the modal in Modals, and so on). The search box filters by any word: a button label, a page or modal name, a flow.
+- Hidden sections and items are still listed, marked *hidden*.
 
 ### Pages and sections (Content → Pages)
 - Add, delete and rename pages, change their address, choose a layout (Cinematic, Index, Console) and show or hide them in the menu.
