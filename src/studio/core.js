@@ -1,6 +1,6 @@
 import { scenes } from './scenes';
 import { gsap } from 'gsap';
-import { openModal } from './site';
+import { openModal, Site } from './site';
 import { isMediaUrl } from './store';
 import { linkOk, embedUrl, embedPoster, mediaSeo } from './libtools';
 import { LIBRARY_BASE } from '../config';
@@ -494,9 +494,13 @@ function flowBlock(cfg,flowId,{display="",onAction=null}={}){
 function runAction(cfg,action,ctx={}){
   if (!action || !action.type || action.type==="none") return;
   if (action.type==="modal") openModal(cfg,action.target,{...ctx,section:action.section||""});
-  else if (action.type==="page"){ if (!(cfg.pages||[]).some(p=>p.id===action.target)) return; if (action.section) goSection(cfg,action.target,action.section); else location.hash=action.target; }
+  else if (action.type==="page"){
+    // In a client proposal, pages it includes open inside it; other pages open on the full website in a new tab.
+    const t=(cfg.__pageMap&&cfg.__pageMap[action.target])||action.target;
+    if (!(cfg.pages||[]).some(p=>p.id===t)){ if (cfg.__proposal&&Site.forOpen) Site.forOpen(action.target+(action.section?"/"+action.section:"")); return; }
+    if (action.section) goSection(cfg,t,action.section); else location.hash=t; }
   else if (action.type==="slide"){ ctx.goSlide && ctx.goSlide((parseInt(action.target,10)||1)-1); }
-  else if (action.type==="post"){ const p=(cfg.posts||[]).find(x=>x.id===action.target); if (p) location.hash="post/"+encodeURIComponent(p.slug||p.id); }
+  else if (action.type==="post"){ const p=(cfg.posts||[]).find(x=>x.id===action.target); if (!p) return; const to="post/"+encodeURIComponent(p.slug||p.id); if (cfg.__proposal&&Site.forOpen) Site.forOpen(to); else location.hash=to; }
   else if (action.type==="doc"){ const m=mediaItem(cfg,action.target); const u=m?(/^https:\/\//i.test(m.link||"")?m.link:mediaUrl(m)):""; if (u){ const a=h("a",{href:u,target:"_blank",rel:"noopener"}); document.body.append(a); a.click(); a.remove(); } }
   else if (action.type==="url"){ const u=String(action.target||""); if (/^https:\/\//i.test(u)){ const a=h("a",{href:u,target:"_blank",rel:"noopener"}); document.body.append(a); a.click(); a.remove(); } }
 }

@@ -22,7 +22,9 @@ function sectionName(cfg,pageId,label){
   const s=p&&(p.sections||[]).find(x=>labelKey(x.anchor)===k||x.id===label);
   return { page:plain(p&&p.title)||pageId, sec:s?(plain(s.eyebrow)||plain(s.title)||label):label };
 }
-const currentPage = cfg => (location.hash.slice(1).split("/")[0]) || (cfg.site && cfg.site.homePage);
+const currentPage = cfg => { const hs=location.hash.slice(1);
+  const id=(cfg.pages||[]).map(p=>p.id).filter(i=>hs===i||hs.startsWith(i+"/")).sort((a,b)=>b.length-a.length)[0]; // proposal page ids hold "/"
+  return id || hs.split("/")[0] || (cfg.site && cfg.site.homePage); };
 
 function goSection(cfg,pageId,label){
   const key=labelKey(label);

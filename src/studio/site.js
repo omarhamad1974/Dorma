@@ -12,7 +12,7 @@ import { fxPreview } from './fx';
 import { hideParts, sectionExtras, photoSection, logoSection, ctaSection } from './extras';
 
 /* ================= SITE RENDERER ================= */
-const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[] };
+const Site = { cfg:null, page:null, preview:false, disposers:[], triggers:[], forDecorate:null, forOpen:null };
 function disposePage(){
   Site.disposers.splice(0).forEach(f=>{ try{ f(); }catch(e){} });
   if (ScrollTrigger) ScrollTrigger.getAll().forEach(t=>t.kill());
@@ -25,13 +25,18 @@ function renderSite(cfg,pageId){
   cfg=localize(cfg); NUM.on=cfg.site.showNumbers===true;
   Site.cfg=cfg; applyTheme(cfg,{mode:siteMode(cfg)}); gsap.globalTimeline.timeScale(+cfg.motion.speed||1); watchDeviceMode();
   // "#page/label" opens the page and travels to the section with that label
-  if (pageId && !/^post\//.test(pageId) && pageId.includes("/")){ const k=pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
-  const pages=cfg.pages||[], page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
+  // (page ids can hold "/" themselves, e.g. a proposal's "for/acme-k7p2/packaging": the longest matching page id wins)
+  const pages=cfg.pages||[];
+  if (pageId && !/^post\//.test(pageId) && pageId.includes("/") && !pages.some(p=>p.id===pageId)){
+    const base=pages.map(p=>p.id).filter(id=>pageId.startsWith(id+"/")).sort((a,b)=>b.length-a.length)[0];
+    const k=base?base.length:pageId.indexOf("/"); JUMP.pending=decodeURIComponent(pageId.slice(k+1))||null; pageId=pageId.slice(0,k); }
+  if (!cfg.__proposal){ const rb=document.querySelector('meta[name="robots"][data-for]'); if (rb) rb.remove(); }
+  const page=postPage(cfg,pageId)||pages.find(p=>p.id===pageId)||pages.find(p=>p.id===cfg.site.homePage)||pages[0];
   const app=$("#app"); app.textContent=""; scrollTo(0,0);
   if (!page){ app.append(h("div",{class:"denied"},h("div",{},h("p",{class:"lede",text:ui("This site has no pages yet.")})))); return; }
   Site.page=page; document.title=(page.title?page.title+" · ":"")+(cfg.site.brand||"Site");
   const sections=page.sections.filter(s=>!s.hidden && (!s.previewOnly || Site.preview)); // hidden in the studio = not shown to visitors; preview-only = draft preview only
-  const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero");
+  const first=sections[0], heroFirst=first && (first.type==="heroCarousel"||first.type==="hero"||first.type==="forCover");
   app.append(siteHeader(cfg,page,{overHero:!!heroFirst}));
   const main=h("main",{id:"main"});
   if (page.layout==="console"){
@@ -50,6 +55,7 @@ function renderSite(cfg,pageId){
   const fp=((cfg.site.logos||{}).places||{}).footer, footLogo=fp&&fp.show?logoNode(cfg,"footer",siteMode(cfg)==="light"?"light":"dark",{alt:cfg.site.brand||"",cls:"foot-logo"}):null;
   app.append(main, h("footer",{class:"wrap site-foot"},footLogo,h("span",{class:"mono",text:cfg.site.footer||""}),h("span",{class:"mono",html:`<b>${esc(page.title||"")}</b>`})));
   if (Site.preview) app.append(studioPill(cfg));
+  if (cfg.__proposal && Site.forDecorate) Site.forDecorate(cfg,app,page); // client proposal: header band and footer link (proposalsite.js)
   requestAnimationFrame(()=>afterRender(cfg,page));
 }
 /* ================= MENU =================
@@ -178,7 +184,7 @@ function decorateSection(cfg,sec,el){
     const fl=flowBlock(cfg,fu.flowId,{display:fu.display||""});
     if (fl){ const host=el.querySelector(".inner")||el.querySelector(".wrap")||el; const box=h("div",{class:"flow-under al-"+(fu.align||"start")},fl.el); host.append(box); el._flow=fl; }
   }
-  if (sec.type!=="heroCarousel"&&sec.type!=="hero"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start;
+  if (sec.type!=="heroCarousel"&&sec.type!=="hero"&&sec.type!=="forCover"){ const start=sectionFx(cfg,sec,el); if (start) el._fx=start;
     el._motion=(opts)=>{ try { imageFx(cfg,sec,el,opts); sectionMotion(cfg,sec,el,opts); } catch(e){ console.error("section animation",sec.type,e); } }; }
   sectionExtras(cfg,sec,el); // heading icons, logo and button blocks, heading style and entrance, card hover (extras.js)
   if (sec.previewOnly) el.prepend(h("p",{class:"preview-only mono",text:ui("Preview only: fictional sample, not shown to visitors")}));

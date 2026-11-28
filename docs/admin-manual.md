@@ -14,7 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
-| **Content** | Pages, Carousels, Blog, Import, AI writing, AI archive |
+| **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing, AI archive |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
@@ -74,6 +74,18 @@ Every section has a folding box **Icon, text, logo and button**, right under its
 
 ### Blog (Content → Blog)
 - Write posts with simple formatting (`## Heading`, `- list`, `**bold**`, links), insert pictures from the Library, add a cover, tags and summary. Untick **Published** to keep a post as a draft.
+
+### Client proposals (Content → Proposals)
+A proposal is a small website made for one client, showing only the services they need, in the site's look. The client gets a link like `…/#for/acme-k7p2`.
+- **New proposal**, then enter the client's name (English and Arabic) and pick their **logo** from the Library (upload it first under Library, Brand & Identity). Choose a white tile behind colour or dark logos, or none for white logos. Without a logo, the name is shown.
+- **Services:** tick the pages to include. Each one becomes a page of the proposal with the same sections, modals and flows as the main site. Reorder with the arrows, write a **note for this client** to replace the card text on the overview, and untick **sections** the client doesn't need.
+- **Overview page** (made for you): Dorma and client logos, the date, "Prepared for …", your headline and **welcome message**, a card per service, **related work** (Library pictures and published blog posts you pick) and the **contact button**. The words around it ("Prepared for", "Services in this proposal", the full website link) can be changed per proposal.
+- **Header:** a band with the client's logo, "Prepared for …", the date and **View the full website**; a menu with only the proposal's pages; the language switch. Buttons to pages outside the proposal open the full website in a new tab.
+- **Link and status:** **Copy link**, **Open**, or **Preview with draft** (shows unpublished studio changes). **Live** = the link works; **Off** = the client sees "This proposal is no longer available"; **Archived** = off and moved to the Archived list to reuse later. **Expires on** stops the link the day after that date. **Search engines may list it**: untick to add a noindex tag (links with `#` are rarely listed anyway).
+- **Opens:** how many times the client opened it and when (phone or computer, English or Arabic). Your own opens while signed in are not counted. **Reset count** clears them.
+- **Languages:** same as the site, English only, Arabic only, or both with a switch, and which language it opens in.
+- **Duplicate for another client** copies the services, texts and work, clears the client and switches the copy off so you can tune it first.
+- Proposals save as soon as you change them (no Publish needed) and are kept in their own database table, never in the public site settings, so nobody can list your clients. The **service pages they show follow the published site**: improve a service page and publish, and every proposal shows the update.
 
 ### Import (Content → Import)
 - Bring in pages, sections, slides, flows, modals, posts or library names from a Markdown file, with a preview first. **Download template** gives a filled-in example.

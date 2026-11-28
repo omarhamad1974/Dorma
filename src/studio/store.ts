@@ -12,6 +12,7 @@ import { clone } from './core';
 import { Site, renderSite } from './site';
 import { renderAdmin } from './admin';
 import { leaveStudioText } from './comfort';
+import { renderProposal } from './proposalsite';
 
 // The settings object is free-form JSON shaped like STARTER.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,6 +207,95 @@ export async function saveSocial(): Promise<void> {
   if (Social.queued) { Social.queued = false; void saveSocial(); }
 }
 
+/* ---------- client proposals (studio → Content → Proposals; site → #for/<code>) ----------
+   Each proposal is a row in its own table (0005_proposals.sql), saved as soon as it changes, like the social plan.
+   Visitors never read the table: openProposal() asks the database for one proposal by its code, which also counts
+   the open. Offline (or before the table exists) proposals stay in this browser. */
+export interface ProposalRow { id: string; slug: string; data: Config; status: 'live' | 'off' | 'archived'; expires_on: string | null; searchable: boolean; created_at?: string; updated_at?: string }
+export interface ProposalStat { opens: number; last: string | null }
+export interface ProposalOpen { opened_at: string; lang: string | null; device: string | null }
+export const Proposals = {
+  rows: null as ProposalRow[] | null,
+  stats: {} as Record<string, ProposalStat>,
+  where: 'local' as 'db' | 'local',
+  status: 'saved' as Status,
+  message: '',
+  timers: {} as Record<string, ReturnType<typeof setTimeout>>,
+  listeners: [] as Array<() => void>,
+};
+const PROPOSAL_COLS = 'id, slug, data, status, expires_on, searchable, created_at, updated_at';
+function proposalStatus(s: Status, msg = ''): void { Proposals.status = s; Proposals.message = msg; Proposals.listeners.forEach((f) => f()); }
+const localProposals = (): ProposalRow[] => (LS.get('dorma.proposals') as ProposalRow[]) || [];
+export async function loadProposals(force = false): Promise<ProposalRow[]> {
+  if (Proposals.rows && !force) return Proposals.rows;
+  if (Store.mode === 'db') {
+    const { data, error } = await db().from('proposals').select(PROPOSAL_COLS).order('created_at', { ascending: false });
+    if (!error) {
+      Proposals.where = 'db'; Proposals.rows = (data as ProposalRow[]) || [];
+      const st = await db().rpc('proposal_stats');
+      Proposals.stats = {};
+      ((st.data as Array<{ proposal_id: string; opens: number; last_opened: string }>) || []).forEach((r) => {
+        Proposals.stats[r.proposal_id] = { opens: Number(r.opens) || 0, last: r.last_opened };
+      });
+      return Proposals.rows;
+    }
+  }
+  Proposals.where = 'local'; Proposals.rows = localProposals();
+  return Proposals.rows;
+}
+/** Saves one proposal shortly after its last change. */
+export function scheduleProposalSave(row: ProposalRow): void {
+  proposalStatus('pending'); clearTimeout(Proposals.timers[row.id]);
+  Proposals.timers[row.id] = setTimeout(() => { void saveProposal(row); }, 700);
+}
+export async function saveProposal(row: ProposalRow): Promise<boolean> {
+  clearTimeout(Proposals.timers[row.id]); proposalStatus('saving');
+  try {
+    if (Proposals.where === 'db') {
+      const { error } = await db().from('proposals').upsert({ id: row.id, slug: row.slug, data: clone(row.data), status: row.status, expires_on: row.expires_on || null, searchable: row.searchable });
+      if (error) throw error;
+    } else LS.set('dorma.proposals', Proposals.rows);
+    proposalStatus('saved'); return true;
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    proposalStatus('error', err.code === '23505' ? 'That link code is already used by another proposal.' : saveError(err)); return false;
+  }
+}
+export async function deleteProposal(row: ProposalRow): Promise<boolean> {
+  clearTimeout(Proposals.timers[row.id]);
+  if (Proposals.where === 'db') { const { error } = await db().from('proposals').delete().eq('id', row.id); if (error) return false; }
+  Proposals.rows = (Proposals.rows || []).filter((r) => r.id !== row.id);
+  if (Proposals.where === 'local') LS.set('dorma.proposals', Proposals.rows);
+  return true;
+}
+/** The latest opens of one proposal (newest first), for the studio. */
+export async function proposalOpens(id: string): Promise<ProposalOpen[]> {
+  if (Proposals.where !== 'db') return [];
+  const { data } = await db().from('proposal_opens').select('opened_at, lang, device').eq('proposal_id', id).order('opened_at', { ascending: false }).limit(25);
+  return (data as ProposalOpen[]) || [];
+}
+export async function clearProposalOpens(id: string): Promise<boolean> {
+  if (Proposals.where !== 'db') return false;
+  const { error } = await db().from('proposal_opens').delete().eq('proposal_id', id);
+  if (!error) delete Proposals.stats[id];
+  return !error;
+}
+export interface OpenedProposal { ok: boolean; code?: string; slug?: string; data?: Config; searchable?: boolean; status?: string; expires_on?: string | null }
+/** What the site shows at #for/<code>. count = record one open (sent once per visit). */
+export async function openProposal(slug: string, opts: { count?: boolean; lang?: string; device?: string } = {}): Promise<OpenedProposal> {
+  if (Store.mode !== 'db') {
+    const r = localProposals().find((x) => x.slug === slug);
+    if (!r) return { ok: false, code: 'missing' };
+    const today = new Date().toISOString().slice(0, 10);
+    if (r.status !== 'live' && !Store.canEdit) return { ok: false, code: 'off' };
+    if (r.expires_on && r.expires_on < today && !Store.canEdit) return { ok: false, code: 'expired' };
+    return { ok: true, slug: r.slug, data: r.data, searchable: r.searchable, status: r.status, expires_on: r.expires_on };
+  }
+  const { data, error } = await db().rpc('open_proposal', { p_slug: slug, p_count: !!opts.count, p_lang: opts.lang || null, p_device: opts.device || null });
+  if (error) return { ok: false, code: 'unreachable' };
+  return (data as OpenedProposal) || { ok: false, code: 'missing' };
+}
+
 /* ---------- edge functions (studio → Write with AI) ----------
    Calls a Supabase edge function as the signed-in editor. Always resolves: app-level problems come back as
    { ok: false, code, message } so the studio can explain them in plain words. */
@@ -274,7 +364,7 @@ export async function signIn(email: string, password: string): Promise<string | 
   return null;
 }
 export async function signOut(): Promise<void> {
-  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null; Social.data = null;
+  await db().auth.signOut(); Store.session = null; Store.canEdit = false; Store.draft = null; Social.data = null; Proposals.rows = null;
 }
 export const signedInEmail = (): string => Store.session?.user?.email || '';
 
@@ -331,6 +421,7 @@ export const isMediaUrl = (u: unknown): u is string =>
 export function route(): void {
   const id = (location.hash || '').slice(1);
   if (id === 'admin') { Site.preview = false; void renderAdmin(); return; }
+  if (/^for\//.test(id)) { leaveStudioText(); void renderProposal(id); return; }
   leaveStudioText(); // the studio's text size is for the studio only
   // Remember the page the editor was on, so the studio's "View site" brings them back to it.
   try { sessionStorage.setItem('dorma.lastPage', id); } catch { /* storage blocked */ }
