@@ -2,7 +2,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
 import { $, $$, ARROW_SVG, applyTheme, buttonEl, captionEl, categoryLabel, ease, emphasize, esc, eyebrowEl, fmtDate, h, ioEase, isMoving, mediaBox, mediaNode, overlayEl, pad, reduce, renderFlow, renderProse, revealTitle, runAction, cue, NUM, accentVars, headerVars, setVar, slideLook, hexOk, pn, LANGS, siteLangs, setLang, localize, ui, iconSvg, rgba, siteMode, setSiteMode, logoNode, SHOWN, mediaUrl } from './core';
 import { mediaJsonLd } from './libtools';
-import { Store } from './store';
+import { Store, submitEnquiry } from './store';
 import { A } from './data';
 import { flowBlock, sectionVars, modalLook } from './core';
 import { JUMP, arrive, jumpTo, labelKey } from './jump';
@@ -490,27 +490,49 @@ const SECTIONS={
     (sec.items||[]).filter(q=>q&&!q.hidden).forEach(q=>g.append(h("figure",{class:"qt","data-rv":""},h("blockquote",{text:q.quote||""}),h("figcaption",{},h("b",{text:q.name||""}),q.role?h("span",{class:"mono",text:q.role}):null))));
     w.append(g); return h("section",{class:"sec quotes"},w);
   },
-  /* Quote request: the visitor's email app opens with the request filled in (Site and titles → Quote requests email).
-     Without an email set, the request can be copied instead. Nothing is stored or sent by the site itself. */
+  /* Quote request and contact forms. By default (Site and titles → Forms) a message is saved to Studio → Inbox through
+     submit_enquiry(); bots are dropped by a hidden field and a minimum fill-in time, and the database limits how many
+     messages one sender can send. If the Inbox can't be reached, or forms are set to "email app", the visitor's email
+     app opens with the message filled in (or it can be copied). On a client proposal the proposal goes along. */
   quote(cfg,sec){
+    const kind=sec.type==="contact"||sec.form==="contact"?"contact":"quote";
     const w=h("div",{class:"wrap qf-wrap"}), head=h("div",{class:"txt","data-rv":""}), eb=eyebrowEl("",sec.eyebrow); if (eb) head.append(eb);
     if (sec.title) head.append(h("h2",{class:"h2",text:sec.title})); if (sec.text) head.append(h("p",{class:"lede",text:sec.text}));
-    const fid=k=>"q-"+sec.id+"-"+k, F=(k,label,type="text",val="")=>{ const i=type==="area"?h("textarea",{id:fid(k),name:k,rows:4}):h("input",{id:fid(k),name:k,type,value:val,autocomplete:k==="name"?"name":k==="email"?"email":k==="phone"?"tel":k==="company"?"organization":"off"}); if (type==="area") i.value=val;
-      return h("label",{class:"qf-f"+(type==="area"?" wide":""),for:fid(k)},h("span",{class:"mono",text:label}),i); };
-    const form=h("form",{class:"qf","data-rv":"",novalidate:true},F("name",ui("Your name")),F("company",ui("Company")),F("email",ui("Email"),"email"),F("phone",ui("Phone"),"tel"),
-      F("service",ui("Service"),"text",sec.service||""),F("quantity",ui("Quantity")),F("deadline",ui("Deadline"),"date"),F("details",ui("Tell us what you need"),"area"));
-    const status=h("p",{class:"qf-status mono",role:"status"}), send=h("button",{class:"more",type:"submit",html:esc(ui("Send request"))+ARROW_SVG});
+    const fid=k=>"q-"+sec.id+"-"+k, F=(k,label,type="text",val="",req=false)=>{ const i=type==="area"?h("textarea",{id:fid(k),name:k,rows:kind==="contact"?6:4,maxlength:"5000"}):h("input",{id:fid(k),name:k,type,value:val,maxlength:k==="phone"?"60":"200",autocomplete:k==="name"?"name":k==="email"?"email":k==="phone"?"tel":k==="company"?"organization":"off"}); if (type==="area") i.value=val; if (req) i.required=true;
+      return h("label",{class:"qf-f"+(type==="area"?" wide":""),for:fid(k)},h("span",{class:"mono",text:label+(req?" *":"")}),i); };
+    const trap=h("label",{class:"qf-trap","aria-hidden":"true"},"Website",h("input",{name:"website",type:"text",tabindex:"-1",autocomplete:"off"}));
+    const form=kind==="contact"
+      ?h("form",{class:"qf","data-rv":"",novalidate:true},F("name",ui("Your name"),"text","",true),F("email",ui("Email"),"email"),F("phone",ui("Phone"),"tel"),F("company",ui("Company")),F("details",ui("Your message"),"area"),trap)
+      :h("form",{class:"qf","data-rv":"",novalidate:true},F("name",ui("Your name"),"text","",true),F("company",ui("Company")),F("email",ui("Email"),"email"),F("phone",ui("Phone"),"tel"),
+        F("service",ui("Service"),"text",sec.service||""),F("quantity",ui("Quantity")),F("deadline",ui("Deadline"),"date"),F("details",ui("Tell us what you need"),"area"),trap);
+    const status=h("p",{class:"qf-status mono",role:"status","aria-live":"polite"}), send=h("button",{class:"more",type:"submit",html:esc(ui(kind==="contact"?"Send message":"Send request"))+ARROW_SVG});
     form.append(h("div",{class:"qf-go wide"},send,status));
     if (sec.hint) form.append(h("p",{class:"qf-hint wide",text:sec.hint}));
-    const body=()=>{ const v=k=>(form.elements[k]&&form.elements[k].value||"").trim(); return [[ui("Service"),v("service")],[ui("Your name"),v("name")],[ui("Company"),v("company")],[ui("Email"),v("email")],[ui("Phone"),v("phone")],[ui("Quantity"),v("quantity")],[ui("Deadline"),v("deadline")],["",v("details")]].filter(x=>x[1]).map(([k,x])=>k?k+": "+x:"\n"+x).join("\n"); };
-    form.addEventListener("submit",e=>{ e.preventDefault(); const mail=String(Site.cfg.site.quoteEmail||"").trim(), subject=ui("Quote request")+(form.elements.service.value?" · "+form.elements.service.value:"");
+    const t0=Date.now(), v=k=>(form.elements[k]&&form.elements[k].value||"").trim();
+    const body=()=>[[ui("Service"),v("service")],[ui("Your name"),v("name")],[ui("Company"),v("company")],[ui("Email"),v("email")],[ui("Phone"),v("phone")],[ui("Quantity"),v("quantity")],[ui("Deadline"),v("deadline")],[ui("Proposal"),cfg.__proposal?cfg.__proposal.slug:""],["",v("details")]].filter(x=>x[1]).map(([k,x])=>k?k+": "+x:"\n"+x).join("\n");
+    const viaEmail=()=>{ const mail=String(Site.cfg.site.quoteEmail||"").trim(), subject=ui(kind==="contact"?"Message":"Quote request")+(v("service")?" · "+v("service"):"");
       if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ location.href="mailto:"+encodeURIComponent(mail)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body()); status.textContent=ui("Your email app opens with the request ready to send."); }
-      else { const t=subject+"\n"+body(); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{ status.textContent=ui("Copied"); }).catch(()=>{ status.textContent=t; }); }
-      if (!reduce) gsap.fromTo(send,{scale:.94},{scale:1,duration:.6,ease:"elastic.out(1,.4)"}); });
+      else { const t=subject+"\n"+body(); (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{ status.textContent=ui("Copied"); }).catch(()=>{ status.textContent=t; }); } };
+    let busy=false;
+    form.addEventListener("submit",async e=>{ e.preventDefault(); if (busy) return;
+      if (!reduce) gsap.fromTo(send,{scale:.94},{scale:1,duration:.6,ease:"elastic.out(1,.4)"});
+      if (!v("name")||(!v("email")&&!v("phone"))){ status.textContent=ui("Please add your name and an email or phone number."); return; }
+      if (v("email")&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email"))){ status.textContent=ui("Please check the email address."); return; }
+      const forms=(Site.cfg.site&&Site.cfg.site.forms)||{};
+      if (forms.mode==="email"){ viaEmail(); return; }
+      busy=true; send.disabled=true; status.textContent=ui("Sending…");
+      const r=await submitEnquiry({ kind, name:v("name"), email:v("email"), phone:v("phone"), company:v("company"), service:v("service"), quantity:v("quantity"), deadline:v("deadline"),
+        message:v("details"), lang:cfg.__lang||"", page:location.hash.slice(1), proposal:cfg.__proposal?cfg.__proposal.slug:"", website:form.elements.website.value, elapsed:Date.now()-t0 });
+      busy=false; send.disabled=false;
+      if (r.ok){ status.textContent=forms.thanks||ui("Thank you. Your message has reached us and we'll get back to you soon."); form.querySelectorAll("input:not([name=website]),textarea").forEach(i=>{ if (i.name!=="service") i.value=""; }); return; }
+      if (r.code==="busy"){ status.textContent=ui("Too many messages were sent just now. Please try again later, or email us."); return; }
+      if (r.code==="missing"||r.code==="email"){ status.textContent=ui("Please add your name and an email or phone number."); return; }
+      viaEmail(); });
     // a catalog item's "Request a quote" fills in the details
     onWin("dorma:quote",e=>{ const d=e.detail||{}; if (d.section&&d.section!==sec.id) return; const t=form.elements.details; if (t&&d.text&&!t.value.includes(d.text)) t.value=(t.value?t.value+"\n":"")+d.text; });
     w.append(head,form); return h("section",{class:"sec quote-sec"},w);
   },
+  contact(cfg,sec,page){ return SECTIONS.quote(cfg,sec,page); },
   /* Catalog: items with up to three filters (item type, package type, price range). Each item's button travels to the quote form. */
   catalog(cfg,sec,page){
     const w=h("div",{class:"wrap"}), head=h("div",{class:"head-row","data-rv":""},h("h2",{class:"h2",text:sec.title||""})), count=h("span",{class:"mono"}); head.append(count); w.append(head);

@@ -92,6 +92,8 @@ describe('health check', () => {
   test('quote email setting', () => {
     const c = base(); c.site.quoteEmail = '';
     const has = c.pages.some((p: any) => p.sections.some((s: any) => s.type === 'quote')) || c.modals.some((m: any) => (m.sections || []).some((s: any) => s.type === 'quote'));
+    expect(find(runHealth(c), 'settings').length).toBe(0); // forms go to the Inbox by default
+    c.site.forms = { mode: 'email' };
     expect(find(runHealth(c), 'settings').length).toBe(has ? 1 : 0);
   });
 

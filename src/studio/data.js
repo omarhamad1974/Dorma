@@ -12,7 +12,8 @@ const STARTER = {
     brand: "Dorma Advertising",
     homePage: "home",
     cta: { label: T2("Request a Quote","اطلب عرض سعر"), action: A("modal","md-quote") },
-    quoteEmail: "",      // where quote requests go (the visitor's email app opens with the request filled in)
+    quoteEmail: "",      // Dorma's email: shown on printable proposals, and where requests go when forms use the email app
+    forms: { mode: "inbox", thanks: T2("Thank you. Your message has reached us and we'll get back to you soon.","شكراً لك. وصلتنا رسالتك وسنعود إليك قريباً.") }, // site forms: inbox (saved to Studio → Inbox) | email (visitor's email app)
     footer: T2("© 2026 Dorma Advertising · Agency | Print & Production","© 2026 دورما للإعلان · خدمات الوكالة | الطباعة والإنتاج"),
     showStudioLink: true,
     languages: "both",
@@ -269,7 +270,8 @@ const SECTION_TYPES = {
   features: { label:"Feature list (grid of items with icons)", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["cols","select","Columns",{options:[[2,"2"],[3,"3"],[4,"4"]]}],
     ["items","list","Items",{ title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Text (optional)",{wide:true}],["icon","icon","Icon (optional)",{wide:true}],["hideText","toggle","Hide the text"]], blank:()=>({title:"New item",text:"",icon:""}) }]] },
   quotes: { label:"Testimonials", fields:[["num","text","Number"],["eyebrow","text","Eyebrow"],["items","list","Quotes",{ title:"name", hideable:true, fields:[["quote","area","Quote",{wide:true}],["name","text","Name"],["role","text","Role or company"],["hideSub","toggle","Hide the role or company"]], blank:()=>({quote:"",name:"",role:""}) }]] },
-  quote: { label:"Quote request form", fields:[["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["service","text","Service (filled in on the form)"],["hint","area","Note under the form (optional)",{wide:true}]] },
+  quote: { label:"Quote request form", fields:[["form","select","Form",{options:[["quote","Quote request (service, quantity, deadline)"],["contact","Contact message (name, email, phone, message)"]]}],["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["service","text","Service (filled in on the form)"],["hint","area","Note under the form (optional)",{wide:true}]] },
+  contact: { label:"Contact form (messages go to Studio → Inbox)", fields:[["eyebrow","text","Eyebrow"],["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["hint","area","Note under the form (optional)",{wide:true}]] },
   catalog: { label:"Catalog (items with filters and quote requests)", fields:[["title","text","Heading",{wide:true}],["text","area","Short paragraph",{wide:true}],["filters","strings","Filter names, one per line (1: item type, 2: package type, 3: price range)",{wide:true}],
     ["items","list","Catalog items",{ itemName:"catalog item", title:"title", hideable:true, fields:[["title","text","Title"],["text","area","Description",{wide:true}],["itemType","text","Item type"],["packageType","text","Package type"],["price","text","Price range"],["media","media","Image",{wide:true}],...ITEM_ICON,...ITEM_HIDE("Hide the type and price line")], blank:()=>({title:"New item",text:"",itemType:"",packageType:"",price:"",media:"m-nebula"}) }]] },
   blog: { label:"Blog posts", fields:[["title","text","Heading",{wide:true}],["category","category","Only this category",{allowAll:true}],["limit","number","Most posts to show"],["filters","toggle","Show category filters as a flow"],["style","select","Style",{options:[["grid","Cards"],["list","List"]]}]] },
@@ -289,7 +291,8 @@ const SECTION_BLANK = {
   logo:()=>({version:"auto",size:120,phone:"",align:"center",in:"pop",loop:"none",delay:0,action:A()}),
   features:()=>({num:"",eyebrow:"",title:"What's included",text:"",cols:3,items:[]}),
   quotes:()=>({num:"",eyebrow:"Testimonials",items:[]}),
-  quote:()=>({anchor:"quote",eyebrow:"Request a Quote",title:"Request a Quote",text:"",service:"",hint:""}),
+  quote:()=>({anchor:"quote",form:"quote",eyebrow:"Request a Quote",title:"Request a Quote",text:"",service:"",hint:""}),
+  contact:()=>({anchor:"contact",eyebrow:T2("Contact","تواصل معنا"),title:T2("Send us a message","أرسل لنا رسالة"),text:T2("",""),hint:T2("","")}),
   catalog:()=>({anchor:"catalog",title:"Catalog",text:"",filters:["Item Type","Package Type","Price Range"],items:[]}),
   blog:()=>({title:"Latest posts",category:"",limit:12,filters:true,style:"grid"}),
   article:()=>({num:"",eyebrow:"",title:"",body:"Write here. Leave an empty line between paragraphs."})
