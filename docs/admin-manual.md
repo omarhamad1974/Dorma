@@ -14,6 +14,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 
 | Tab | Sub-tabs |
 |---|---|
+| **Outline** | Site outline (also the **Outline** button just before Live preview) |
 | **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing, AI archive |
 | **Inbox** | Messages, Form settings |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
@@ -43,6 +44,16 @@ Next to the sub-tab names (Pages, Carousels…) there is a small toolbar. It onl
 ---
 
 ## 1. What you can edit
+
+### The whole site at a glance (Outline)
+- **Outline** (first in the side menu, or the **Outline** button just before **Live preview** in the top bar) shows every page in menu order, with its sections in the order visitors see them. The line at the top counts pages, pages in the menu, sections and hidden sections.
+- Tap a page to open or close it. **Open all** and **Close all** in the toolbar at the top open or close every page at once.
+- **Pages:** drag the dots (or use the up and down arrows) to change the order, which is also the menu order. **In menu / Not in menu** switches whether a page shows in the menu. The eye previews the page, the two squares duplicate it (the copy gets its own address and stays out of the menu until you add it), the cross removes it. The home page can't be removed.
+- **Sections:** drag to reorder, or drag onto another open page to move it there. **Shown / Hidden** switches it for visitors. Duplicate puts a copy right below. **＋ Add section** under a page opens the visual picker and adds the section at the end of that page.
+- **＋ Add page** at the bottom adds a page from a template (Page, Service page, Catalog page, Article page).
+- **Jump to design** (or tap a section's name) opens that page in Content → Pages with the section open and in view. Hero carousels open in Content → Carousels.
+- Removing asks first, and says if any buttons link to that page or section. After any change in Outline, an **Undo** button appears at the top. Undo goes back one step at a time, and only while you haven't changed the same pages somewhere else in the studio.
+- **Not live yet** marks pages and sections that are in the draft but not published.
 
 ### Pages and sections (Content → Pages)
 - Add, delete and rename pages, change their address, choose a layout (Cinematic, Index, Console) and show or hide them in the menu.

@@ -215,7 +215,8 @@ export function comfortTools({ body, panel }) {
   const findBtn = h('button', { type: 'button', class: 'tl', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Find a setting or jump to a group (press / )', html: IC.find + '<span>Find</span>' });
   const all = folded => { closePop(); const b = body(), p = panel();
     b.querySelectorAll('.card-a.fold').forEach(c => setFold(c, folded, p, true));
-    if (folded) b.querySelectorAll('.sub-item:not(.closed)').forEach(s => s.classList.add('closed')); };
+    if (folded) b.querySelectorAll('.sub-item:not(.closed)').forEach(s => s.classList.add('closed'));
+    b.dispatchEvent(new CustomEvent('studio:foldall', { detail: { folded } })); /* tabs with their own folding (Outline) listen for this */ };
   findBtn.addEventListener('click', () => { const b = findBox(body(), panel(), all); if (openPop(findBtn, b.el, 'pop-find')) b.input.focus(); });
   sizeBtn.addEventListener('click', () => openPop(sizeBtn, textBox(syncSize), 'pop-text'));
   syncSize();

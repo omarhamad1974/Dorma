@@ -15,6 +15,7 @@ import { FX, FX_OPTIONS, FX_DEFAULTS, fxPreview } from './fx';
 import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
+import { panelOutline, OIC } from './outline';
 import { mountLivePreview } from './livepreview';
 import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager, pageInfo } from './comfort';
 import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './ai';
@@ -56,6 +57,8 @@ const IC={
 const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"],["inbox","Messages"],["inboxSet","Form settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
 const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["inbox","Inbox","inbox",["inbox","inboxSet"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
+/* Outline: the whole site as a tree of pages and sections (src/studio/outline.js). First in the sidebar, and a button just before Live preview. */
+PANELS.push(["outline","Site outline"]); GROUPS.unshift(["outline","Outline","outline",["outline"]]); IC.outline=OIC.outline;
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -112,6 +115,7 @@ function updateTop(){
     diff?h("span",{class:"mono",style:"color:var(--warn)",text:"Draft differs from live"}):h("span",{class:"mono",text:"Live is up to date"}),
     newMenu(),
     h("button",{class:"btn view-site",type:"button",title:"Back to the live site, on the page you came from",html:IC.site+"View site",onclick:viewSite}),
+    h("button",{class:"btn"+(Admin.panel==="outline"?" on":""),type:"button",html:IC.outline+"Outline",title:"See the whole site as pages and sections",onclick:()=>openPanel("outline")}),
     h("button",{class:"btn lp-toggle"+(LP&&LP.isOpen()?" on":""),type:"button","aria-pressed":LP&&LP.isOpen()?"true":"false",title:"A small window with the draft site that updates as you edit",html:IC.pv+"Live preview",onclick:()=>{ if (LP) LP.toggle(); }}),
     h("button",{class:"btn",type:"button",html:IC.eye+"Preview draft",onclick:previewDraft}),
     h("button",{class:"btn primary",type:"button",disabled:!diff,html:IC.up+"Publish",onclick:async()=>{ if (await publishDraft()) toast("Published. Visitors now see this version."); updateTop(); }}));
@@ -137,6 +141,7 @@ function openPanel(k){
     G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","data-k":s,"aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
+  if (k==="outline"){ panelOutline(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges(); return; }
   ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups,inbox:panelInbox,inboxSet:b=>panelInboxSettings(b,formsCard)})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges();
 }
@@ -477,7 +482,7 @@ function confirmInline(anchor,msg,yes,yesLabel="Remove"){
   anchor.after(c);
 }
 function sortable(box,arr,onMove){
-  if (!window.Sortable) return;
+  if (!Sortable) return;
   Sortable.create(box,{handle:".handle",draggable:".sub-item",animation:180,ghostClass:"sortable-ghost",onEnd(e){ if (e.oldIndex===e.newIndex) return; const [m]=arr.splice(e.oldIndex,1); arr.splice(e.newIndex,0,m); onMove(); }});
 }
 function card(title,...kids){ return h("section",{class:"card-a"},h("h2",{},title),...kids); }
@@ -1847,3 +1852,4 @@ function sectionExtras(s){
   return box;
 }
 export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, goToSlot, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+export { PAGE_TEMPLATES, secTitle };
