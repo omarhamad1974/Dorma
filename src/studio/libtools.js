@@ -161,6 +161,9 @@ function mediaJsonLd(cfg,ids,urlOf){
     if (m.w&&m.h){ o.width=+m.w; o.height=+m.h; }
     if (Array.isArray(m.tags)&&m.tags.length) o.keywords=m.tags.map(P).filter(Boolean).join(", ");
     if (m.added) o.uploadDate=String(m.added).slice(0,10);
+    const c=m.credit; // stock photos (Library › Find photos): who took it and under which licence
+    if (c&&typeof c==="object"){ if (c.author) o.creator={"@type":"Person",name:String(c.author),...(c.authorUrl?{url:String(c.authorUrl)}:{})};
+      o.creditText=String(c.line||(c.author?"Photo by "+c.author+(c.site?" on "+c.site:""):c.site||"")); if (c.pageUrl) o.acquireLicensePage=String(c.pageUrl); if (c.licenceUrl) o.license=String(c.licenceUrl); }
     if (m.kind==="video"){ const th=embedPoster(m); if (th) o.thumbnailUrl=th; if (!o.description) o.description=name; }
     out.push(o); });
   return out;
