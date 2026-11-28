@@ -2,6 +2,27 @@
 
 The studio is at **/#admin** on the site (for example `https://omarhamad1974.github.io/Dorma/#admin`). Sign in with your editor account.
 
+An illustrated, large-print version of this manual (with screenshots, numbered steps, contents and a glossary) is kept as `admin-manual.pdf` in the project files; its sources are in `docs/manual/`.
+
+## Signing in and getting around
+
+- Open the site with `#admin` at the end, type your editor **email** and **password** and press **Sign in**. Only editor accounts (added in Supabase) can open the studio; other accounts see *This account isn't an editor*.
+- The side menu shows **Signed in as …** and **Sign out** at the bottom, and **Dark mode / Light mode** for the studio (this browser only).
+- **View site** (top bar) goes back to the public site, on the page you came from. When you are signed in, the site header can show a small **Studio** button that only you see: switch it on under **Design → Site and titles → Brand and header** and Publish.
+- **＋ New…** (top bar) adds a page, section, flow, modal or post from any tab.
+
+## Live preview while you edit
+
+**Live preview** (top bar, next to Preview draft) opens a small window with the **draft** site that updates by itself about half a second after each change. Visitors never see it, and nothing is published.
+
+- **It follows what you edit.** In Pages it shows the selected page, and jumps to a section when you click on that section's editor. In Carousels it shows the carousel's page, in Blog the selected post, in Modals it opens the selected modal. The target icon (**Follow what I edit**) turns this off, so the window stays where you are, and you can click around the preview like a visitor.
+- **Move and size it:** drag the bar to move it, drag the bottom-right corner to resize, double-click the bar (or the line button) to minimise it to just its bar.
+- **Computer or phone width:** the screen and phone icons lay the site out at computer width (shrunk to fit) or at phone width.
+- **Beside the studio:** on wide screens (1200 px and up) the split icon docks the preview on the right and the studio makes room for it; drag its left edge to change the width. Press it again to float it.
+- **Reload:** the round arrow loads the preview again from scratch (for example after adding pictures to the library on GitHub).
+- **On a phone:** a **Preview** button at the bottom right opens it as a sheet from the bottom, at phone width. The cross closes it.
+- Where the window sits, its size, docked or floating, and its settings are remembered on this browser only. While it is closed or minimised it does nothing, so editing stays as fast as before.
+
 ## The golden rule: Draft, Preview, Publish
 
 - Every change saves to the **draft** on its own ("Draft saved" at the top).
@@ -164,9 +185,13 @@ Messages people send from the site's forms: the **Contact form** section, the **
 ### Library (Library)
 - All pictures, videos, articles and generated scenes, sorted into **categories** (a category is required).
 - The Library always opens **newest first** (most recently uploaded, linked or added from Find photos at the top). Other orders (Library order, oldest, name, size, category, duplicates) are in the **Sort** menu for that visit.
-- Per item: name, tags, alt text, focus point, colour overlay, hide from library.
-- **Quick upload** stores files in Supabase. **Picture optimizing** shrinks photos first (resized, saved as WebP, PNG kept for transparent logos). Tick **Keep originals** to skip it once.
-- **Missing images** lists every empty slot, placeholder or broken picture on the site with a **Go there** button.
+- Per item: name, category, tags, focus point and crop zoom, colour overlay, **Used in** (every place that shows it), hide from library or delete.
+- **SEO** per item: a readable file name (**Rename file**; GitHub files are copied to Supabase under the new name with **Rename (copy to Supabase)**), and alt text, title, caption and description in English and Arabic. The AI button can **describe the picture**.
+- **Move:** drag pictures onto a category, or **Select several** and press Move, Hide or Delete.
+- **Possible duplicates** lists pictures with the same size, name or link (keep the one that's used, delete the other). **Read missing sizes** fills in sizes for older uploads and links.
+- **Add by link** uses a picture or video that lives elsewhere (a direct https image or video link, YouTube or Vimeo) without uploading it.
+- **Quick upload** stores files in Supabase. **Picture optimizing** shrinks photos first (longest side, quality and format; saved as WebP, PNG kept for transparent logos; GIFs, SVGs and videos never changed). Tick **Keep originals** to skip it once. **Optimize files for GitHub** does the same for files you upload on GitHub yourself.
+- **Missing images** lists every empty slot, placeholder or broken picture on the site with a **Go there** button. **Fill missing from category** fills empty slots with unused pictures from the right category, with a preview, per-row untick and Undo.
 - Image pickers show **pictures not used on the site yet** first, newest first.
 
 ### Find photos (Library → Find photos)
