@@ -23,6 +23,7 @@ import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './
 import { DESCRIBE_KEYS } from './aitext';
 import { panelProposals } from './proposalpanel';
 import { panelHealth, panelBackups } from './carepanel';
+import { panelStock } from './stock';
 import { panelInbox, panelInboxSettings } from './inboxpanel';
 
 /* ================= ADMIN STUDIO ================= */
@@ -55,9 +56,9 @@ const IC={
   inbox:'<svg viewBox="0 0 24 24"><path d="M3 13l2.6-7.2A2 2 0 0 1 7.5 4.5h9a2 2 0 0 1 1.9 1.3L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"],["inbox","Messages"],["inboxSet","Form settings"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["stock","Find photos"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"],["inbox","Messages"],["inboxSet","Form settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["inbox","Inbox","inbox",["inbox","inboxSet"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["inbox","Inbox","inbox",["inbox","inboxSet"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing","stock"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
 /* Outline: the whole site as a tree of pages and sections (src/studio/outline.js), and Connections: what opens what (connpanel.js). First in the sidebar, and a button just before Live preview. */
 PANELS.push(["outline","Site outline"],["connections","Connections"]); GROUPS.unshift(["outline","Outline","outline",["outline","connections"]]); IC.outline=OIC.outline;
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
@@ -143,7 +144,7 @@ function openPanel(k){
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
   if (k==="outline"||k==="connections"){ (k==="outline"?panelOutline:panelConnections)(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges(); return; }
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups,inbox:panelInbox,inboxSet:b=>panelInboxSettings(b,formsCard)})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,stock:panelStock,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups,inbox:panelInbox,inboxSet:b=>panelInboxSettings(b,formsCard)})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges();
 }
 /* Badges: unread messages on Inbox, proposal opens nobody has looked at on Content and Proposals.
@@ -1575,7 +1576,9 @@ function panelMedia(body){
     const actions=h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn sm",type:"button",text:m.hidden?"Show in library again":"Hide from library",title:"Hidden items stay where they're used but leave the pickers",onclick:()=>{ m.hidden=!m.hidden; touch(); drawGrid(); drawDetail(); }}),
       h("button",{class:"btn danger sm",type:"button",text:"Delete",onclick:e=>deleteItems(e.currentTarget,[m.id])}));
-    det.append(card(h("span",{class:"grow"},"Edit "+({article:"article",scene:"scene",video:"video"}[m.kind]||"image")),pv,src,
+    const cr=m.credit&&typeof m.credit==="object"?m.credit:null; // stock photo (Library › Find photos)
+    const credit=cr?h("p",{class:"hint",style:"margin:0;overflow-wrap:anywhere"},(cr.line||"Stock photo")+" · "+(cr.licence||"")+" · ",cr.pageUrl?h("a",{href:linkOk(cr.pageUrl),target:"_blank",rel:"noopener noreferrer",text:"original page"}):null):null;
+    det.append(card(h("span",{class:"grow"},"Edit "+({article:"article",scene:"scene",video:"video"}[m.kind]||"image")),pv,src,credit,
       fieldsFor(m,schema,(v,k)=>{ redraw(); drawGrid(); if (k==="category") toast("Moved to "+categoryLabel(D,m.category)+"."); }),
       h("p",{class:"hint",text:"Use it in a blog post by writing [["+m.id+"|caption]] on its own line."}),
       twin,

@@ -19,7 +19,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 | **Inbox** | Messages, Form settings |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
-| **Library** | Library, Missing images |
+| **Library** | Library, Missing images, Find photos |
 | **Social** | Create posts, Calendar, Social settings |
 | **Site care** | Health check, Backups |
 
@@ -164,6 +164,16 @@ Messages people send from the site's forms: the **Contact form** section, the **
 - **Quick upload** stores files in Supabase. **Picture optimizing** shrinks photos first (resized, saved as WebP, PNG kept for transparent logos). Tick **Keep originals** to skip it once.
 - **Missing images** lists every empty slot, placeholder or broken picture on the site with a **Go there** button.
 - Image pickers show **pictures not used on the site yet** first.
+
+### Find photos (Library → Find photos)
+Free photos from **Pexels**, **Pixabay** and **Unsplash**, found and added without leaving the studio.
+
+- **One-time setup:** get a free key from one or more services (any one is enough) and add it in Supabase → Edge Functions → Secrets as `PEXELS_API_KEY`, `PIXABAY_API_KEY` or `UNSPLASH_ACCESS_KEY`. The steps, links and Copy buttons are on the tab. Keys stay on Supabase and never appear on the site.
+- **Search:** describe the picture in English or Arabic. With **Let AI choose the search words** ticked, Gemini turns the description (and the optional *Look and feel*) into short English search words and suggests a few other searches under **Also try** (one AI use from the daily allowance; needs the Gemini key from AI writing). Narrow by **shape** (landscape, portrait, square), **main colour** and **services**.
+- **Preview:** tap a photo to see it large with its photographer, licence and size; use the arrows or ← → keys to move through the results.
+- **Add** puts it in the Library, in the category chosen beside **Find photos**, with its name, alt text, tags and a credit caption ("Photo by … on Pexels"). Pexels and Pixabay photos are copied into your Library and optimized like any upload. Unsplash photos stay on Unsplash (their rule) and Unsplash is told the photo was used. The credit and licence also go into the page's picture data for search engines, and show under the picture in Library.
+- **Reject** hides a photo from later searches (Undo right after; **Hidden photos** at the bottom shows them all again). Photos already in the Library are hidden from results too.
+- Free limits: Pexels about 200 searches an hour, Pixabay 100 a minute, Unsplash 50 an hour.
 
 ### Social (Social)
 - **Create posts**: pick any text from the site (pages, sections, blog posts, catalog items, flows) and the studio writes ready-to-copy posts for **LinkedIn, Facebook Page and Instagram**, in English and Arabic when the site has Arabic. It suggests a picture, crops it to each platform's size and saves it as a JPG, and can make carousel slides. Press **Add to calendar** to plan it.

@@ -24,6 +24,8 @@ const STARTER = {
     logoHeight: 34,
     logos: JSON.parse(JSON.stringify(LOGO_DEFAULTS))   // Design → Logo: versions (white, colour, silver, added SVGs) and where each is used
   },
+  /* Studio → Library → Find photos: free stock photo search (stock-search edge function). Rejected photos ("pexels:123") stay hidden. */
+  stock: { ai: true, orientation: "any", colour: "any", providers: { pexels: true, pixabay: true, unsplash: true }, rejected: [] },
   /* Studio → Content → AI writing: the "Write with AI" buttons (Gemini through the ai-write edge function).
      The notes are sent with every request so the AI writes in Dorma's voice and only uses real facts. */
   ai: {
@@ -390,7 +392,7 @@ function mediaSlots(cfg,{all=false}={}){
    Starts from the image slots above (named places), then sweeps the rest of the site settings for any field that holds a
    library id (menu logo, loader, backgrounds…) and for [[id|caption]] written in text, so nothing that shows a picture is missed.
    Returns Map id → list of places (words). Hidden sections and draft posts count as used: the picture is still assigned there. */
-const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type", ai:"AI writing" };
+const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type", ai:"AI writing", stock:"Find photos" };
 function mediaUsage(cfg){
   const ids=new Set((cfg.media||[]).map(m=>m&&m.id).filter(Boolean)), use=new Map(), seen=new WeakMap();
   const P=v=>v&&typeof v==="object"?(v.en||v.ar||""):String(v??"");
