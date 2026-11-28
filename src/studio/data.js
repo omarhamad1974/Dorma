@@ -36,6 +36,16 @@ const STARTER = {
       "Voice: clear, practical and confident. Explain what Dorma does and how it helps the client. Speak to the client as \"you\".",
     arabic: "Write Dorma as دورما. Use the same service names as the Arabic site.",
     avoid: "world-class, cutting-edge, best-in-class, unleash, elevate, synergy, one-stop shop",
+    /* default length and style (choices in supabase/functions/ai-write/prompt.ts TUNE); "auto" lets the box decide */
+    style: { length:"auto", words:"", tone:"auto", purpose:"auto", formality:"auto", level:"auto", sentences:"auto", arabicStyle:"auto", cta:"auto", audience:"", extra:"" },
+    /* named styles to pick in the AI window */
+    presets: [
+      { id:"pr-social", name:"Social media post", style:{ length:"short", tone:"friendly", purpose:"social", sentences:"short", cta:"yes" } },
+      { id:"pr-service", name:"Service page", style:{ length:"medium", tone:"confident", purpose:"marketing", level:"standard" } },
+      { id:"pr-guide", name:"Technical guide", style:{ length:"long", tone:"calm", purpose:"technical", level:"expert", sentences:"varied", cta:"no" } },
+    ],
+    /* reference websites the AI reads for facts and focus: [{ url, note, on }] (on = used by default) */
+    refs: [],
   },
   loader: { enabled: true, mark: "image", image: "", bg: "theme", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {

@@ -25,6 +25,122 @@ export interface WriteRequest {
   general?: boolean;
   /** a picture to describe (describe action), base64 without the data: prefix */
   image?: { mime: string; data: string } | null;
+  /** length and style choices (Content → AI writing defaults, a preset, or the window) */
+  tune?: Tune;
+  /** reference websites the studio asked for (read by the edge function, see fetchref.ts) */
+  refUrls?: string[];
+  /** their text, filled in by the edge function before the prompt is built */
+  refs?: RefPage[];
+}
+
+export interface RefPage { url: string; title: string; text: string }
+
+/* ---------- tuning: length and style ----------
+   Each choice is [value, label in the studio, instruction for the AI]. "auto" adds no instruction.
+   The studio (aitext.js) imports these lists, so the choices and the rules stay in one place. */
+export type TuneKey = 'length' | 'tone' | 'purpose' | 'formality' | 'level' | 'sentences' | 'arabicStyle' | 'cta';
+export const TUNE: Record<TuneKey, { label: string; options: [string, string, string][] }> = {
+  length: { label: 'Length', options: [
+    ['auto', 'Fits the box', ''],
+    ['short', 'Short', 'Keep it short: about half of what this kind of box usually holds.'],
+    ['medium', 'Medium', 'A medium length for this kind of box.'],
+    ['long', 'Long', 'Make it fuller and more detailed than usual for this kind of box, without padding.'],
+    ['words', 'Exact number of words', ''],
+  ] },
+  tone: { label: 'Tone', options: [
+    ['auto', 'Dorma voice', ''],
+    ['professional', 'Professional', 'Tone: professional and businesslike.'],
+    ['friendly', 'Friendly', 'Tone: friendly and approachable.'],
+    ['confident', 'Confident', 'Tone: confident and direct, without boasting.'],
+    ['warm', 'Warm', 'Tone: warm and human.'],
+    ['bold', 'Bold', 'Tone: bold and energetic, with strong verbs.'],
+    ['calm', 'Calm', 'Tone: calm, reassuring and precise.'],
+    ['premium', 'Premium', 'Tone: refined and premium, understated rather than loud.'],
+  ] },
+  purpose: { label: 'Purpose', options: [
+    ['auto', 'Fits the box', ''],
+    ['marketing', 'Marketing (persuade)', 'Purpose: persuade. Lead with the benefit to the client.'],
+    ['informative', 'Informative (explain)', 'Purpose: inform. Explain clearly what it is and how it works.'],
+    ['technical', 'Technical (specs and process)', 'Purpose: technical. Be specific about process, materials and options, with correct terms.'],
+    ['story', 'Storytelling', 'Purpose: tell it as a short story: the situation, what was done, the outcome (only real facts).'],
+    ['social', 'Social media post', 'Purpose: a social media post. A strong first line that makes people stop, short paragraphs, one clear idea. No hashtags (the Social tab adds them).'],
+    ['seo', 'Search engines (SEO)', 'Purpose: search engines. Use the words people search for naturally, near the start, without keyword stuffing.'],
+  ] },
+  formality: { label: 'Formality', options: [
+    ['auto', 'Fits the box', ''],
+    ['formal', 'Formal', 'Formality: formal.'],
+    ['neutral', 'Neutral', 'Formality: neutral.'],
+    ['conversational', 'Conversational', 'Formality: conversational, as if speaking to the client.'],
+  ] },
+  level: { label: 'Reading level', options: [
+    ['auto', 'Fits the box', ''],
+    ['simple', 'Simple (anyone)', 'Reading level: simple. Everyday words, explain any trade term.'],
+    ['standard', 'Standard (business readers)', 'Reading level: standard business reader.'],
+    ['expert', 'Expert (trade buyers)', 'Reading level: expert. Trade terms are fine without explanation.'],
+  ] },
+  sentences: { label: 'Sentences', options: [
+    ['auto', 'Fits the box', ''],
+    ['short', 'Short and punchy', 'Sentences: short and punchy.'],
+    ['varied', 'Varied rhythm', 'Sentences: mix short and longer sentences for rhythm.'],
+    ['bullets', 'Bullet points where it fits', 'Where the box allows lists, prefer short bullet points over paragraphs.'],
+  ] },
+  arabicStyle: { label: 'Arabic style', options: [
+    ['auto', 'Modern Standard Arabic', ''],
+    ['formal', 'Formal MSA (official)', 'Arabic style: formal Modern Standard Arabic, suitable for official and corporate documents.'],
+    ['modern', 'Modern MSA (marketing)', 'Arabic style: modern, fluent Modern Standard Arabic as used in Gulf marketing, easy to read.'],
+    ['gulf', 'Light Gulf flavour', 'Arabic style: Modern Standard Arabic with a light Gulf flavour in word choice; no slang and no dialect spelling.'],
+  ] },
+  cta: { label: 'Call to action', options: [
+    ['auto', 'Only if it fits', ''],
+    ['yes', 'End with one', 'End with a short call to action (for example to get in touch or request a quote).'],
+    ['no', 'Never', 'Do not add a call to action.'],
+  ] },
+};
+export const TUNE_KEYS = Object.keys(TUNE) as TuneKey[];
+export interface Tune extends Partial<Record<TuneKey, string>> { words?: number; audience?: string; extra?: string }
+
+/** Keeps only known choices; words between 3 and 1500. */
+export function cleanTune(t: unknown): Tune {
+  const o = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>, out: Tune = {};
+  TUNE_KEYS.forEach((k) => { const v = o[k]; if (typeof v === 'string' && v !== 'auto' && TUNE[k].options.some((x) => x[0] === v)) out[k] = v; });
+  if (out.length === 'words') {
+    const w = Math.round(Number(o.words));
+    if (w >= 3 && w <= 1500) out.words = w; else delete out.length;
+  }
+  const aud = cut(o.audience, 200).trim(), ex = cut(o.extra, 600).trim();
+  if (aud) out.audience = aud;
+  if (ex) out.extra = ex;
+  return out;
+}
+
+/** The STYLE lines for a tune (empty when everything is automatic). */
+export function tuneRules(t: Tune | undefined, kind: Kind, langs: Lang[]): string[] {
+  if (!t) return [];
+  const out: string[] = [];
+  TUNE_KEYS.forEach((k) => {
+    const v = t[k]; if (!v) return;
+    if (k === 'arabicStyle' && !langs.includes('ar')) return;
+    if (k === 'length' && v === 'words') { out.push(`Length: about ${t.words} words${langs.length > 1 ? ' in each language' : ''}.`); return; }
+    if (k === 'length' && kind === 'text' && v !== 'long') return; // a one-line box is short anyway
+    const line = TUNE[k].options.find((x) => x[0] === v)?.[2]; if (line) out.push(line);
+  });
+  if (t.audience) out.push(`Audience: ${t.audience}.`);
+  if (t.extra) out.push(`Extra instructions from the editor: ${t.extra}`);
+  return out;
+}
+
+/** Only public web pages: http(s), no user:password, no IP-literal or local host names (fetchref.ts checks the address too). */
+export function cleanUrls(v: unknown, max = 3): string[] {
+  const out: string[] = [];
+  (Array.isArray(v) ? v : []).forEach((x) => {
+    if (out.length >= max || typeof x !== 'string') return;
+    let u: URL; try { u = new URL(x.trim()); } catch { return; }
+    if (!/^https?:$/.test(u.protocol) || u.username || u.password || (u.port && !['80', '443'].includes(u.port))) return;
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(u.hostname) || /(^|\.)(localhost|local|internal|lan|home|corp|intranet)$/i.test(u.hostname)) return;
+    u.hash = '';
+    if (!out.includes(u.href)) out.push(u.href);
+  });
+  return out;
 }
 
 export const ACTIONS: Action[] = ['write', 'improve', 'shorten', 'translate', 'describe'];
@@ -65,6 +181,8 @@ export function cleanRequest(body: unknown): WriteRequest | string {
     avoid: cut(b.avoid, LIMITS.short),
     general: b.general === true,
     image: null,
+    tune: cleanTune(b.tune),
+    refUrls: cleanUrls(b.refs),
   };
   const img = b.image as Record<string, unknown> | null | undefined;
   if (img && typeof img.data === 'string' && /^image\/(jpeg|png|webp)$/.test(String(img.mime))) {
@@ -91,7 +209,7 @@ export function systemPrompt(r: WriteRequest): string {
     'You are helping the site editor fill in one box in their website studio. Your text goes into that box after the editor reads and edits it.',
     '',
     r.general ? generalRule() :
-      'FACTS. Use only facts found in the brand notes, the existing text, the brief, the picture and the page context below. ' +
+      'FACTS. Use only facts found in the brand notes, the existing text, the brief, the picture, the reference pages and the page context below. ' +
       'Never invent clients, brand names, project names, results, statistics, numbers, years, awards, testimonials, quotes, prices, locations, team members or contact details. ' +
       `When the text needs a fact you were not given, write ${GAP} in English and ${GAP_AR} in Arabic instead of making one up.`,
     'VOICE. Clear, practical and confident. Short sentences. Speak to the reader as "you". Say what Dorma does and how, instead of piling up adjectives. ' +
@@ -99,6 +217,8 @@ export function systemPrompt(r: WriteRequest): string {
     'ARABIC. Modern Standard Arabic that reads naturally to Gulf business readers. Never translate word for word: say the same thing the way an Arabic copywriter would. ' +
       'Write Dorma as دورما. Keep the same meaning, facts and length as the English.',
   ];
+  const style = tuneRules(r.tune, r.field.kind, r.langs);
+  if (style.length) rules.push('STYLE (the editor\'s choices for this text; they override the general voice above):\n- ' + style.join('\n- '));
   if (r.avoid) rules.push(`AVOID these words and phrases: ${r.avoid}`);
   if (r.arabic) rules.push(`ARABIC NOTES from the editor: ${r.arabic}`);
   rules.push('FORMAT. ' + formatRule(r.field.kind));
@@ -137,6 +257,11 @@ export function userPrompt(r: WriteRequest): string {
   const now = (['en', 'ar'] as Lang[]).filter((l) => r.text[l]);
   if (now.length) { out.push('', 'TEXT IN THE BOX NOW:'); now.forEach((l) => out.push(`[${LANG_NAME[l]}]`, r.text[l] as string)); }
   if (r.brief) out.push('', 'BRIEF FROM THE EDITOR:', r.brief);
+  if (r.refs?.length) {
+    out.push('', 'REFERENCE PAGES the editor chose, to keep the text focused and accurate. Use them for general and industry facts and terms. ' +
+      'Write in your own words; never copy sentences. Unless a page is Dorma\'s own website, its clients, projects, numbers and claims are NOT Dorma\'s: never present them as Dorma\'s.');
+    r.refs.forEach((p, i) => out.push(`[Reference ${i + 1}] ${p.title ? p.title + ' — ' : ''}${p.url}`, p.text));
+  }
   out.push('', 'TASK: ' + task(r));
   return out.join('\n');
 }
