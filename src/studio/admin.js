@@ -1,7 +1,7 @@
 import { LIBRARY_BASE, REPO_BRANCH, REPO_URL } from '../config';
 import { libraryUrl, mediaUrl, flowBlock, hexOk, LANGS, isTx, plain, setDocLang, TIMING_PARTS, $, $$, ARROW_SVG, applyTheme, categoryLabel, clone, esc, fmtDate, h, libPathOk, mediaBox, mediaNode, overlayCss, overlayEl, renderFlow, revealTitle, sanitizeSvg, uid, LOGO_PLACES, cleanLogoSvg, logoNode, logoFor } from './core';
 import { gsap } from 'gsap';
-import { Store, draftDiffers, listVersions, loadDraft, media, normalize, publishDraft, restoreVersion, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
+import { Store, draftDiffers, loadDraft, media, normalize, publishDraft, route, scheduleSave, signIn, signOut, signedInEmail } from './store';
 import { Site, closeModal, disposePage, openModal } from './site';
 import { IMPORTERS, buildIcons } from './mdimport';
 import { A, OPT, OV_PRESETS, SECTION_BLANK, SECTION_TYPES, STARTER, snapshotStyle, applyStyle, resetOverrides, defaultCategory, ensureCategory, mediaSlots, mediaUsage, slotCategory } from './data';
@@ -20,6 +20,7 @@ import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager,
 import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './ai';
 import { DESCRIBE_KEYS } from './aitext';
 import { panelProposals } from './proposalpanel';
+import { panelHealth, panelBackups } from './carepanel';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -47,11 +48,12 @@ const IC={
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4M6 9l6-6 6 6M5 20h14"/></svg>',
   social:'<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/></svg>',
   pv:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><rect x="11" y="10" width="8" height="5" rx="1"/><path d="M8 21h8"/></svg>',
+  care:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.3-9.4C1.4 8.1 3.6 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.6 0 5.8 3.6 4.5 7.1C19.5 16.4 12 21 12 21z"/><path d="M3.5 12.5h4l1.7-3 2.6 6 1.9-3h6.8"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -132,7 +134,7 @@ function openPanel(k){
     G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
 }
 
@@ -511,7 +513,7 @@ function panelSite(body){
   const titles=h("div",{class:"fields"});
   D.pages.forEach(p=>{ titles.append(F(p,"title","text",p.id+" · title")); titles.append(F(p,"nav","toggle","Show "+(plain(p.title)||p.id)+" in menu")); });
   body.append(card("Page titles",titles));
-  body.append(card("Backup",h("p",{class:"adm-intro",text:"Copy every setting as text to keep a backup, or paste a backup to replace the draft."}),
+  body.append(card("Backup",h("p",{class:"adm-intro"},"Copy every setting as text, or paste settings to replace the draft. Backup files, snapshots and the published versions are under ",h("button",{type:"button",class:"linkish",text:"Site care → Backups",onclick:()=>openPanel("backups")}),"."),
     h("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
       h("button",{class:"btn",type:"button",text:"Copy settings",onclick:async()=>{ const s=JSON.stringify(Store.draft); try { await navigator.clipboard.writeText(s); toast("Settings copied"); } catch(e){ area.value=s; area.select(); toast("Select all and copy the text below"); } }}),
       h("button",{class:"btn",type:"button",text:"Replace draft with pasted settings",onclick:()=>{ try { const c=JSON.parse(area.value); Store.draft=normalize(c); touch({theme:true}); toast("Draft replaced"); openPanel("site"); } catch(e){ toast("That text isn't a valid settings backup."); } }}),
@@ -519,7 +521,6 @@ function panelSite(body){
       h("button",{class:"btn danger",type:"button",text:"Reset to starter template",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with the starter template?",()=>{ Store.draft=clone(STARTER); touch({theme:true}); openPanel("site"); })})),
     (area=h("textarea",{class:"code","aria-label":"Settings text",rows:4,style:"width:100%;padding:10px;border-radius:7px;border:1px solid var(--faint);background:var(--field-bg);font-family:var(--mono);font-size:.74rem"}))));
   var area;
-  if (Store.mode==="db") body.append(versionsCard());
 }
 /* ---------- Design → Logo ----------
    Versions (white, colour, silver, added SVGs or library images) and the places that use them, each with a version for
@@ -632,16 +633,6 @@ function loaderCard(){
       h("button",{class:"btn",type:"button",text:"Upload SVG logo",onclick:()=>file.click()}),
       h("button",{class:"btn primary",type:"button",text:"Preview loader",onclick:()=>previewLoader(D)}),file),note);
   redraw(); return c;
-}
-function versionsCard(){
-  const list=h("div",{class:"fields"},h("p",{class:"mono",text:"Loading…"}));
-  listVersions().then(vs=>{ list.textContent="";
-    if (!vs.length){ list.append(h("p",{class:"adm-intro",text:"Nothing has been published yet."})); return; }
-    vs.forEach((v,i)=>list.append(h("div",{style:"display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"},
-      h("span",{text:new Date(v.published_at).toLocaleString()+(i===0?" · live now":"")}),
-      i===0?null:h("button",{class:"btn sm",type:"button",text:"Put in draft",onclick:e=>confirmInline(e.currentTarget.parentNode,"Replace the draft with this version? Publish afterwards to make it live.",async()=>{ if (await restoreVersion(v.id)){ touch({theme:true}); toast("That version is now the draft"); openPanel("site"); } else toast("Couldn't load that version."); })}))));
-  });
-  return card("Published versions",h("p",{class:"adm-intro",text:"The last 30 published versions. Putting one in the draft lets you check it before publishing it again."}),list);
 }
 function signInForm(){
   const email=h("input",{type:"email",autocomplete:"username",required:true,id:"si-email"}), pw=h("input",{type:"password",autocomplete:"current-password",required:true,id:"si-pw"});
@@ -1829,4 +1820,4 @@ function sectionExtras(s){
       ["titleFont","select","Title font",{options:[["","Global"],...OPT.fonts]}],["title","color","Title colour",{optional:true,placeholder:"Global"}],["text","color","Text colour",{optional:true,placeholder:"Global"}],["accent","color","Accent",{optional:true,placeholder:"Global"}]])]}));
   return box;
 }
-export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, versionsCard, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
+export { panelMissing, missingSlots, libBrowser, mediaState, makeFlow, makeModal, makePage, sectionsEditor, sectionExtras, sectionLabels, overlayEditor, LIB, syncLibrary, libFilter, categorySelect, githubCard, categoriesCard, panelBlog, proseField, panelMedia, slugify, prettyName, goToSlot, signInForm, notEditor, IC, PANELS, Admin, assetsApi, toast, touch, renderAdmin, updateTop, previewDraft, openPanel, F, fieldsFor, actionEditor, mediaThumb, mediaPicker, iconPicker, listEditor, subCard, confirmInline, sortable, card, masterDetail, idOk, panelSite, PALETTES, panelTheme, panelMotion, panelIcons, flowItemSchema, panelFlows, panelModals, panelPages };
