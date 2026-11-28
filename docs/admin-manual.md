@@ -15,6 +15,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 | Tab | Sub-tabs |
 |---|---|
 | **Content** | Pages, Carousels, Blog, Proposals, Import, AI writing, AI archive |
+| **Inbox** | Messages, Form settings |
 | **Design** | Global style, Colours and type, Logo, Animation, Site and titles |
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
@@ -84,9 +85,24 @@ A proposal is a small website made for one client, showing only the services the
 - **Header:** a band with the client's logo, "Prepared for …", the date and **View the full website**; a menu with only the proposal's pages; the language switch. Buttons to pages outside the proposal open the full website in a new tab.
 - **Link and status:** **Copy link**, **Open**, or **Preview with draft** (shows unpublished studio changes). **Live** = the link works; **Off** = the client sees "This proposal is no longer available"; **Archived** = off and moved to the Archived list to reuse later. **Expires on** stops the link the day after that date. **Search engines may list it**: untick to add a noindex tag (links with `#` are rarely listed anyway).
 - **Opens:** how many times the client opened it and when (phone or computer, English or Arabic). Your own opens while signed in are not counted. **Reset count** clears them.
+- **New opens:** when a client opens a proposal, a yellow number appears on **Content** and on the **Proposals** sub-tab, and the list shows "· 2 new". Open that proposal in the studio and the new opens count as seen. The studio checks every two minutes while it's open. (No email alert: that would need a paid or extra email service.)
+- **Version: Live or Frozen.** **Live** (the default) follows the published site: improve a service page, publish, and the proposal shows it. **Freeze this version** keeps a copy of the service pages, pictures, modals and flows the proposal uses, as they are published now, so later site edits don't change what the client agreed to. The badge next to **Version** (and "frozen" in the list) shows which mode each proposal is in. **Update the frozen copy** takes a fresh copy; **Go back to live** follows the site again. The welcome, client details and words stay editable while frozen; colours, fonts and the logo always follow the site. A service ticked after freezing shows live until you update the copy (the studio warns you).
+- **PDF:** **PDF (English)** / **PDF (Arabic)** open a clean white, A4 version with both logos, "Prepared for …", the date, the welcome, a list of the services, each service's picture and text, related work and how to reach Dorma (the email under Site and titles). Press **Save as PDF** and choose *Save as PDF* in the print window. Forms, buttons and animations are left out. The client also gets a **Save as PDF** link in the proposal's header (switch it off under *Languages, notes and copies*). The PDF link is `…/#for/<code>/pdf/en` or `/pdf/ar`.
+- **Request a Quote** on a proposal sends the message to **Inbox**, marked *Proposal* with the client's name and a link back to the proposal.
 - **Languages:** same as the site, English only, Arabic only, or both with a switch, and which language it opens in.
 - **Duplicate for another client** copies the services, texts and work, clears the client and switches the copy off so you can tune it first.
 - Proposals save as soon as you change them (no Publish needed) and are kept in their own database table, never in the public site settings, so nobody can list your clients. The **service pages they show follow the published site**: improve a service page and publish, and every proposal shows the update.
+
+### Inbox (Inbox)
+Messages people send from the site's forms: the **Contact form** section, the **Quote request form** on service pages and catalogs, the **Request a Quote** modal, and Request a Quote on client proposals.
+- **Messages:** unread messages are bold with a yellow dot, and their number shows on the **Inbox** tab. Click a message to read it (it becomes *Read*). **Reply by email** opens your email app with a reply ready (in Arabic if they wrote in Arabic). **Copy**, **Mark unread**, **Archive** (moves it to *Archived*) and **Delete** (for good).
+- **Views and search:** Inbox, Unread, Archived and All; filter by type (Contact, Quote requests, From proposals) and search names, emails, companies and message text. Tick several messages to mark, archive or delete them together.
+- **Export CSV** downloads the messages shown (or the ticked ones) as a spreadsheet file that opens in Excel with Arabic intact.
+- **Form settings:** where messages go: **Studio Inbox** (recommended) or **the visitor's email app** (nothing is saved). The **thank-you message** visitors see after sending, in English and Arabic. **Dorma's email** is used when the Inbox can't be reached and on printable proposals. Publish to apply.
+- **Spam protection** (free, nothing to set up): a hidden field that bots fill in, a minimum of 2.5 seconds to fill the form, and limits of 5 messages per visitor in 10 minutes, 5 per email address an hour and 300 a day for the whole site. The Inbox keeps the newest 5,000 messages.
+- **Privacy:** only signed-in editors can read messages. Visitors can send a message but can never read, list or change any.
+- **Add a contact form:** Pages → Add section → **Contact form** (name, email, phone, company and message). A **Quote request form** can also be switched to a contact message with its **Form** field.
+- **Email alerts are not set up yet.** New messages show in the studio only. A free email alert is possible with a free Resend account; ask for it as a new task.
 
 ### Import (Content → Import)
 - Bring in pages, sections, slides, flows, modals, posts or library names from a Markdown file, with a preview first. **Download template** gives a filled-in example.
@@ -121,7 +137,7 @@ A proposal is a small website made for one client, showing only the services the
 - **Colours and type**: palettes, My colours, background colours, fonts and sizes for titles, subtitles, body, labels, Arabic and handwriting.
 - **Logo**: white, colour and silver logo, your own SVG versions, and the size of the logo in the header, menu, footer and loader.
 - **Animation**: overall speed, easing, title reveal, sections on scroll, number count-up, mouse parallax, button glow, modal opening and closing.
-- **Site and titles**: brand name, footer, home page, header button, quote email, languages (English, Arabic or both) and numbering, the page loader, page titles, and copying or pasting all settings as text (backup files and versions are under Site care).
+- **Site and titles**: brand name, footer, home page, header button, forms and enquiries (where form messages go, the thank-you message and Dorma's email), languages (English, Arabic or both) and numbering, the page loader, page titles, and copying or pasting all settings as text (backup files and versions are under Site care).
 
 ### Library (Library)
 - All pictures, videos, articles and generated scenes, sorted into **categories** (a category is required).
@@ -144,7 +160,7 @@ A proposal is a small website made for one client, showing only the services the
 - **Arabic text**: when the site has Arabic, every section, modal, flow and published post whose texts have no Arabic yet, grouped with the field names. Alt text without Arabic is listed here too.
 - **Pages nobody can reach**: pages not in the menu with no button going to them, and pages with nothing to show.
 - **Large files**: pictures over 1.5 MB that are used on the site.
-- **Settings**: for example a quote form with no quote email.
+- **Settings**: for example forms set to the email app with no email set.
 - **Hidden things**: hidden sections and slides, and blog posts that aren't published.
 - **Unused library items**: pictures and videos not used anywhere.
 - **Outside links**: press **Check outside links** to try every outside web address. A browser can only tell whether the address answers, so open a link to be sure.
@@ -172,7 +188,7 @@ These need a code change or a change in GitHub or Supabase. Ask for them as a ne
 - **The studio itself**: its tabs, fields and layout.
 - **Who can edit**: editor accounts are added in Supabase, not in the studio.
 - **Library files on GitHub**: adding files to the `public/library/` folders, creating a new category folder, and deleting files is done on GitHub (the studio opens the right GitHub page for you). The site redeploys in about two minutes, then press **Check GitHub for new files**. GitHub takes up to 25 MB per file.
-- **Quote requests** open the visitor's email app addressed to your quote email. Nothing is stored on the site, and there is no form inbox.
+- **Email alerts** for new messages or proposal opens: they need an email service (for example a free Resend account) and a small server function. Until then, check the Inbox and Proposals badges in the studio.
 - **Translation**: the studio's **AI** button can draft the Arabic (or the English) for you, but it is a suggestion: read it, fix it, and press **Use this** only when it's right.
 - **The Gemini key and AI limits**: the key is a secret in Supabase (Edge Functions → Secrets), and the daily limit per editor is a Supabase setting (`AI_DAILY_LIMIT`), not a studio field.
 - **The real logo SVG**: upload it under Design → Logo once you have it. Until then the PNG is used, and the loader's **Draw** animation needs an SVG.

@@ -6,11 +6,11 @@
    The list shows each proposal's state and how often the client opened it. */
 import './proposals.css';
 import { h, esc, plain, clone, mediaItem, mediaUrl, mediaNode, fmtDate } from './core';
-import { Store, Proposals, loadProposals, scheduleProposalSave, saveProposal, deleteProposal, proposalOpens, clearProposalOpens } from './store';
+import { Store, Proposals, loadProposals, scheduleProposalSave, saveProposal, deleteProposal, proposalOpens, clearProposalOpens, markOpensSeen, loadBadges } from './store';
 import { Site } from './site';
 import { IC, card, toast, openPanel, F, confirmInline, masterDetail, Admin, libBrowser } from './admin';
 import { SECTION_TYPES } from './data';
-import { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, proposalState, proposalPages, pageSummary } from './proposals';
+import { PR_WORDS, STATUS_NAME, proposalDefaults, normalizeProposal, newCode, codeOk, proposalState, proposalPages, pageSummary, freezeSnapshot, notInFrozen, snapshotBytes } from './proposals';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const VIEW = { show: "active" };
@@ -64,7 +64,8 @@ function drawPanel(body) {
       h("p", { class: "adm-intro", style: "margin:0", text: VIEW.show === "archived" ? "Archived proposals are switched off and kept here to reuse later." : "Make one with New proposal: enter the client's name, pick their logo and tick the services they're interested in." })));
     return;
   }
-  const stateText = r => { const s = proposalState(r, T0), st = Proposals.stats[r.id]; return STATUS_NAME[s] + (st && st.opens ? " · opened " + st.opens + "×" : ""); };
+  const stateText = r => { const s = proposalState(r, T0), st = Proposals.stats[r.id];
+    return STATUS_NAME[s] + (r.data && r.data.frozen ? " · frozen" : "") + (st && st.opens ? " · opened " + st.opens + "×" : "") + (st && st.fresh ? " · " + st.fresh + " new" : ""); };
   masterDetail(body, { items: () => (VIEW.show === "archived" ? Proposals.rows.filter(r => r.status === "archived") : Proposals.rows.filter(r => r.status !== "archived")),
     selKey: "proposal", label: nameOf, kind: stateText, detail: (r, redrawList) => detail(r, redrawList) });
 }
@@ -73,7 +74,9 @@ function drawPanel(body) {
 function detail(r, redrawList) {
   const d = r.data = normalizeProposal(r.data, today());
   const changed = () => { save(r); redrawList(); };
-  return [linkCard(r, changed, redrawList), clientCard(r, d, changed), servicesCard(r, d, changed), wordsCard(d, changed), workCard(d, changed), moreCard(r, d, changed)];
+  const st = Proposals.stats[r.id];
+  if (st && st.fresh) setTimeout(async () => { if (await markOpensSeen(r.id)) { redrawList(); void loadBadges(); } }, 1500); // seen once the editor has looked
+  return [linkCard(r, changed, redrawList), versionCard(r, d, changed), clientCard(r, d, changed), servicesCard(r, d, changed), wordsCard(d, changed), workCard(d, changed), moreCard(r, d, changed)];
 }
 
 function linkCard(r, changed, redrawList) {
@@ -87,6 +90,7 @@ function linkCard(r, changed, redrawList) {
   const stats = h("div", { class: "pr-stats" });
   const drawStats = () => { stats.textContent = ""; const s = Proposals.stats[r.id];
     stats.append(h("span", { text: Proposals.where !== "db" ? "Opens are counted on the online site only." : s && s.opens ? "Opened " + s.opens + (s.opens === 1 ? " time" : " times") + " · last " + when(s.last) : "Not opened yet" }));
+    if (s && s.fresh) stats.append(h("span", { class: "pr-new", text: s.fresh + (s.fresh === 1 ? " new open" : " new opens") + " since you last looked" }));
     if (Proposals.where === "db" && s && s.opens) {
       stats.append(h("button", { class: "btn sm", type: "button", text: "Show opens", onclick: async e => { const b = e.currentTarget; b.disabled = true; const list = await proposalOpens(r.id); const ul = h("ul", { class: "pr-opens" });
         list.forEach(o => ul.append(h("li", {}, h("span", { text: when(o.opened_at) }), h("small", { text: [o.device, o.lang === "ar" ? "Arabic" : o.lang === "en" ? "English" : ""].filter(Boolean).join(" · ") })))); b.replaceWith(ul); } }),
@@ -98,7 +102,8 @@ function linkCard(r, changed, redrawList) {
     h("div", { class: "pr-linkrow" }, link,
       h("button", { class: "btn sm", type: "button", html: IC.copy + "Copy link", onclick: () => copyText(linkOf(r.slug), "Link copied") }),
       h("a", { class: "btn sm", href: "#for/" + r.slug, target: "_blank", rel: "noopener", html: IC.eye + "Open" }),
-      h("button", { class: "btn sm", type: "button", text: "Preview with draft", title: "See it with the studio's unpublished changes", onclick: () => { Site.preview = true; location.hash = "for/" + r.slug; } })),
+      h("button", { class: "btn sm", type: "button", text: "Preview with draft", title: "See it with the studio's unpublished changes", onclick: () => { Site.preview = true; location.hash = "for/" + r.slug; } }),
+      ...pdfLangs(r).map(l => h("a", { class: "btn sm", href: "#for/" + r.slug + "/pdf/" + l, target: "_blank", rel: "noopener", title: "A clean printable version: use Save as PDF in the print window", html: IC.down + (l === "ar" ? "PDF (Arabic)" : "PDF (English)") }))),
     proposalState(r, today()) === "live" ? null : h("p", { class: "pr-warn", text: proposalState(r, today()) === "expired" ? "Expired: the link shows that the proposal isn't available. Clear or move the expiry date to open it again." : "This proposal is off: the client sees a short \"not available\" note. Set it to Live when it's ready." }),
     h("div", { class: "fields" },
       h("div", { class: "field" }, h("label", { for: "pr-code", text: "Link code" }), codeIn, hint),
@@ -106,6 +111,31 @@ function linkCard(r, changed, redrawList) {
       F(r, "expires_on", "date", "Expires on (empty = never)", { hint: "The link stops working the day after this date." }, v => { if (!v) r.expires_on = null; changed(); }),
       F(r, "searchable", "toggle", "Search engines may list it", { hint: "Off adds a noindex tag. Links with # are rarely listed anyway." }, changed)),
     stats);
+}
+
+/** Languages the printable version can be made in (the proposal's languages). */
+function pdfLangs(r) {
+  const d = normalizeProposal(r.data), l = d.langs === "site" ? (Store.draft.site.languages || "en") : d.langs;
+  return l === "both" ? ["en", "ar"] : [l === "ar" ? "ar" : "en"];
+}
+
+/* Live or frozen: live follows the published site; frozen keeps a copy of the service pages, pictures, modals and
+   flows the proposal uses, so later edits to the main site don't change what this client sees. */
+function versionCard(r, d, changed) {
+  const live = Store.live || Store.draft;
+  const freeze = (msg) => { d.frozen = freezeSnapshot(live, d); changed(); toast(msg); openPanel("proposals"); };
+  const fz = d.frozen, missing = notInFrozen(d), kb = Math.round(snapshotBytes(fz) / 1024);
+  const badge = h("span", { class: "pr-mode " + (fz ? "frozen" : "live"), text: fz ? "Frozen · " + when(fz.at) : "Live · follows the published site" });
+  const body = fz
+    ? [h("p", { class: "adm-intro", style: "margin:0", text: "This client sees the service pages, pictures, modals and flows as they were published when you froze it. Edits to the main site don't change it. The welcome, client details and the words on this page can still be changed. Colours, fonts and the logo follow the main site." }),
+       missing.length ? h("p", { class: "pr-warn", text: "Added after freezing, so shown live: " + missing.map(id => { const p = (live.pages || []).find(x => x.id === id); return p ? plain(p.title) || id : id; }).join(", ") + ". Use Update the frozen copy to include it." }) : null,
+       h("p", { class: "hint", text: "Frozen copy: " + fz.pages.length + (fz.pages.length === 1 ? " page" : " pages") + ", " + fz.media.length + " library items, about " + kb + " KB." }),
+       h("div", { class: "pr-actions" },
+         h("button", { class: "btn sm", type: "button", text: "Update the frozen copy", title: "Take a new copy from the published site now", onclick: () => freeze("Frozen copy updated from the published site") }),
+         h("button", { class: "btn sm", type: "button", text: "Go back to live", onclick: e => confirmInline(e.currentTarget.parentNode, "Show the current published pages to this client again?", () => { d.frozen = null; changed(); toast("Back to live: it follows the published site"); openPanel("proposals"); }, "Go live") }))]
+    : [h("p", { class: "adm-intro", style: "margin:0", text: "Live is the default: when you edit and publish a service page, this proposal shows the new version. Freeze it once the client has the proposal, so what they agreed to stays the same." }),
+       h("div", { class: "pr-actions" }, h("button", { class: "btn sm primary", type: "button", text: "Freeze this version", title: "Keep a copy of the published pages this proposal uses", onclick: () => freeze("Frozen. Later edits to the main site won't change this proposal.") }))];
+  return card(h("span", { class: "grow" }, "Version ", badge), ...body);
 }
 
 /** The client's name in English and Arabic side by side ("name" is kept single-language elsewhere in the studio). */
@@ -220,7 +250,7 @@ function workCard(d, changed) {
 
 function moreCard(r, d, changed) {
   const dup = () => {
-    const nd = clone(d); nd.client = { name: { en: "", ar: "" }, logo: "", logoSrc: "", logoBg: d.client.logoBg }; nd.title = { en: "", ar: "" }; nd.date = today(); nd.internal = "";
+    const nd = clone(d); nd.client = { name: { en: "", ar: "" }, logo: "", logoSrc: "", logoBg: d.client.logoBg }; nd.title = { en: "", ar: "" }; nd.date = today(); nd.internal = ""; nd.frozen = null;
     const n = newRow(nd, { searchable: r.searchable }); Proposals.rows.unshift(n); Admin.sel.proposal = n.id; VIEW.show = "active"; void saveProposal(n);
     toast("Copy made, switched off. Enter the new client's name and logo."); openPanel("proposals");
   };
@@ -229,6 +259,7 @@ function moreCard(r, d, changed) {
     h("div", { class: "fields" },
       F(d, "langs", "select", "Languages", { options: [["site", "Same as the site"], ["en", "English only"], ["ar", "Arabic only"], ["both", "English and Arabic (switch in the header)"]] }, changed),
       F(d, "defaultLang", "select", "Language it opens in", { options: [["site", "Same as the site"], ["en", "English"], ["ar", "العربية"]] , hint: "A visitor who already switched language keeps their choice." }, changed),
+      F(d, "pdfLink", "toggle", "“Save as PDF” link in the proposal's header", { hint: "Opens a clean printable version the client can save as a PDF." }, changed),
       F(d, "internal", "area", "Studio notes (never shown to the client)", { wide: true, rows: 2, noAi: true }, changed)),
     h("div", { class: "pr-actions" },
       h("button", { class: "btn sm", type: "button", html: IC.copy + "Duplicate for another client", onclick: dup }),

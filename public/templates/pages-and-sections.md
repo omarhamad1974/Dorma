@@ -21,7 +21,7 @@ Section lines:
 
 - Section: the section type. One of: Hero carousel, Hero, Division, Chapters, Numbers, About, Clients,
   Card grid, Accordion, Timeline, Flow strip, Wide banner, Call to action, Blog posts, Text article,
-  Feature list, Testimonials, Quote request form, Catalog, Photo only, Logo.
+  Feature list, Testimonials, Quote request form, Contact form, Catalog, Photo only, Logo.
 - Hidden: yes adds the section hidden (you can show it later with one tap in Pages).
 - Any text line can have an Arabic twin on its own line: "Title (Arabic): …".
 - Images: a file path (exhibitions/booth-01.jpg), a name as shown in the Library, or an https:// link.
@@ -229,6 +229,12 @@ Quotes:
 Section: Quote request form
 Heading: Request a Quote
 Service: Booth Production
+
+---
+Section: Contact form
+Eyebrow: Contact
+Heading: Send us a message
+Heading (Arabic): أرسل لنا رسالة
 
 ---
 Section: Catalog
