@@ -160,10 +160,11 @@ Messages people send from the site's forms: the **Contact form** section, the **
 
 ### Library (Library)
 - All pictures, videos, articles and generated scenes, sorted into **categories** (a category is required).
+- The Library always opens **newest first** (most recently uploaded, linked or added from Find photos at the top). Other orders (Library order, oldest, name, size, category, duplicates) are in the **Sort** menu for that visit.
 - Per item: name, tags, alt text, focus point, colour overlay, hide from library.
 - **Quick upload** stores files in Supabase. **Picture optimizing** shrinks photos first (resized, saved as WebP, PNG kept for transparent logos). Tick **Keep originals** to skip it once.
 - **Missing images** lists every empty slot, placeholder or broken picture on the site with a **Go there** button.
-- Image pickers show **pictures not used on the site yet** first.
+- Image pickers show **pictures not used on the site yet** first, newest first.
 
 ### Find photos (Library → Find photos)
 Free photos from **Pexels**, **Pixabay** and **Unsplash**, found and added without leaving the studio.

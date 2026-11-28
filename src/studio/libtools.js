@@ -73,7 +73,7 @@ function bytesOf(m,index){
 }
 /** When the item came in: the date the studio stored, else the GitHub file's date. */
 const addedOf=(m,index)=>(m&&m.added)||(m&&m.path&&index&&Array.isArray(index.files)?((index.files.find(x=>x.path===m.path)||{}).modified||""):"");
-const SORTS=[["order","Library order"],["newest","Newest first"],["oldest","Oldest first"],["name","Name A–Z"],["size","Largest first"],["small","Smallest first"],["category","Category"],["dupes","Possible duplicates together"]];
+const SORTS=[["newest","Newest first"],["order","Library order"],["oldest","Oldest first"],["name","Name A–Z"],["size","Largest first"],["small","Smallest first"],["category","Category"],["dupes","Possible duplicates together"]];
 function sortMedia(list,by,{index=null,dupes=null,catLabel=c=>c}={}){
   const pos=new Map(list.map((m,i)=>[m,i])), name=m=>P(m.label).toLowerCase(), size=m=>bytesOf(m,index);
   const cmp={
