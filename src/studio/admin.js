@@ -17,6 +17,8 @@ import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
 import { mountLivePreview } from './livepreview';
 import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager, pageInfo } from './comfort';
+import { aiButton, aiEnabled, panelAI, toText, fromText } from './ai';
+import { DESCRIBE_KEYS } from './aitext';
 
 /* ================= ADMIN STUDIO ================= */
 const IC={
@@ -46,9 +48,9 @@ const IC={
   pv:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><rect x="11" y="10" width="8" height="5" rx="1"/><path d="M8 21h8"/></svg>',
   replay:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>'
 };
-const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
+const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
-const GROUPS=[["content","Content","pages",["pages","carousels","blog","import"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]]];
+const GROUPS=[["content","Content","pages",["pages","carousels","blog","import","ai"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]]];
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -129,7 +131,7 @@ function openPanel(k){
     G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
+  ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged();
 }
 
@@ -141,12 +143,12 @@ const MEDIA_KINDS=new Set(["image","video","scene","article"]);
 function bilingual(obj,key,kind){
   const D=Store.draft; if (!D || D.site.languages==="en" || !D.site.languages) return false;
   if (!["text","area","strings","prose"].includes(kind) || MONO_KEYS.has(key) || Array.isArray(obj)) return false;
-  return !(obj===D.loader || (obj && MEDIA_KINDS.has(obj.kind)));
+  return !(obj===D.loader || obj===D.ai || (obj && MEDIA_KINDS.has(obj.kind)));
 }
 function F(obj,key,kind,label,opts={},onChange=()=>{}){
   if (!opts.lang && bilingual(obj,key,kind)) return biField(obj,key,kind,label,opts,onChange);
   if (!opts.lang && isTx(obj[key])){ // English-only site: edit the English text and keep any Arabic already written
-    const v=obj[key], tmp={x:v.en??""}; return F(tmp,"x",kind,label,{...opts,lang:"en"},(nv)=>{ obj[key]=blankTx(v.ar)?nv:{en:nv,ar:v.ar}; onChange(obj[key],key); });
+    const v=obj[key], tmp={x:v.en??""}; return withAi(F(tmp,"x",kind,label,{...opts,lang:"en",noAi:true},(nv)=>{ obj[key]=blankTx(v.ar)?nv:{en:nv,ar:v.ar}; onChange(obj[key],key); }),obj,key,kind,label,opts,onChange,["en"]);
   }
   const D=Store.draft, wrap=h("div",{class:"field"+(opts.wide?" wide":"")}), id=uid("f");
   const lab=h("label",{for:id,text:label}); wrap.append(lab);
@@ -227,6 +229,31 @@ function F(obj,key,kind,label,opts={},onChange=()=>{}){
       s.addEventListener("change",()=>set(s.value)); wrap.append(s); break; }
   }
   if (opts.hint) wrap.append(h("span",{class:"hint",text:opts.hint}));
+  if (!opts.lang) withAi(wrap,obj,key,kind,label,opts,onChange,[(Store.draft&&Store.draft.site.languages)==="ar"?"ar":"en"]);
+  return wrap;
+}
+/* ---------- Write with AI (ai.js): a small AI button in the corner of text boxes ----------
+   It reads and writes the setting itself, then redraws the field, so the box shows the text that was used. */
+const AI_KINDS=new Set(["text","area","prose","strings"]);
+function aiAllowed(obj,key,kind,opts){
+  const D=Store.draft; if (!D || !aiEnabled() || opts.noAi || !AI_KINDS.has(kind) || MONO_KEYS.has(key) || !obj || Array.isArray(obj)) return false;
+  if (obj===D.loader || obj===D.ai) return false;
+  return !(MEDIA_KINDS.has(obj.kind) && !DESCRIBE_KEYS.includes(key));
+}
+function withAi(wrap,obj,key,kind,label,opts,onChange,langs){
+  if (!aiAllowed(obj,key,kind,opts)) return wrap;
+  const get=()=>{ const v=obj[key]; return isTx(v)?{en:toText(v.en,kind),ar:toText(v.ar,kind)}:{[langs[0]]:toText(v,kind)}; };
+  const set=val=>{
+    const v=obj[key], two=langs.length>1;
+    if (two||isTx(v)){ const cur=isTx(v)?v:{en:v??(kind==="strings"?[]:""),ar:kind==="strings"?[]:""}, nx={en:cur.en,ar:cur.ar};
+      Object.keys(val).forEach(l=>{ nx[l]=fromText(val[l],kind); });
+      obj[key]=!two&&blankTx(nx.ar)?nx.en:nx; }
+    else obj[key]=fromText(val[langs[0]]??"",kind);
+    const nw=F(obj,key,kind,label,opts,onChange); wrap.replaceWith(nw); onChange(obj[key],key); touch();
+  };
+  const image=()=>obj.kind==="image"?mediaUrl(obj)||null:null;
+  wrap.classList.add("has-ai");
+  wrap.append(aiButton({label,group:opts.groupLabel||"",kind,key,langs,get,set,image,root:wrap}));
   return wrap;
 }
 const blankTx=x=>x==null||x===""||(Array.isArray(x)&&!x.length);
@@ -271,7 +298,8 @@ function biField(obj,key,kind,label,opts,onChange){
     const f=F(tmp,"x",kind,l==="en"?"English":"العربية",{...opts,wide:false,hint:l==="en"?opts.hint:"",lang:l,groupLabel:label},nv=>{ cur[l]=nv; obj[key]={en:cur.en,ar:cur.ar}; onChange(obj[key],key); });
     f.classList.add("bi-"+l); if (l==="ar") $$("input,textarea",f).forEach(i=>{ i.dir="rtl"; i.lang="ar"; });
     row.append(f); });
-  wrap.append(row); return wrap;
+  wrap.append(row);
+  return withAi(wrap,obj,key,kind,label,opts,onChange,["en","ar"]);
 }
 function fieldsFor(obj,schema,onChange){ const g=h("div",{class:"fields"}); schema.forEach(([k,kind,l,o])=>g.append(F(obj,k,kind,l,o||{},onChange))); return g; }
 function actionEditor(a,onChange){

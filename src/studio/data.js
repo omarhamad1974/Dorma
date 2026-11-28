@@ -23,6 +23,19 @@ const STARTER = {
     logoHeight: 34,
     logos: JSON.parse(JSON.stringify(LOGO_DEFAULTS))   // Design → Logo: versions (white, colour, silver, added SVGs) and where each is used
   },
+  /* Studio → Content → AI writing: the "Write with AI" buttons (Gemini through the ai-write edge function).
+     The notes are sent with every request so the AI writes in Dorma's voice and only uses real facts. */
+  ai: {
+    enabled: true,
+    model: "flash",
+    brand: "Dorma Advertising, established in 2000. Two divisions under one roof:\n" +
+      "- Agency: Creative & Design; Photography, Video & Music; Digital Marketing & Social Media; Websites & Mobile Apps; Event & Activation Logistics.\n" +
+      "- Printing & Production: Printing & Finishing; Giveaways & Branded Merchandise; Packaging; Signage & Displays; In-Store Branding; Booth Production; Custom Fabrication; Event & Activation Accessories.\n" +
+      "Dorma brings agency services and in-house print and production together, from concept and design to manufacturing, delivery, and setup.\n" +
+      "Voice: clear, practical and confident. Explain what Dorma does and how it helps the client. Speak to the client as \"you\".",
+    arabic: "Write Dorma as دورما. Use the same service names as the Arabic site.",
+    avoid: "world-class, cutting-edge, best-in-class, unleash, elevate, synergy, one-stop shop",
+  },
   loader: { enabled: true, mark: "image", image: "", bg: "theme", text: "DORMA", sub: "ADVERTISING", logo: "", style: "reveal", exit: "wipe", minTime: 1.2 },
   theme: {
     ink: "#040915", panel: "#0b1630", fg: "#eef2fa", accent: "#ffc93c",
@@ -359,7 +372,7 @@ function mediaSlots(cfg,{all=false}={}){
    Starts from the image slots above (named places), then sweeps the rest of the site settings for any field that holds a
    library id (menu logo, loader, backgrounds…) and for [[id|caption]] written in text, so nothing that shows a picture is missed.
    Returns Map id → list of places (words). Hidden sections and draft posts count as used: the picture is still assigned there. */
-const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type" };
+const USE_TOP={ site:"Site and titles", theme:"Colours and type", motion:"Animation", style:"Global style", loader:"Loader", colorMode:"Colours and type", ai:"AI writing" };
 function mediaUsage(cfg){
   const ids=new Set((cfg.media||[]).map(m=>m&&m.id).filter(Boolean)), use=new Map(), seen=new WeakMap();
   const P=v=>v&&typeof v==="object"?(v.en||v.ar||""):String(v??"");
