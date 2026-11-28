@@ -1,0 +1,55 @@
+name: Keep Supabase awake
+
+# The free Supabase plan pauses a project after about a week with no database activity, which takes the site's
+# content and the studio offline until someone restores it in the dashboard. This job calls the database once a day
+# (the keep_alive function from supabase/migrations/0006_backups_keepalive.sql) so that never happens, and also checks
+# that the live site answers. The studio shows the last ping under Site care → Health check.
+#
+# Uses only the public site key (the same one the website uses), no secrets. If a run fails, GitHub emails the
+# repository owner. GitHub turns scheduled jobs off after 60 days without changes to the repository: if the studio
+# says pings have stopped, open Actions → Keep Supabase awake and press "Enable workflow".
+
+on:
+  schedule:
+    - cron: '23 5 * * *'   # every day at 05:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Public values; repository variables override them like in pages.yml (defaults match src/config.ts).
+      SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://uhytsroauemdkuanwdoh.supabase.co' }}
+      SUPABASE_KEY: ${{ vars.SUPABASE_ANON_KEY || 'sb_publishable_16UMrxNPt2ZofQxJ0Z-zvw_7pdzdwWs' }}
+      SITE_URL: https://omarhamad1974.github.io/Dorma/
+    steps:
+      - name: Check the live site
+        id: site
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 --retry 2 "$SITE_URL" || echo 000)
+          echo "Site answered $code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Ping the database
+        run: |
+          body=$(printf '{"p_source":"github","p_note":"site %s"}' "${{ steps.site.outputs.code }}")
+          for i in 1 2 3; do
+            code=$(curl -s -o reply.txt -w '%{http_code}' --max-time 30 -X POST "$SUPABASE_URL/rest/v1/rpc/keep_alive" \
+              -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d "$body" || echo 000)
+            echo "Database answered $code: $(head -c 200 reply.txt)"
+            if [ "$code" = "200" ]; then exit 0; fi
+            # Before the 0006 migration is live the function doesn't exist (404); reading the live site is still activity.
+            if [ "$code" = "404" ]; then
+              curl -sf --max-time 30 "$SUPABASE_URL/rest/v1/site_config?id=eq.live&select=updated_at" -H "apikey: $SUPABASE_KEY" && exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Supabase did not answer. If the project is paused, restore it at https://supabase.com/dashboard/project/uhytsroauemdkuanwdoh"
+          exit 1
+      - name: Report the site
+        if: steps.site.outputs.code != '200'
+        run: |
+          echo "::warning::The live site answered ${{ steps.site.outputs.code }} instead of 200."

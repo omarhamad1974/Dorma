@@ -7,8 +7,8 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 - Every change saves to the **draft** on its own ("Draft saved" at the top).
 - **Preview draft** shows the draft site. Visitors do not see it.
 - **Publish** makes the draft live. Visitors see it right away.
-- Made a mistake after publishing? **Design → Site and titles → Published versions** keeps the last 30. Press **Put in draft** on an older one, check it, then Publish.
-- **Design → Site and titles → Backup** copies all settings as text, and can paste a backup back in.
+- Made a mistake after publishing? **Site care → Backups** keeps every publish (the last 30 by default). Press **Put in draft** on an older one, check it, then Publish. A safety copy of your current draft is saved first.
+- **Site care → Backups → Download backup** saves everything (draft, live site, Social plan, proposals) as one file on your computer. Do it every month and before big changes.
 
 ## Where things are
 
@@ -19,6 +19,7 @@ The studio is at **/#admin** on the site (for example `https://omarhamad1974.git
 | **Flows and modals** | Flows, Modals, Icons |
 | **Library** | Library, Missing images |
 | **Social** | Create posts, Calendar, Social settings |
+| **Site care** | Health check, Backups |
 
 Most settings follow a simple chain: **Global style → the item → one slide or one item**. Leave a field empty (or set it to *Global*) to follow the level above. Pick *Custom* to give one thing its own look.
 
@@ -28,7 +29,7 @@ Every "pick a type" choice (section type, ＋ New, background effect, animation,
 
 Next to the sub-tab names (Pages, Carousels…) there is a small toolbar. It only changes how the studio looks for you, in this browser. Visitors never see it, and the public site is not affected.
 
-- **Groups fold open and closed.** Every box with a title (Page, Sections, Look, Animation…) is a group. Tap its title or the arrow to close or open it. The studio remembers each choice on this browser. Groups most people seldom use (for example *Header on this page*, *Look*, *More button*, *Backup*, *Published versions*, *Import…*) start closed.
+- **Groups fold open and closed.** Every box with a title (Page, Sections, Look, Animation…) is a group. Tap its title or the arrow to close or open it. The studio remembers each choice on this browser. Groups most people seldom use (for example *Header on this page*, *Look*, *More button*, *Backup*, *Import…*) start closed.
 - **Open all / Close all** open or close every group on the tab (Close all also closes open items such as sections and slides).
 - **Find** (or press **/**) lists the groups on the tab so you can jump to one, and searches setting names, items and groups as you type. Pick a result and the studio opens its group, scrolls to it and makes it blink once. Closed items (a section or slide you have not opened yet) are found by their name.
 - **Text size:** **A−** and **A+** make all studio text smaller or bigger, from 90% up to 200%. Tap **Aa** to pick a size from the list. It is saved on this browser only.
@@ -120,7 +121,7 @@ A proposal is a small website made for one client, showing only the services the
 - **Colours and type**: palettes, My colours, background colours, fonts and sizes for titles, subtitles, body, labels, Arabic and handwriting.
 - **Logo**: white, colour and silver logo, your own SVG versions, and the size of the logo in the header, menu, footer and loader.
 - **Animation**: overall speed, easing, title reveal, sections on scroll, number count-up, mouse parallax, button glow, modal opening and closing.
-- **Site and titles**: brand name, footer, home page, header button, quote email, languages (English, Arabic or both) and numbering, the page loader, page titles, published versions and backup.
+- **Site and titles**: brand name, footer, home page, header button, quote email, languages (English, Arabic or both) and numbering, the page loader, page titles, and copying or pasting all settings as text (backup files and versions are under Site care).
 
 ### Library (Library)
 - All pictures, videos, articles and generated scenes, sorted into **categories** (a category is required).
@@ -134,6 +135,32 @@ A proposal is a small website made for one client, showing only the services the
 - **Calendar**: your posting plan. **Fill empty rhythm days** adds suggestions from the site, or **Suggest a post**. Mark each post drafted, scheduled or posted, and add the link to the live post.
 - **Social settings**: platforms on or off, tone and template per platform, call to action, hashtags, carousel slides, the weekly rhythm, and the site address that posts link back to (change it when the site gets its own domain). Optional tracking on links.
 - The plan is saved in the studio database for editors only. It is never published on the site.
+
+### Site care (Site care)
+**Health check** lists what needs attention on the site, checked in the draft. The tiles at the top count **Broken** (visitors hit a problem), **To fix** and **Good to know**; tap a tile to see only that level. Each row says where the problem is, and **Fix it** opens that page, section, carousel, modal, flow, blog post or library item. **Ignore** hides a row you're happy with (it stays hidden, and **Show ignored** brings it back). The checks:
+- **Broken links and buttons**: buttons that go to a page, modal, blog post or article that was removed, a section label that isn't there any more, an unpublished blog post, an empty or wrong web address, and flows that were deleted.
+- **Missing pictures**: pictures removed from the library, and how many places have no picture or a placeholder (opens Missing images).
+- **Alt text**: pictures used on the site with no description.
+- **Arabic text**: when the site has Arabic, every section, modal, flow and published post whose texts have no Arabic yet, grouped with the field names. Alt text without Arabic is listed here too.
+- **Pages nobody can reach**: pages not in the menu with no button going to them, and pages with nothing to show.
+- **Large files**: pictures over 1.5 MB that are used on the site.
+- **Settings**: for example a quote form with no quote email.
+- **Hidden things**: hidden sections and slides, and blog posts that aren't published.
+- **Unused library items**: pictures and videos not used anywhere.
+- **Outside links**: press **Check outside links** to try every outside web address. A browser can only tell whether the address answers, so open a link to be sure.
+
+Hidden sections and draft posts are left out of the other checks.
+
+At the top, **Site connection and backups** shows:
+- **Keep-alive**: the free Supabase plan pauses a project after about a week without use. A GitHub job pings the database every day at 05:23 UTC and checks that the site answers. *Awake* means the last ping came in the last two days. If pings stop, press **Open on GitHub**: GitHub turns scheduled jobs off after 60 days without changes to the repository, and **Enable workflow** there turns it back on. **Ping now** wakes it by hand.
+- **Database size**: how much of the free 500 MB is used, and how much the saved versions take (about 75 KB each).
+- **Backup file**: when a backup file was last downloaded on this computer.
+
+**Backups**
+- **Download backup**: one file with the draft, the live site, the Social plan and the client proposals. Pictures and videos are not in the file; they stay in the Library and the file keeps their names.
+- **Bring back from a file**: choose a backup file (or a downloaded version). The studio shows what's in it, then **Put it in the draft** replaces the draft, after saving a safety copy of the current draft. You can also replace the Social plan, and add back proposals that were deleted (existing proposals are never changed). Check with Preview draft, then Publish.
+- **Version history**: every Publish, every **Save a snapshot now** (give it a name, for example *Before the new home page*) and every safety copy. For each version: a name, **Pin** (a pinned version is never removed), **Compare with the draft** (what changed since), **Download**, **Put in draft** and **Delete**. The version visitors see now can't be deleted.
+- **Versions to keep**: 5 to 100 (30 by default). Older unpinned versions are removed when a new one is saved.
 
 ---
 
@@ -149,7 +176,7 @@ These need a code change or a change in GitHub or Supabase. Ask for them as a ne
 - **Translation**: the studio's **AI** button can draft the Arabic (or the English) for you, but it is a suggestion: read it, fix it, and press **Use this** only when it's right.
 - **The Gemini key and AI limits**: the key is a secret in Supabase (Edge Functions → Secrets), and the daily limit per editor is a Supabase setting (`AI_DAILY_LIMIT`), not a studio field.
 - **The real logo SVG**: upload it under Design → Logo once you have it. Until then the PNG is used, and the loader's **Draw** animation needs an SVG.
-- **Hosting, domain and Supabase plan**: the site runs on GitHub Pages and the free Supabase plan. Supabase pauses after about a week with no use; it needs waking up in the Supabase dashboard.
+- **Hosting, domain and Supabase plan**: the site runs on GitHub Pages and the free Supabase plan. The daily keep-alive stops Supabase from pausing; if it ever does pause (for example the GitHub job was off for a week), restore it in the Supabase dashboard.
 - **Posting to social media**: the Social tab writes posts and pictures for you, but it does not post them. You copy the text, save the picture and post it yourself on LinkedIn, Facebook or Instagram.
 
 ---

@@ -144,18 +144,75 @@ export async function publishDraft(): Promise<boolean> {
 
 export const draftDiffers = (): boolean => JSON.stringify(Store.draft) !== JSON.stringify(Store.live);
 
-/* ---------- published versions ---------- */
-export interface Version { id: number; published_at: string }
+/* ---------- published versions and backups (studio → Site care → Backups) ----------
+   site_versions holds every publish, hand-saved snapshots and the automatic "before restore / import" copies
+   (migration 0006). Until 0006 is applied, the older columns still work: the list falls back to id and date. */
+export interface Version { id: number; published_at: string; kind?: 'publish' | 'snapshot' | 'auto'; label?: string; pinned?: boolean; bytes?: number; mine?: boolean }
 export async function listVersions(): Promise<Version[]> {
   if (Store.mode !== 'db') return [];
-  const { data } = await db().from('site_versions').select('id, published_at').order('id', { ascending: false }).limit(30);
-  return (data as Version[]) || [];
+  const full = await db().rpc('version_list');
+  if (!full.error) return (full.data as Version[]) || [];
+  const { data } = await db().from('site_versions').select('id, published_at').order('id', { ascending: false }).limit(100);
+  return ((data as Version[]) || []).map((v) => ({ ...v, kind: 'publish' as const }));
 }
-/** Puts an earlier published version into the draft, so it can be checked and published again. */
-export async function restoreVersion(id: number): Promise<boolean> {
+/** The full settings of one version (for restoring, downloading or comparing). */
+export async function versionConfig(id: number): Promise<Config | null> {
+  if (Store.mode !== 'db') return null;
   const { data, error } = await db().from('site_versions').select('config').eq('id', id).maybeSingle();
-  if (error || !data) return false;
-  Store.draft = normalize(data.config); scheduleSave(); return true;
+  return error || !data ? null : data.config;
+}
+/** Saves the current draft as a version without publishing it. kind 'auto' marks the safety copy made before a restore. */
+export async function saveSnapshot(label: string, kind: 'snapshot' | 'auto' = 'snapshot'): Promise<boolean> {
+  if (Store.mode !== 'db') return false;
+  await saveDraft();
+  if (Store.status === 'error') return false;
+  const { error } = await db().rpc('save_snapshot', { p_label: label.slice(0, 120), p_kind: kind });
+  return !error;
+}
+export async function updateVersion(id: number, label: string, pinned: boolean): Promise<boolean> {
+  const { error } = await db().rpc('update_version', { p_id: id, p_label: label.slice(0, 120), p_pinned: pinned });
+  return !error;
+}
+export async function deleteVersion(id: number): Promise<boolean> {
+  const { data, error } = await db().rpc('delete_version', { p_id: id });
+  return !error && data === true;
+}
+/** Puts an earlier version (or imported settings) into the draft, keeping a copy of the current draft first. */
+export async function replaceDraft(config: Config, safetyLabel: string): Promise<boolean> {
+  if (Store.mode === 'db') { const ok = await saveSnapshot(safetyLabel, 'auto'); if (!ok) return false; }
+  else LS.set('dorma.draftBefore', Store.draft);
+  Store.draft = normalize(config); await saveDraft();
+  return Store.status !== 'error';
+}
+export async function restoreVersion(id: number): Promise<boolean> {
+  const c = await versionConfig(id);
+  return c ? replaceDraft(c, 'Before restoring version ' + id) : false;
+}
+/** Database size in bytes (Supabase free plan: 500 MB), or 0 when unknown. */
+export async function databaseSize(): Promise<number> {
+  if (Store.mode !== 'db') return 0;
+  const { data, error } = await db().rpc('database_size');
+  return error ? 0 : Number(data) || 0;
+}
+
+/* ---------- keep-alive (studio → Site care → Health check) ----------
+   A GitHub Actions job pings keep_alive() every day so the free Supabase project never pauses from being idle. */
+export interface Ping { at: string; source: string; note: string }
+export async function keepAliveLog(): Promise<{ ok: boolean; rows: Ping[] }> {
+  if (Store.mode !== 'db') return { ok: false, rows: [] };
+  const { data, error } = await db().rpc('keepalive_status');
+  return { ok: !error, rows: (data as Ping[]) || [] };
+}
+export async function pingNow(): Promise<boolean> {
+  if (Store.mode !== 'db') return false;
+  const { error } = await db().rpc('keep_alive', { p_source: 'studio', p_note: 'Ping from the studio' });
+  return !error;
+}
+
+/** Editors-only data that is not part of the site settings, for the backup file. */
+export async function backupExtras(): Promise<{ social: Config; proposals: ProposalRow[] }> {
+  const [social, proposals] = await Promise.all([loadSocial().catch(() => null), loadProposals(true).catch(() => [])]);
+  return { social: social ? clone(social) : null, proposals: clone(proposals || []) };
 }
 
 /* ---------- social plan (studio → Social) ----------
