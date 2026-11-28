@@ -11,3 +11,7 @@ enabled = false
 # so the gateway's older JWT check is off (it doesn't understand the new publishable keys).
 [functions.ai-write]
 verify_jwt = false
+
+# Studio Library → Find photos (free stock photos). Same sign-in check as ai-write.
+[functions.stock-search]
+verify_jwt = false

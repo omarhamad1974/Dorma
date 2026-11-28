@@ -1,0 +1,54 @@
+/* ================= STUDIO › LIBRARY › FIND PHOTOS (stock.js) ================= */
+.sk-form{display:flex;flex-direction:column;gap:10px}
+.sk-lab{font-weight:500;font-size:.9rem}
+.sk-form input[type=text],.sk-form select{padding:8px 10px;border-radius:8px;border:1px solid var(--faint);background:var(--field-bg);color:var(--fg);font:inherit;font-size:.88rem;min-width:0}
+.sk-form > input[type=text]{width:100%}
+.sk-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sk-row .btn svg{width:15px;height:15px;stroke:currentColor;fill:none}
+.sk-small{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sk-provs{display:flex;gap:6px;flex-wrap:wrap}
+.sk-prov-t{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;border:1px solid var(--faint);background:var(--glass);font-size:.82rem;cursor:pointer}
+.sk-prov-t input{width:auto;margin:0}
+.sk-prov-t.off{opacity:.5;cursor:not-allowed}
+.sk-chips{display:flex;gap:6px;flex-wrap:wrap}
+.sk-chip{padding:4px 10px;border-radius:999px;border:1px solid var(--faint);font-size:.76rem;color:var(--muted)}
+.sk-chip.on{border-color:color-mix(in srgb,#3ecf8e 60%,var(--faint));color:var(--fg);background:color-mix(in srgb,#3ecf8e 12%,transparent)}
+.sk-keys{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+
+.sk-results{display:flex;flex-direction:column;gap:14px;scroll-margin-top:300px}
+.sk-results:empty{display:none}
+.sk-head{display:flex;flex-direction:column;gap:8px}
+.sk-q{margin:0;font-size:.95rem}
+.sk-alts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sk-undo{margin:0;font-size:.84rem}
+.sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.sk-tile{margin:0;display:flex;flex-direction:column;border:1px solid var(--faint);border-radius:10px;overflow:hidden;background:var(--panel)}
+.sk-tile.added{border-color:color-mix(in srgb,#3ecf8e 60%,var(--faint))}
+.sk-img{position:relative;display:block;padding:0;border:0;background:var(--ink);cursor:zoom-in;aspect-ratio:4/3;overflow:hidden}
+.sk-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+.sk-img:hover img,.sk-img:focus-visible img{transform:scale(1.04)}
+.sk-badge{position:absolute;left:8px;top:8px;padding:2px 8px;border-radius:999px;background:rgba(4,6,12,.7);color:#fff;font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase}
+.sk-tile figcaption{display:flex;flex-direction:column;gap:8px;padding:8px 10px 10px}
+.sk-tile small{color:var(--muted);font-size:.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sk-acts{display:flex;gap:6px}
+.sk-acts .btn{flex:1;justify-content:center}
+
+.sk-back{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:16px;background:rgba(4,6,12,.75);backdrop-filter:blur(3px)}
+.sk-pv{width:min(1100px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;border:1px solid var(--faint);border-radius:12px;background:var(--panel);color:var(--fg);overflow:hidden;box-shadow:0 40px 120px -20px rgba(0,0,0,.8)}
+.sk-pv-img{position:relative;flex:1;min-height:0;display:grid;place-items:center;background:var(--ink)}
+.sk-pv-img img{max-width:100%;max-height:calc(100dvh - 210px);object-fit:contain;display:block}
+.sk-nav{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(4,6,12,.55);color:#fff;font-size:1.6rem;line-height:1;cursor:pointer}
+.sk-nav:disabled{opacity:.25;cursor:default}
+.sk-nav.prev{left:12px}.sk-nav.next{right:12px}
+.sk-pv-info{display:flex;gap:16px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;padding:14px 16px}
+.sk-pv-text{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 320px}
+.sk-pv-text p{margin:0;font-size:.86rem;overflow-wrap:anywhere}
+.sk-pv-text a{color:var(--accent)}
+@media (max-width:700px){
+  .sk-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .sk-back{padding:0}
+  .sk-pv{max-height:100dvh;height:100%;border-radius:0}
+  .sk-pv-img img{max-height:calc(100dvh - 260px)}
+  .sk-pv-info .ai-btns{width:100%}
+  .sk-pv-info .ai-btns .btn{flex:1;justify-content:center}
+}
