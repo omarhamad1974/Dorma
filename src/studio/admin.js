@@ -16,6 +16,7 @@ import { previewImage, previewSection, previewModal } from './motionfx';
 import { panelSocial, panelSocialCal, panelSocialSet } from './socialpanel';
 import { typePicker, kindOf, registerLists } from './typepick';
 import { panelOutline, OIC } from './outline';
+import { panelConnections } from './connpanel';
 import { mountLivePreview } from './livepreview';
 import { applyStudioText, comfortTools, mountComfort, closePop, revealEl, pager, pageInfo } from './comfort';
 import { aiButton, aiEnabled, panelAI, panelArchive, toText, fromText } from './ai';
@@ -57,8 +58,8 @@ const IC={
 const PANELS=[["style","Global style"],["site","Site and titles"],["theme","Colours and type"],["logo","Logo"],["motion","Animation"],["media","Library"],["missing","Missing images"],["icons","Icons"],["flows","Flows"],["modals","Modals"],["pages","Pages"],["carousels","Carousels"],["blog","Blog"],["import","Import"],["ai","AI writing"],["aiArchive","AI archive"],["proposals","Proposals"],["social","Create posts"],["socialCal","Calendar"],["socialSet","Social settings"],["health","Health check"],["backups","Backups"],["inbox","Messages"],["inboxSet","Form settings"]];
 /* Four main tabs; each holds related sub-tabs. The studio remembers the last sub-tab of each group. */
 const GROUPS=[["content","Content","pages",["pages","carousels","blog","proposals","import","ai","aiArchive"]],["inbox","Inbox","inbox",["inbox","inboxSet"]],["design","Design","theme",["style","theme","logo","motion","site"]],["blocks","Flows and modals","flows",["flows","modals","icons"]],["media","Library","media",["media","missing"]],["social","Social","social",["social","socialCal","socialSet"]],["care","Site care","care",["health","backups"]]];
-/* Outline: the whole site as a tree of pages and sections (src/studio/outline.js). First in the sidebar, and a button just before Live preview. */
-PANELS.push(["outline","Site outline"]); GROUPS.unshift(["outline","Outline","outline",["outline"]]); IC.outline=OIC.outline;
+/* Outline: the whole site as a tree of pages and sections (src/studio/outline.js), and Connections: what opens what (connpanel.js). First in the sidebar, and a button just before Live preview. */
+PANELS.push(["outline","Site outline"],["connections","Connections"]); GROUPS.unshift(["outline","Outline","outline",["outline","connections"]]); IC.outline=OIC.outline;
 const groupOf=k=>GROUPS.find(g=>g[3].includes(k))||GROUPS[0];
 const lastSub={};
 /* Studio light or dark mode: a per-person preference kept in this browser; until one is chosen it follows the device. */
@@ -141,7 +142,7 @@ function openPanel(k){
     G[3].forEach(s=>tabs.append(h("button",{type:"button",role:"tab","data-k":s,"aria-selected":s===k?"true":"false",class:s===k?"on":"",text:(PANELS.find(p=>p[0]===s)||[])[1],onclick:()=>openPanel(s)})));
     sub.append(comfortTools({body:()=>$("#admBody"),panel:()=>Admin.panel})); }
   const body=$("#admBody"); if (!body) return; body.textContent=""; body.className="adm-body p-"+k; disposePage();
-  if (k==="outline"){ panelOutline(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges(); return; }
+  if (k==="outline"||k==="connections"){ (k==="outline"?panelOutline:panelConnections)(body); updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges(); return; }
   ({style:panelStyle,logo:panelLogo,site:panelSite,theme:panelTheme,motion:panelMotion,media:panelMedia,missing:panelMissing,icons:panelIcons,flows:panelFlows,modals:panelModals,pages:panelPages,carousels:panelCarousels,blog:panelBlog,import:panelImport,ai:panelAI,aiArchive:panelArchive,proposals:panelProposals,social:panelSocial,socialCal:panelSocialCal,socialSet:panelSocialSet,health:panelHealth,backups:panelBackups,inbox:panelInbox,inboxSet:b=>panelInboxSettings(b,formsCard)})[k](body);
   updateTop(); scrollTo(0,0); if (LP) LP.panelChanged(); drawBadges();
 }
